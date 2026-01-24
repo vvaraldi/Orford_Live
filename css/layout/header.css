@@ -69,9 +69,10 @@
 .nav__link.is-active,
 .nav__link--active {
   color: var(--color-white);
-  background-color: rgba(255, 255, 255, 0.25);
+  background-color: rgba(255, 255, 255, 0.35);
   font-weight: var(--font-semibold);
   cursor: default;
+  border: 1px solid rgba(255, 255, 255, 0.5);
 }
 
 .nav__link--icon {
