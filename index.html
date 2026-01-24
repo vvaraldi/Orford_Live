@@ -1,0 +1,335 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Orford Live - Portail de gestion de la patrouille Mont Orford">
+  <meta name="theme-color" content="#1b4b72">
+  <title>Orford Live - Portail</title>
+  
+  <!-- Favicon -->
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏔️</text></svg>">
+  
+  <!-- CSS -->
+  <link rel="stylesheet" href="css/main.css">
+</head>
+<body data-theme="light" data-module="portal">
+  <!-- Skip Link for Accessibility -->
+  <a href="#main-content" class="skip-link">Aller au contenu principal</a>
+
+  <!-- Header -->
+  <header class="header">
+    <a href="index.html" class="logo">
+      <span class="logo__icon">🏔️</span>
+      <span class="logo__text">Orford Live</span>
+    </a>
+
+    <!-- Desktop Navigation -->
+    <nav class="nav">
+      <a href="index.html" class="nav__link is-active">
+        <span>🏠</span>
+        <span>Accueil</span>
+      </a>
+      <a href="pages/user-profile.html" class="nav__link">
+        <span>👤</span>
+        <span>Mon profil</span>
+      </a>
+      <a href="pages/user-management.html" class="nav__link" data-require-admin style="display: none;">
+        <span>⚙️</span>
+        <span>Gestion</span>
+      </a>
+      
+      <div class="nav__divider"></div>
+      
+      <!-- Theme Toggle -->
+      <button class="theme-toggle" onclick="window.themeManager.toggle()" aria-label="Changer le thème" title="Changer le thème">
+        <svg class="theme-toggle__icon theme-toggle__icon--moon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
+        </svg>
+        <svg class="theme-toggle__icon theme-toggle__icon--sun" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display: none;">
+          <circle cx="12" cy="12" r="5"></circle>
+          <line x1="12" y1="1" x2="12" y2="3"></line>
+          <line x1="12" y1="21" x2="12" y2="23"></line>
+          <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+          <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+          <line x1="1" y1="12" x2="3" y2="12"></line>
+          <line x1="21" y1="12" x2="23" y2="12"></line>
+          <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
+          <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+        </svg>
+      </button>
+
+      <!-- User Menu -->
+      <div class="user-menu">
+        <button class="user-menu__trigger">
+          <span class="user-menu__avatar" data-user-initials>--</span>
+          <span class="user-menu__name" data-user-name>Chargement...</span>
+        </button>
+        <div class="user-menu__dropdown">
+          <div class="user-menu__header">
+            <div class="user-menu__header-name" data-user-name>-</div>
+            <div class="user-menu__header-email" data-user-email>-</div>
+          </div>
+          <a href="pages/user-profile.html" class="user-menu__item">
+            <span>👤</span>
+            <span>Mon profil</span>
+          </a>
+          <a href="pages/user-management.html" class="user-menu__item" data-require-admin style="display: none;">
+            <span>⚙️</span>
+            <span>Gestion des utilisateurs</span>
+          </a>
+          <div class="user-menu__divider"></div>
+          <button class="user-menu__item user-menu__item--danger" onclick="handleLogout()">
+            <span>🚪</span>
+            <span>Déconnexion</span>
+          </button>
+        </div>
+      </div>
+    </nav>
+
+    <!-- Mobile Menu Button -->
+    <button class="mobile-menu-btn" id="mobile-menu-btn" aria-label="Menu">
+      <svg class="mobile-menu-btn__icon" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <line x1="3" y1="12" x2="21" y2="12"></line>
+        <line x1="3" y1="6" x2="21" y2="6"></line>
+        <line x1="3" y1="18" x2="21" y2="18"></line>
+      </svg>
+    </button>
+  </header>
+
+  <!-- Mobile Navigation -->
+  <div class="mobile-nav__backdrop" id="mobile-nav-backdrop"></div>
+  <nav class="mobile-nav" id="mobile-nav">
+    <div class="mobile-nav__header">
+      <a href="index.html" class="mobile-nav__logo">
+        <span>🏔️</span>
+        <span>Orford Live</span>
+      </a>
+      <button class="mobile-nav__close" id="mobile-nav-close" aria-label="Fermer">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <line x1="18" y1="6" x2="6" y2="18"></line>
+          <line x1="6" y1="6" x2="18" y2="18"></line>
+        </svg>
+      </button>
+    </div>
+    
+    <div class="mobile-nav__user">
+      <div class="mobile-nav__user-name" data-user-name>-</div>
+      <div class="mobile-nav__user-role" data-user-role>-</div>
+    </div>
+
+    <div class="mobile-nav__section">
+      <div class="mobile-nav__section-title">Navigation</div>
+      <a href="index.html" class="mobile-nav__link is-active">
+        <span class="mobile-nav__link-icon">🏠</span>
+        <span>Accueil</span>
+      </a>
+      <a href="pages/user-profile.html" class="mobile-nav__link">
+        <span class="mobile-nav__link-icon">👤</span>
+        <span>Mon profil</span>
+      </a>
+      <a href="pages/user-management.html" class="mobile-nav__link" data-require-admin style="display: none;">
+        <span class="mobile-nav__link-icon">⚙️</span>
+        <span>Gestion des utilisateurs</span>
+      </a>
+    </div>
+
+    <div class="mobile-nav__divider"></div>
+
+    <div class="mobile-nav__section">
+      <a href="#" class="mobile-nav__link" onclick="handleLogout(); return false;">
+        <span class="mobile-nav__link-icon">🚪</span>
+        <span>Déconnexion</span>
+      </a>
+    </div>
+
+    <div class="mobile-nav__theme">
+      <span class="mobile-nav__theme-label">
+        <span>🌙</span>
+        <span>Mode sombre</span>
+      </span>
+      <label class="form-switch">
+        <input type="checkbox" class="form-switch__input" id="mobile-theme-toggle" onchange="window.themeManager.toggle()">
+      </label>
+    </div>
+  </nav>
+
+  <!-- Loading Screen -->
+  <div id="loading" class="page-loading">
+    <div class="loading-spinner"></div>
+    <p class="loading-text">Vérification de l'authentification...</p>
+  </div>
+
+  <!-- Main Content -->
+  <main id="main-content" class="main" style="display: none;">
+    <!-- Welcome Section -->
+    <section class="welcome-section">
+      <h1 class="welcome-title">
+        Bienvenue, <span class="welcome-user" data-user-name>-</span>
+      </h1>
+      <p class="welcome-subtitle">Sélectionnez une application pour commencer</p>
+    </section>
+
+    <!-- App Grid -->
+    <section class="app-grid" id="app-grid">
+      <!-- Cards will be generated dynamically by JavaScript -->
+    </section>
+  </main>
+
+  <!-- Footer -->
+  <footer class="footer footer--simple">
+    <div class="footer__content">
+      <p class="footer__copyright">© 2025 Patrouille Mont Orford</p>
+      <p class="footer__version" id="app-version"></p>
+    </div>
+  </footer>
+
+  <!-- Status Messages Container -->
+  <div id="status-messages"></div>
+
+  <!-- Firebase SDK -->
+  <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-storage-compat.js"></script>
+
+  <!-- Core JS -->
+  <script src="js/core/config.js"></script>
+  <script src="js/core/utils.js"></script>
+  <script src="js/core/theme.js"></script>
+  <script src="js/core/ui.js"></script>
+  <script src="js/core/auth.js"></script>
+
+  <!-- Page JS -->
+  <script>
+    // App definitions for the portal
+    const portalApps = [
+      {
+        id: 'inspection',
+        title: 'Inspection Randonnée',
+        icon: '🔍',
+        description: 'Gestion des inspections de sentiers et abris de randonnée. Créez des rapports, consultez l\'historique et gérez le statut des pistes.',
+        url: 'pages/inspection-dashboard.html',
+        permission: 'allowInspection',
+        permissionDefault: true,
+        actionText: 'Accéder à l\'application'
+      },
+      {
+        id: 'infraction',
+        title: 'Infractions',
+        icon: '🚨',
+        description: 'Enregistrement et gestion des infractions constatées sur le terrain.',
+        url: 'pages/infraction-report.html',
+        permission: 'allowInfraction',
+        permissionDefault: false,
+        actionText: 'Accéder à l\'application'
+      },
+      {
+        id: 'signalisation',
+        title: 'Signalisation',
+        icon: '🚧',
+        description: 'Gestion de la signalisation des pistes. Capturez l\'état et signalez les problèmes.',
+        url: 'pages/signalisation-report.html',
+        permission: 'allowSignalisation',
+        permissionDefault: false,
+        actionText: 'Accéder à l\'application'
+      },
+      {
+        id: 'request',
+        title: 'Demandes',
+        icon: '🎫',
+        description: 'Soumettez et suivez vos demandes auprès de l\'administration.',
+        url: 'pages/request-create.html',
+        permission: null, // Accessible to all
+        actionText: 'Accéder à l\'application'
+      },
+      {
+        id: 'status',
+        title: 'Statut Randonnée',
+        icon: '🗺️',
+        description: 'Consultez l\'état actuel des sentiers de randonnée - page publique.',
+        url: 'pages/public-status.html',
+        permission: null, // Public
+        actionText: 'Voir le statut',
+        isPublic: true
+      }
+    ];
+
+    /**
+     * Generate app cards based on user permissions
+     */
+    function generateAppCards(userData) {
+      const appGrid = document.getElementById('app-grid');
+      if (!appGrid) return;
+
+      appGrid.innerHTML = '';
+
+      portalApps.forEach(app => {
+        // Check permission
+        let hasAccess = true;
+        if (app.permission) {
+          if (app.permissionDefault) {
+            // Default true unless explicitly false
+            hasAccess = userData[app.permission] !== false;
+          } else {
+            // Default false unless explicitly true
+            hasAccess = userData[app.permission] === true;
+          }
+        }
+
+        // Create card
+        const card = document.createElement('a');
+        card.href = hasAccess ? app.url : '#';
+        card.className = `app-card app-card--${app.id}${!hasAccess ? ' app-card--disabled' : ''}`;
+        if (!hasAccess) {
+          card.onclick = (e) => {
+            e.preventDefault();
+            showMessage('Vous n\'avez pas accès à cette application.', 'warning');
+          };
+        }
+
+        card.innerHTML = `
+          <div class="app-card__header">
+            <div class="app-card__icon">${app.icon}</div>
+            <h3 class="app-card__title">${app.title}</h3>
+          </div>
+          <div class="app-card__body">
+            <p class="app-card__description">${app.description}</p>
+          </div>
+          <div class="app-card__footer">
+            <span class="app-card__action">
+              ${hasAccess ? app.actionText : 'Accès non autorisé'}
+              ${hasAccess ? '<span>→</span>' : '<span>🔒</span>'}
+            </span>
+            ${!hasAccess ? '<span class="app-card__badge">Non autorisé</span>' : ''}
+          </div>
+        `;
+
+        appGrid.appendChild(card);
+      });
+    }
+
+    /**
+     * Initialize the portal page
+     */
+    function initPortal() {
+      // Set version
+      const versionEl = document.getElementById('app-version');
+      if (versionEl) {
+        versionEl.textContent = `v${APP_CONFIG.version}`;
+      }
+
+      // Check auth and generate cards
+      checkAuthStatus({
+        requireAuth: true,
+        onAuthenticated: (userData) => {
+          generateAppCards(userData);
+        }
+      });
+    }
+
+    // Initialize when DOM is ready
+    document.addEventListener('DOMContentLoaded', initPortal);
+  </script>
+</body>
+</html>

@@ -1,0 +1,717 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Gestion des utilisateurs - Orford Live">
+  <meta name="theme-color" content="#1b4b72">
+  <title>Gestion des utilisateurs - Orford Live</title>
+  
+  <!-- Favicon -->
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏔️</text></svg>">
+  
+  <!-- CSS -->
+  <link rel="stylesheet" href="../css/main.css">
+</head>
+<body data-theme="light" data-module="portal">
+  <!-- Skip Link for Accessibility -->
+  <a href="#main-content" class="skip-link">Aller au contenu principal</a>
+
+  <!-- Header -->
+  <header class="header">
+    <a href="../index.html" class="logo">
+      <span class="logo__icon">🏔️</span>
+      <span class="logo__text">Orford Live</span>
+    </a>
+
+    <!-- Desktop Navigation -->
+    <nav class="nav">
+      <a href="../index.html" class="nav__link">
+        <span>🏠</span>
+        <span>Accueil</span>
+      </a>
+      <a href="user-profile.html" class="nav__link">
+        <span>👤</span>
+        <span>Mon profil</span>
+      </a>
+      <a href="user-management.html" class="nav__link is-active" data-require-admin>
+        <span>⚙️</span>
+        <span>Gestion</span>
+      </a>
+      
+      <div class="nav__divider"></div>
+      
+      <!-- Theme Toggle -->
+      <button class="theme-toggle" onclick="window.themeManager.toggle()" aria-label="Changer le thème">
+        <svg class="theme-toggle__icon theme-toggle__icon--moon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
+        </svg>
+        <svg class="theme-toggle__icon theme-toggle__icon--sun" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display: none;">
+          <circle cx="12" cy="12" r="5"></circle>
+          <line x1="12" y1="1" x2="12" y2="3"></line>
+          <line x1="12" y1="21" x2="12" y2="23"></line>
+          <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+          <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+          <line x1="1" y1="12" x2="3" y2="12"></line>
+          <line x1="21" y1="12" x2="23" y2="12"></line>
+          <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
+          <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+        </svg>
+      </button>
+
+      <!-- User Menu -->
+      <div class="user-menu">
+        <button class="user-menu__trigger">
+          <span class="user-menu__avatar" data-user-initials>--</span>
+          <span class="user-menu__name" data-user-name>Chargement...</span>
+        </button>
+        <div class="user-menu__dropdown">
+          <div class="user-menu__header">
+            <div class="user-menu__header-name" data-user-name>-</div>
+            <div class="user-menu__header-email" data-user-email>-</div>
+          </div>
+          <a href="user-profile.html" class="user-menu__item">
+            <span>👤</span>
+            <span>Mon profil</span>
+          </a>
+          <div class="user-menu__divider"></div>
+          <button class="user-menu__item user-menu__item--danger" onclick="handleLogout()">
+            <span>🚪</span>
+            <span>Déconnexion</span>
+          </button>
+        </div>
+      </div>
+    </nav>
+
+    <!-- Mobile Menu Button -->
+    <button class="mobile-menu-btn" id="mobile-menu-btn" aria-label="Menu">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <line x1="3" y1="12" x2="21" y2="12"></line>
+        <line x1="3" y1="6" x2="21" y2="6"></line>
+        <line x1="3" y1="18" x2="21" y2="18"></line>
+      </svg>
+    </button>
+  </header>
+
+  <!-- Mobile Navigation -->
+  <div class="mobile-nav__backdrop" id="mobile-nav-backdrop"></div>
+  <nav class="mobile-nav" id="mobile-nav">
+    <div class="mobile-nav__header">
+      <a href="../index.html" class="mobile-nav__logo">
+        <span>🏔️</span>
+        <span>Orford Live</span>
+      </a>
+      <button class="mobile-nav__close" id="mobile-nav-close" aria-label="Fermer">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <line x1="18" y1="6" x2="6" y2="18"></line>
+          <line x1="6" y1="6" x2="18" y2="18"></line>
+        </svg>
+      </button>
+    </div>
+    
+    <div class="mobile-nav__user">
+      <div class="mobile-nav__user-name" data-user-name>-</div>
+      <div class="mobile-nav__user-role" data-user-role>-</div>
+    </div>
+
+    <div class="mobile-nav__section">
+      <a href="../index.html" class="mobile-nav__link">
+        <span class="mobile-nav__link-icon">🏠</span>
+        <span>Accueil</span>
+      </a>
+      <a href="user-profile.html" class="mobile-nav__link">
+        <span class="mobile-nav__link-icon">👤</span>
+        <span>Mon profil</span>
+      </a>
+      <a href="user-management.html" class="mobile-nav__link is-active">
+        <span class="mobile-nav__link-icon">⚙️</span>
+        <span>Gestion des utilisateurs</span>
+      </a>
+    </div>
+
+    <div class="mobile-nav__divider"></div>
+
+    <div class="mobile-nav__section">
+      <a href="#" class="mobile-nav__link" onclick="handleLogout(); return false;">
+        <span class="mobile-nav__link-icon">🚪</span>
+        <span>Déconnexion</span>
+      </a>
+    </div>
+
+    <div class="mobile-nav__theme">
+      <span class="mobile-nav__theme-label">
+        <span>🌙</span>
+        <span>Mode sombre</span>
+      </span>
+      <label class="form-switch">
+        <input type="checkbox" class="form-switch__input" id="mobile-theme-toggle" onchange="window.themeManager.toggle()">
+      </label>
+    </div>
+  </nav>
+
+  <!-- Loading Screen -->
+  <div id="loading" class="page-loading">
+    <div class="loading-spinner"></div>
+    <p class="loading-text">Vérification des accès...</p>
+  </div>
+
+  <!-- Main Content -->
+  <main id="main-content" class="main" style="display: none;">
+    <!-- Page Header -->
+    <div class="page-header">
+      <div class="page-header__content">
+        <h1 class="page-title">
+          <span class="page-title__icon">⚙️</span>
+          Gestion des utilisateurs
+        </h1>
+        <p class="page-subtitle">Gérez les comptes et permissions des utilisateurs</p>
+      </div>
+      <div class="page-header__actions">
+        <button class="btn btn-primary" onclick="openAddUserModal()">
+          <span>➕</span>
+          <span>Ajouter un utilisateur</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- Statistics Cards -->
+    <div class="quick-stats mb-6">
+      <div class="quick-stat">
+        <div class="quick-stat__icon">👥</div>
+        <div class="quick-stat__content">
+          <div class="quick-stat__value" id="stat-total">-</div>
+          <div class="quick-stat__label">Total utilisateurs</div>
+        </div>
+      </div>
+      <div class="quick-stat">
+        <div class="quick-stat__icon">✅</div>
+        <div class="quick-stat__content">
+          <div class="quick-stat__value" id="stat-active">-</div>
+          <div class="quick-stat__label">Actifs</div>
+        </div>
+      </div>
+      <div class="quick-stat">
+        <div class="quick-stat__icon">👑</div>
+        <div class="quick-stat__content">
+          <div class="quick-stat__value" id="stat-admins">-</div>
+          <div class="quick-stat__label">Administrateurs</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Users Table -->
+    <div class="user-table-section">
+      <div class="user-table-section__header">
+        <h2 class="user-table-section__title">
+          <span>👥</span>
+          <span>Liste des utilisateurs</span>
+          <span class="user-table-section__count" id="users-count">(0)</span>
+        </h2>
+        <div class="user-table-section__actions">
+          <div class="search-input">
+            <span class="search-input__icon">🔍</span>
+            <input type="text" class="search-input__input" id="search-users" placeholder="Rechercher...">
+          </div>
+          <select class="form-select form-select--sm" id="filter-status" style="width: auto;">
+            <option value="">Tous les statuts</option>
+            <option value="active">Actifs</option>
+            <option value="inactive">Inactifs</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="data-table__body">
+        <table class="table table--hover table--responsive" id="users-table">
+          <thead>
+            <tr>
+              <th>Nom</th>
+              <th>Courriel</th>
+              <th>Rôle</th>
+              <th>Accès</th>
+              <th>Statut</th>
+              <th class="table-cell--actions">Actions</th>
+            </tr>
+          </thead>
+          <tbody id="users-tbody">
+            <!-- Users will be loaded dynamically -->
+          </tbody>
+        </table>
+      </div>
+
+      <!-- Empty State -->
+      <div class="empty-state" id="empty-state" style="display: none;">
+        <div class="empty-state__icon">👥</div>
+        <h3 class="empty-state__title">Aucun utilisateur trouvé</h3>
+        <p class="empty-state__description">Aucun utilisateur ne correspond à vos critères de recherche.</p>
+      </div>
+
+      <!-- Loading State -->
+      <div class="loading-state" id="table-loading">
+        <div class="loading-spinner"></div>
+        <p class="loading-text">Chargement des utilisateurs...</p>
+      </div>
+    </div>
+
+    <!-- Export Section -->
+    <div class="export-section mt-6">
+      <div class="export-section__header">
+        <span>📊</span>
+        <h3 class="export-section__title">Exporter les données</h3>
+      </div>
+      <div class="export-section__form">
+        <select class="form-select" id="export-format" style="width: auto;">
+          <option value="csv">CSV</option>
+          <option value="json">JSON</option>
+        </select>
+        <button class="btn btn-secondary" onclick="exportUsers()">
+          <span>⬇️</span>
+          <span>Exporter</span>
+        </button>
+      </div>
+    </div>
+  </main>
+
+  <!-- Add/Edit User Modal -->
+  <div class="modal" id="user-modal">
+    <div class="modal__container">
+      <div class="modal__header">
+        <h3 class="modal__title" id="modal-title">Ajouter un utilisateur</h3>
+        <button class="modal__close" onclick="closeUserModal()">✕</button>
+      </div>
+      <div class="modal__body">
+        <form class="edit-user-form" id="user-form" onsubmit="saveUser(event)">
+          <input type="hidden" id="user-id">
+          
+          <div class="edit-user-form__row">
+            <div class="form-group">
+              <label class="form-label form-label--required" for="user-name">Nom complet</label>
+              <input type="text" class="form-input" id="user-name" required>
+            </div>
+            <div class="form-group">
+              <label class="form-label form-label--required" for="user-email">Courriel</label>
+              <input type="email" class="form-input" id="user-email" required>
+            </div>
+          </div>
+
+          <div class="edit-user-form__row">
+            <div class="form-group">
+              <label class="form-label" for="user-phone">Téléphone</label>
+              <input type="tel" class="form-input" id="user-phone" placeholder="514-555-1234">
+            </div>
+            <div class="form-group">
+              <label class="form-label form-label--required" for="user-role">Rôle</label>
+              <select class="form-select" id="user-role" required>
+                <option value="inspector">Inspecteur</option>
+                <option value="admin">Administrateur</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label form-label--required" for="user-status">Statut</label>
+            <select class="form-select" id="user-status" required>
+              <option value="active">Actif</option>
+              <option value="inactive">Inactif</option>
+            </select>
+          </div>
+
+          <div class="edit-user-form__access">
+            <div class="edit-user-form__access-title">Permissions d'accès aux applications</div>
+            <div class="form-check">
+              <input type="checkbox" class="form-check-input" id="access-inspection" checked>
+              <label class="form-check-label" for="access-inspection">
+                🔍 Inspection Randonnée
+              </label>
+            </div>
+            <div class="form-check">
+              <input type="checkbox" class="form-check-input" id="access-infraction">
+              <label class="form-check-label" for="access-infraction">
+                🚨 Infractions
+              </label>
+            </div>
+            <div class="form-check">
+              <input type="checkbox" class="form-check-input" id="access-signalisation">
+              <label class="form-check-label" for="access-signalisation">
+                🚧 Signalisation
+              </label>
+            </div>
+            <p class="form-hint mt-2">
+              🎫 Demandes - Accessible à tous les utilisateurs authentifiés.
+            </p>
+          </div>
+
+          <!-- Password field for new users only -->
+          <div class="form-group" id="password-group" style="display: none;">
+            <label class="form-label form-label--required" for="user-password">Mot de passe temporaire</label>
+            <input type="password" class="form-input" id="user-password" minlength="6">
+            <span class="form-hint">L'utilisateur devra changer ce mot de passe à la première connexion.</span>
+          </div>
+        </form>
+      </div>
+      <div class="modal__footer">
+        <button type="button" class="btn btn-secondary" onclick="closeUserModal()">Annuler</button>
+        <button type="submit" form="user-form" class="btn btn-primary" id="save-user-btn">Enregistrer</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Footer -->
+  <footer class="footer footer--simple">
+    <div class="footer__content">
+      <p class="footer__copyright">© 2025 Patrouille Mont Orford</p>
+    </div>
+  </footer>
+
+  <!-- Status Messages Container -->
+  <div id="status-messages"></div>
+
+  <!-- Firebase SDK -->
+  <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
+
+  <!-- Core JS -->
+  <script src="../js/core/config.js"></script>
+  <script src="../js/core/utils.js"></script>
+  <script src="../js/core/theme.js"></script>
+  <script src="../js/core/ui.js"></script>
+  <script src="../js/core/auth.js"></script>
+
+  <!-- Page JS -->
+  <script>
+    let users = [];
+    let filteredUsers = [];
+    let editingUserId = null;
+
+    /**
+     * Load users from Firestore
+     */
+    async function loadUsers() {
+      const tbody = document.getElementById('users-tbody');
+      const tableLoading = document.getElementById('table-loading');
+      const emptyState = document.getElementById('empty-state');
+
+      tableLoading.style.display = 'flex';
+      tbody.innerHTML = '';
+      emptyState.style.display = 'none';
+
+      try {
+        const snapshot = await db.collection('inspectors').orderBy('name').get();
+        
+        users = [];
+        snapshot.forEach(doc => {
+          users.push({ id: doc.id, ...doc.data() });
+        });
+
+        updateStatistics();
+        filterAndRenderUsers();
+
+      } catch (error) {
+        console.error('Error loading users:', error);
+        showMessage('Erreur lors du chargement des utilisateurs.', 'error');
+      } finally {
+        tableLoading.style.display = 'none';
+      }
+    }
+
+    /**
+     * Update statistics
+     */
+    function updateStatistics() {
+      document.getElementById('stat-total').textContent = users.length;
+      document.getElementById('stat-active').textContent = users.filter(u => u.status === 'active').length;
+      document.getElementById('stat-admins').textContent = users.filter(u => u.role === 'admin').length;
+    }
+
+    /**
+     * Filter and render users
+     */
+    function filterAndRenderUsers() {
+      const search = document.getElementById('search-users').value.toLowerCase();
+      const statusFilter = document.getElementById('filter-status').value;
+
+      filteredUsers = users.filter(user => {
+        const matchesSearch = !search || 
+          user.name?.toLowerCase().includes(search) ||
+          user.email?.toLowerCase().includes(search);
+        const matchesStatus = !statusFilter || user.status === statusFilter;
+        return matchesSearch && matchesStatus;
+      });
+
+      renderUsers();
+    }
+
+    /**
+     * Render users table
+     */
+    function renderUsers() {
+      const tbody = document.getElementById('users-tbody');
+      const emptyState = document.getElementById('empty-state');
+      const countEl = document.getElementById('users-count');
+
+      countEl.textContent = `(${filteredUsers.length})`;
+
+      if (filteredUsers.length === 0) {
+        tbody.innerHTML = '';
+        emptyState.style.display = 'flex';
+        return;
+      }
+
+      emptyState.style.display = 'none';
+
+      tbody.innerHTML = filteredUsers.map(user => `
+        <tr>
+          <td data-label="Nom">
+            <span class="user-table__name" onclick="editUser('${user.id}')">${escapeHtml(user.name || '-')}</span>
+          </td>
+          <td data-label="Courriel">${escapeHtml(user.email || '-')}</td>
+          <td data-label="Rôle">
+            <span class="badge ${user.role === 'admin' ? 'badge-admin' : 'badge-inspector'}">
+              ${user.role === 'admin' ? 'Admin' : 'Inspecteur'}
+            </span>
+          </td>
+          <td data-label="Accès">
+            <div class="user-table__access">
+              <span class="access-badge ${user.allowInspection !== false ? 'access-badge--inspection' : ''}" title="Inspection">🔍</span>
+              <span class="access-badge ${user.allowInfraction === true ? 'access-badge--infraction' : ''}" title="Infraction">🚨</span>
+              <span class="access-badge ${user.allowSignalisation === true ? 'access-badge--signalisation' : ''}" title="Signalisation">🚧</span>
+            </div>
+          </td>
+          <td data-label="Statut">
+            <span class="badge ${user.status === 'active' ? 'badge-success' : 'badge-secondary'}">
+              ${user.status === 'active' ? 'Actif' : 'Inactif'}
+            </span>
+          </td>
+          <td class="table-cell--actions" data-label="Actions">
+            <div class="user-table__actions">
+              <button class="btn btn-ghost btn-icon btn-icon--sm" onclick="editUser('${user.id}')" title="Modifier">
+                ✏️
+              </button>
+              <button class="btn btn-ghost btn-icon btn-icon--sm" onclick="toggleUserStatus('${user.id}')" title="${user.status === 'active' ? 'Désactiver' : 'Activer'}">
+                ${user.status === 'active' ? '🚫' : '✅'}
+              </button>
+            </div>
+          </td>
+        </tr>
+      `).join('');
+    }
+
+    /**
+     * Open add user modal
+     */
+    function openAddUserModal() {
+      editingUserId = null;
+      document.getElementById('modal-title').textContent = 'Ajouter un utilisateur';
+      document.getElementById('user-form').reset();
+      document.getElementById('user-id').value = '';
+      document.getElementById('password-group').style.display = 'block';
+      document.getElementById('user-password').required = true;
+      document.getElementById('access-inspection').checked = true;
+      
+      const modal = document.getElementById('user-modal');
+      modal.classList.add('is-active');
+      document.body.classList.add('modal-open');
+    }
+
+    /**
+     * Edit user
+     */
+    function editUser(userId) {
+      const user = users.find(u => u.id === userId);
+      if (!user) return;
+
+      editingUserId = userId;
+      document.getElementById('modal-title').textContent = 'Modifier l\'utilisateur';
+      document.getElementById('user-id').value = userId;
+      document.getElementById('user-name').value = user.name || '';
+      document.getElementById('user-email').value = user.email || '';
+      document.getElementById('user-phone').value = user.phone || '';
+      document.getElementById('user-role').value = user.role || 'inspector';
+      document.getElementById('user-status').value = user.status || 'active';
+      document.getElementById('access-inspection').checked = user.allowInspection !== false;
+      document.getElementById('access-infraction').checked = user.allowInfraction === true;
+      document.getElementById('access-signalisation').checked = user.allowSignalisation === true;
+      
+      // Hide password field for existing users
+      document.getElementById('password-group').style.display = 'none';
+      document.getElementById('user-password').required = false;
+
+      const modal = document.getElementById('user-modal');
+      modal.classList.add('is-active');
+      document.body.classList.add('modal-open');
+    }
+
+    /**
+     * Close user modal
+     */
+    function closeUserModal() {
+      const modal = document.getElementById('user-modal');
+      modal.classList.remove('is-active');
+      document.body.classList.remove('modal-open');
+      editingUserId = null;
+    }
+
+    /**
+     * Save user
+     */
+    async function saveUser(e) {
+      e.preventDefault();
+
+      const btn = document.getElementById('save-user-btn');
+      const userId = document.getElementById('user-id').value;
+      const isNew = !userId;
+
+      const userData = {
+        name: document.getElementById('user-name').value.trim(),
+        email: document.getElementById('user-email').value.trim(),
+        phone: document.getElementById('user-phone').value.trim() || null,
+        role: document.getElementById('user-role').value,
+        status: document.getElementById('user-status').value,
+        allowInspection: document.getElementById('access-inspection').checked,
+        allowInfraction: document.getElementById('access-infraction').checked,
+        allowSignalisation: document.getElementById('access-signalisation').checked
+      };
+
+      setButtonLoading(btn, true, 'Enregistrement...');
+
+      try {
+        if (isNew) {
+          // Create new user with Firebase Auth
+          const password = document.getElementById('user-password').value;
+          
+          // Note: In production, you'd use Firebase Admin SDK via Cloud Functions
+          // This is a simplified version for demonstration
+          const userCredential = await auth.createUserWithEmailAndPassword(userData.email, password);
+          const newUserId = userCredential.user.uid;
+
+          // Add to inspectors collection
+          await db.collection('inspectors').doc(newUserId).set({
+            ...userData,
+            createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+            createdBy: currentUser.uid
+          });
+
+          // Sign back in as admin (since createUser signs in as the new user)
+          // In production, use Cloud Functions to avoid this issue
+          showMessage('Utilisateur créé avec succès. Veuillez vous reconnecter.', 'success');
+          
+        } else {
+          // Update existing user
+          await db.collection('inspectors').doc(userId).update({
+            ...userData,
+            modifiedAt: firebase.firestore.FieldValue.serverTimestamp(),
+            modifiedBy: currentUser.uid
+          });
+
+          showMessage('Utilisateur mis à jour avec succès.', 'success');
+        }
+
+        closeUserModal();
+        loadUsers();
+
+      } catch (error) {
+        console.error('Error saving user:', error);
+        showMessage(getAuthErrorMessage(error), 'error');
+      } finally {
+        setButtonLoading(btn, false);
+      }
+    }
+
+    /**
+     * Toggle user status
+     */
+    async function toggleUserStatus(userId) {
+      const user = users.find(u => u.id === userId);
+      if (!user) return;
+
+      const newStatus = user.status === 'active' ? 'inactive' : 'active';
+      const action = newStatus === 'active' ? 'activer' : 'désactiver';
+
+      const confirmed = await confirm({
+        title: `${action.charAt(0).toUpperCase() + action.slice(1)} l'utilisateur`,
+        message: `Voulez-vous vraiment ${action} ${user.name}?`,
+        confirmText: action.charAt(0).toUpperCase() + action.slice(1),
+        confirmClass: newStatus === 'active' ? 'btn-success' : 'btn-warning'
+      });
+
+      if (!confirmed) return;
+
+      try {
+        await db.collection('inspectors').doc(userId).update({
+          status: newStatus,
+          modifiedAt: firebase.firestore.FieldValue.serverTimestamp(),
+          modifiedBy: currentUser.uid
+        });
+
+        showMessage(`Utilisateur ${newStatus === 'active' ? 'activé' : 'désactivé'}.`, 'success');
+        loadUsers();
+
+      } catch (error) {
+        console.error('Error toggling status:', error);
+        showMessage('Erreur lors de la modification du statut.', 'error');
+      }
+    }
+
+    /**
+     * Export users
+     */
+    function exportUsers() {
+      const format = document.getElementById('export-format').value;
+      const data = filteredUsers.map(u => ({
+        Nom: u.name,
+        Courriel: u.email,
+        Téléphone: u.phone || '',
+        Rôle: u.role === 'admin' ? 'Administrateur' : 'Inspecteur',
+        Statut: u.status === 'active' ? 'Actif' : 'Inactif',
+        Inspection: u.allowInspection !== false ? 'Oui' : 'Non',
+        Infraction: u.allowInfraction === true ? 'Oui' : 'Non',
+        Signalisation: u.allowSignalisation === true ? 'Oui' : 'Non'
+      }));
+
+      let content, filename, type;
+
+      if (format === 'csv') {
+        const headers = Object.keys(data[0] || {}).join(',');
+        const rows = data.map(row => Object.values(row).map(v => `"${v}"`).join(','));
+        content = [headers, ...rows].join('\n');
+        filename = 'utilisateurs.csv';
+        type = 'text/csv';
+      } else {
+        content = JSON.stringify(data, null, 2);
+        filename = 'utilisateurs.json';
+        type = 'application/json';
+      }
+
+      const blob = new Blob([content], { type });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      a.click();
+      URL.revokeObjectURL(url);
+
+      showMessage(`Export ${format.toUpperCase()} téléchargé.`, 'success');
+    }
+
+    /**
+     * Initialize page
+     */
+    function initUserManagement() {
+      checkAuthStatus({
+        requireAuth: true,
+        requireAdmin: true,
+        onAuthenticated: () => {
+          loadUsers();
+
+          // Setup search and filter listeners
+          document.getElementById('search-users').addEventListener('input', debounce(filterAndRenderUsers, 300));
+          document.getElementById('filter-status').addEventListener('change', filterAndRenderUsers);
+        }
+      });
+    }
+
+    // Initialize when DOM is ready
+    document.addEventListener('DOMContentLoaded', initUserManagement);
+  </script>
+</body>
+</html>
