@@ -360,6 +360,9 @@
       <button class="admin-tabs__btn is-active" data-tab="users" onclick="switchTab('users')">
         👥 Utilisateurs
       </button>
+      <button class="admin-tabs__btn" data-tab="import" onclick="switchTab('import')">
+        📥 Import
+      </button>
       <button class="admin-tabs__btn" data-tab="data" onclick="switchTab('data')">
         📦 Données
       </button>
@@ -467,7 +470,115 @@
       </div>
     </div>
 
-    <!-- TAB 2: DATA MANAGEMENT -->
+    <!-- TAB 2: BULK IMPORT -->
+    <div class="admin-tab-content" id="import-tab">
+      <div class="data-export-section">
+        <div class="data-export-section__header">
+          <span>📥</span>
+          <h3>Importation en lot</h3>
+        </div>
+        <p class="data-export-section__description">
+          Importez plusieurs utilisateurs à partir d'un fichier CSV. Le fichier doit contenir les colonnes: 
+          <strong>name, email, password, role</strong> (optionnel: phone, allowInspection, allowInfraction, allowSignalisation)
+        </p>
+
+        <div class="form-group">
+          <label class="form-label" for="csv-file">Fichier CSV</label>
+          <input type="file" class="form-input" id="csv-file" accept=".csv" onchange="handleCsvSelect(event)">
+          <span class="form-hint">Format: name,email,password,role (inspector ou admin)</span>
+        </div>
+
+        <!-- CSV Preview -->
+        <div id="csv-preview" style="display: none;" class="mt-4">
+          <div class="data-export-section__header">
+            <span>👁️</span>
+            <h4>Aperçu (<span id="csv-count">0</span> utilisateurs)</h4>
+          </div>
+          <div class="data-table__body" style="max-height: 300px; overflow-y: auto;">
+            <table class="table table--sm">
+              <thead>
+                <tr>
+                  <th>Nom</th>
+                  <th>Email</th>
+                  <th>Rôle</th>
+                  <th>Accès</th>
+                </tr>
+              </thead>
+              <tbody id="csv-preview-tbody"></tbody>
+            </table>
+          </div>
+          
+          <div class="export-form-row mt-4">
+            <button class="btn btn-primary" id="start-import-btn" onclick="startBulkImport()" disabled>
+              <span>🚀</span>
+              <span>Démarrer l'importation</span>
+            </button>
+            <button class="btn btn-secondary" id="cancel-import-btn" onclick="cancelBulkImport()" style="display: none;">
+              <span>❌</span>
+              <span>Annuler</span>
+            </button>
+          </div>
+
+          <!-- Progress -->
+          <div id="import-progress" style="display: none;" class="mt-4">
+            <div class="form-label">Progression</div>
+            <div style="background: var(--theme-border); border-radius: var(--radius-md); height: 8px; overflow: hidden;">
+              <div id="import-progress-bar" style="background: var(--theme-accent); height: 100%; width: 0%; transition: width 0.3s;"></div>
+            </div>
+            <p id="import-progress-text" class="form-hint mt-2">0 / 0</p>
+          </div>
+        </div>
+
+        <!-- Import Results -->
+        <div id="import-results" style="display: none;" class="mt-4">
+          <div class="quick-stats">
+            <div class="quick-stat">
+              <div class="quick-stat__icon">✅</div>
+              <div class="quick-stat__content">
+                <div class="quick-stat__value" id="import-success-count">0</div>
+                <div class="quick-stat__label">Créés</div>
+              </div>
+            </div>
+            <div class="quick-stat">
+              <div class="quick-stat__icon">⏭️</div>
+              <div class="quick-stat__content">
+                <div class="quick-stat__value" id="import-skipped-count">0</div>
+                <div class="quick-stat__label">Ignorés (doublons)</div>
+              </div>
+            </div>
+            <div class="quick-stat">
+              <div class="quick-stat__icon">❌</div>
+              <div class="quick-stat__content">
+                <div class="quick-stat__value" id="import-error-count">0</div>
+                <div class="quick-stat__label">Erreurs</div>
+              </div>
+            </div>
+          </div>
+          
+          <div id="import-errors-list" style="display: none;" class="mt-4">
+            <h5 style="color: var(--color-danger);">Détails des erreurs :</h5>
+            <ul id="import-errors-ul" style="font-size: 0.875rem; color: var(--theme-text-secondary);"></ul>
+          </div>
+        </div>
+
+        <!-- Sample CSV Template -->
+        <div class="mt-6" style="padding-top: var(--space-lg); border-top: 1px solid var(--theme-border);">
+          <div class="data-export-section__header">
+            <span>📄</span>
+            <h4>Modèle CSV</h4>
+          </div>
+          <p class="data-export-section__description">
+            Téléchargez un modèle CSV pour voir le format attendu.
+          </p>
+          <button class="btn btn-secondary" onclick="downloadCsvTemplate()">
+            <span>⬇️</span>
+            <span>Télécharger le modèle</span>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- TAB 3: DATA MANAGEMENT -->
     <div class="admin-tab-content" id="data-tab">
       <div class="data-export-section">
         <div class="data-export-section__header">
@@ -1084,6 +1195,238 @@
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
+    }
+
+    // ========================================
+    // BULK IMPORT
+    // ========================================
+
+    let parsedUsers = [];
+    let importCancelled = false;
+
+    function handleCsvSelect(event) {
+      const file = event.target.files[0];
+      if (!file) return;
+
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        parseCsv(e.target.result);
+      };
+      reader.readAsText(file);
+    }
+
+    function parseCsv(csvText) {
+      const lines = csvText.trim().split('\n');
+      if (lines.length < 2) {
+        showMessage('Le fichier CSV doit contenir un en-tête et au moins une ligne de données.', 'error');
+        return;
+      }
+
+      // Parse header
+      const headers = lines[0].split(',').map(h => h.trim().toLowerCase().replace(/"/g, ''));
+      
+      // Validate required columns
+      const required = ['name', 'email', 'password'];
+      const missing = required.filter(r => !headers.includes(r));
+      if (missing.length > 0) {
+        showMessage(`Colonnes manquantes: ${missing.join(', ')}`, 'error');
+        return;
+      }
+
+      // Parse rows
+      parsedUsers = [];
+      for (let i = 1; i < lines.length; i++) {
+        const values = lines[i].split(',').map(v => v.trim().replace(/^"|"$/g, ''));
+        if (values.length < headers.length) continue;
+
+        const user = {};
+        headers.forEach((h, idx) => {
+          user[h] = values[idx] || '';
+        });
+
+        // Set defaults
+        user.role = (user.role || 'inspector').toLowerCase();
+        if (user.role !== 'admin') user.role = 'inspector';
+        
+        user.allowInspection = user.allowinspection !== 'false' && user.allowinspection !== '0';
+        user.allowInfraction = user.allowinfraction === 'true' || user.allowinfraction === '1';
+        user.allowSignalisation = user.allowsignalisation === 'true' || user.allowsignalisation === '1';
+
+        if (user.name && user.email && user.password) {
+          parsedUsers.push(user);
+        }
+      }
+
+      renderCsvPreview();
+    }
+
+    function renderCsvPreview() {
+      const previewDiv = document.getElementById('csv-preview');
+      const tbody = document.getElementById('csv-preview-tbody');
+      const countSpan = document.getElementById('csv-count');
+      const startBtn = document.getElementById('start-import-btn');
+
+      if (parsedUsers.length === 0) {
+        previewDiv.style.display = 'none';
+        return;
+      }
+
+      tbody.innerHTML = parsedUsers.map(user => `
+        <tr>
+          <td>${escapeHtml(user.name)}</td>
+          <td>${escapeHtml(user.email)}</td>
+          <td><span class="badge ${user.role === 'admin' ? 'badge-admin' : 'badge-inspector'}">${user.role}</span></td>
+          <td>
+            <span class="access-badge--clickable access-badge--inspection ${user.allowInspection ? 'is-active' : ''}" style="width:24px;height:24px;font-size:0.875rem;">🔍</span>
+            <span class="access-badge--clickable access-badge--infraction ${user.allowInfraction ? 'is-active' : ''}" style="width:24px;height:24px;font-size:0.875rem;">🚨</span>
+            <span class="access-badge--clickable access-badge--signalisation ${user.allowSignalisation ? 'is-active' : ''}" style="width:24px;height:24px;font-size:0.875rem;">🚧</span>
+          </td>
+        </tr>
+      `).join('');
+
+      countSpan.textContent = parsedUsers.length;
+      previewDiv.style.display = 'block';
+      startBtn.disabled = false;
+      
+      // Hide previous results
+      document.getElementById('import-results').style.display = 'none';
+    }
+
+    async function startBulkImport() {
+      if (parsedUsers.length === 0) return;
+
+      importCancelled = false;
+      
+      const startBtn = document.getElementById('start-import-btn');
+      const cancelBtn = document.getElementById('cancel-import-btn');
+      const progressDiv = document.getElementById('import-progress');
+      const progressBar = document.getElementById('import-progress-bar');
+      const progressText = document.getElementById('import-progress-text');
+
+      startBtn.disabled = true;
+      cancelBtn.style.display = 'inline-block';
+      progressDiv.style.display = 'block';
+      document.getElementById('import-results').style.display = 'none';
+
+      // Get existing emails
+      let existingEmails = new Set();
+      try {
+        const snapshot = await db.collection('inspectors').get();
+        snapshot.forEach(doc => {
+          const email = doc.data().email?.toLowerCase();
+          if (email) existingEmails.add(email);
+        });
+      } catch (e) {
+        console.error('Error fetching existing users:', e);
+      }
+
+      const results = { success: [], skipped: [], errors: [] };
+
+      for (let i = 0; i < parsedUsers.length; i++) {
+        if (importCancelled) break;
+
+        const user = parsedUsers[i];
+        const progress = ((i + 1) / parsedUsers.length) * 100;
+        progressBar.style.width = `${progress}%`;
+        progressText.textContent = `${i + 1} / ${parsedUsers.length}`;
+
+        // Check duplicate
+        if (existingEmails.has(user.email.toLowerCase())) {
+          results.skipped.push({ email: user.email, reason: 'Email déjà existant' });
+          continue;
+        }
+
+        // Create user using secondary Firebase app to avoid logging out current user
+        let secondaryApp = null;
+        try {
+          secondaryApp = firebase.initializeApp(APP_CONFIG.firebase, `secondary-${Date.now()}`);
+          const secondaryAuth = secondaryApp.auth();
+          
+          const userCredential = await secondaryAuth.createUserWithEmailAndPassword(user.email, user.password);
+          
+          await db.collection('inspectors').doc(userCredential.user.uid).set({
+            name: user.name,
+            email: user.email,
+            phone: user.phone || null,
+            role: user.role,
+            status: 'active',
+            allowInspection: user.allowInspection,
+            allowInfraction: user.allowInfraction,
+            allowSignalisation: user.allowSignalisation,
+            createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+            createdBy: currentUser.uid,
+            importedVia: 'bulk_import'
+          });
+
+          results.success.push({ email: user.email, name: user.name });
+          existingEmails.add(user.email.toLowerCase());
+
+        } catch (error) {
+          console.error('Error creating user:', user.email, error);
+          results.errors.push({ email: user.email, reason: getBulkImportErrorMessage(error) });
+        } finally {
+          if (secondaryApp) {
+            try { await secondaryApp.delete(); } catch (e) {}
+          }
+        }
+
+        // Small delay to prevent rate limiting
+        await new Promise(resolve => setTimeout(resolve, 500));
+      }
+
+      showImportResults(results);
+
+      startBtn.disabled = false;
+      cancelBtn.style.display = 'none';
+      progressDiv.style.display = 'none';
+
+      loadUsers();
+    }
+
+    function getBulkImportErrorMessage(error) {
+      switch (error.code) {
+        case 'auth/email-already-in-use': return 'Email déjà utilisé';
+        case 'auth/invalid-email': return 'Email invalide';
+        case 'auth/weak-password': return 'Mot de passe trop faible (min 6 caractères)';
+        case 'auth/operation-not-allowed': return 'Création de compte désactivée';
+        default: return error.message || 'Erreur inconnue';
+      }
+    }
+
+    function cancelBulkImport() {
+      importCancelled = true;
+    }
+
+    function showImportResults(results) {
+      const resultsDiv = document.getElementById('import-results');
+      document.getElementById('import-success-count').textContent = results.success.length;
+      document.getElementById('import-skipped-count').textContent = results.skipped.length;
+      document.getElementById('import-error-count').textContent = results.errors.length;
+
+      const errorsList = document.getElementById('import-errors-list');
+      const errorsUl = document.getElementById('import-errors-ul');
+
+      if (results.errors.length > 0) {
+        errorsUl.innerHTML = results.errors.map(e => `<li>${escapeHtml(e.email)}: ${escapeHtml(e.reason)}</li>`).join('');
+        errorsList.style.display = 'block';
+      } else {
+        errorsList.style.display = 'none';
+      }
+
+      resultsDiv.style.display = 'block';
+
+      if (results.success.length > 0) {
+        showMessage(`${results.success.length} utilisateur(s) importé(s) avec succès.`, 'success');
+      }
+    }
+
+    function downloadCsvTemplate() {
+      const template = `name,email,password,role,phone,allowInspection,allowInfraction,allowSignalisation
+Jean Dupont,jean.dupont@example.com,MotDePasse123,inspector,514-555-1234,true,false,false
+Marie Tremblay,marie.tremblay@example.com,MotDePasse456,admin,,true,true,true`;
+      
+      downloadFile('\uFEFF' + template, 'modele_import_utilisateurs.csv', 'text/csv;charset=utf-8');
+      showMessage('Modèle CSV téléchargé.', 'success');
     }
 
     // ========================================

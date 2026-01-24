@@ -18,7 +18,11 @@ function initFirebase() {
   
   window.auth = firebase.auth();
   window.db = firebase.firestore();
-  window.storage = firebase.storage();
+  
+  // Storage is optional - only initialize if SDK is loaded
+  if (typeof firebase.storage === 'function') {
+    window.storage = firebase.storage();
+  }
 }
 
 /**

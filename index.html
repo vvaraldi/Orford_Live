@@ -269,16 +269,13 @@
           }
         }
 
+        // Skip card entirely if user doesn't have access (instead of showing disabled)
+        if (!hasAccess) return;
+
         // Create card
         const card = document.createElement('a');
-        card.href = hasAccess ? app.url : '#';
-        card.className = `app-card app-card--${app.id}${!hasAccess ? ' app-card--disabled' : ''}`;
-        if (!hasAccess) {
-          card.onclick = (e) => {
-            e.preventDefault();
-            showMessage('Vous n\'avez pas accès à cette application.', 'warning');
-          };
-        }
+        card.href = app.url;
+        card.className = `app-card app-card--${app.id}`;
 
         card.innerHTML = `
           <div class="app-card__header">
@@ -290,10 +287,9 @@
           </div>
           <div class="app-card__footer">
             <span class="app-card__action">
-              ${hasAccess ? app.actionText : 'Accès non autorisé'}
-              ${hasAccess ? '<span>→</span>' : '<span>🔒</span>'}
+              ${app.actionText}
+              <span>→</span>
             </span>
-            ${!hasAccess ? '<span class="app-card__badge">Non autorisé</span>' : ''}
           </div>
         `;
 

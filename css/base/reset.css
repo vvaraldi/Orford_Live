@@ -35,6 +35,9 @@ body {
   background-color: var(--theme-bg);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  /* Sticky footer layout */
+  display: flex;
+  flex-direction: column;
 }
 
 /* Remove list styles on ul, ol elements */

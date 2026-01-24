@@ -145,11 +145,11 @@
     }
 
     /**
-     * Get return URL from query params
+     * Get return URL - always go to main portal
      */
     function getReturnUrl() {
-      const params = new URLSearchParams(window.location.search);
-      return params.get('returnUrl') || '../index.html';
+      // Always redirect to main portal after login
+      return '../index.html';
     }
 
     /**
