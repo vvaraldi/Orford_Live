@@ -3,24 +3,6 @@ All in one app for inspection, signalisation, infraction, ...
 
 
 
-Few elements to consider and adjust the files please :
-
-1- error message when going in the admin page... or My profile page...
-
-Uncaught TypeError: firebase.storage is not a function
-    initFirebase https://vvaraldi.github.io/Orford_Live/js/core/auth.js:21
-    <anonymous> https://vvaraldi.github.io/Orford_Live/js/core/auth.js:352
-
-2- There was a way to import a batch of users (via a CSV). I want to keep this functaionnality
-
-3- When not authorised I want to just to not show he card of the application vs current proposal where you grey it and make it inactive.
-
-4- When logging on it should send you to the main page even if before you were in a different one.
-
-5- If the screen is tall the white framed footer is not at the bottom of the screen. could it be ?
-
-
-
 Phase 2: Inspection Module
 2.1Inspection dashboardTrail/shelter status overview with map
 2.2Trail report formCreate/edit trail inspections
