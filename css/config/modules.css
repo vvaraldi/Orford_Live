@@ -1,0 +1,140 @@
+/* ========================================
+   MODULES.CSS - Module Accent Colors
+   ========================================
+   Defines accent colors for each application module.
+   Use data-module attribute on <body> to set.
+   
+   Example: <body data-theme="light" data-module="infraction">
+   ======================================== */
+
+/* ===== PORTAL MODULE (Default) ===== */
+[data-module="portal"],
+:root {
+  --theme-accent: var(--color-portal);
+  --theme-accent-light: var(--color-portal-light);
+  --theme-accent-dark: var(--color-portal-dark);
+  --theme-accent-rgb: var(--color-portal-rgb);
+  
+  /* Gradient for headers */
+  --theme-gradient: linear-gradient(135deg, var(--color-portal) 0%, var(--color-portal-dark) 100%);
+  --theme-gradient-hover: linear-gradient(135deg, var(--color-portal-dark) 0%, var(--color-portal) 100%);
+}
+
+/* ===== INSPECTION MODULE ===== */
+[data-module="inspection"] {
+  --theme-accent: var(--color-inspection);
+  --theme-accent-light: var(--color-inspection-light);
+  --theme-accent-dark: var(--color-inspection-dark);
+  --theme-accent-rgb: var(--color-inspection-rgb);
+  
+  --theme-gradient: linear-gradient(135deg, var(--color-inspection) 0%, var(--color-inspection-dark) 100%);
+  --theme-gradient-hover: linear-gradient(135deg, var(--color-inspection-dark) 0%, var(--color-inspection) 100%);
+}
+
+/* ===== INFRACTION MODULE ===== */
+[data-module="infraction"] {
+  --theme-accent: var(--color-infraction);
+  --theme-accent-light: var(--color-infraction-light);
+  --theme-accent-dark: var(--color-infraction-dark);
+  --theme-accent-rgb: var(--color-infraction-rgb);
+  
+  --theme-gradient: linear-gradient(135deg, var(--color-infraction) 0%, var(--color-infraction-dark) 100%);
+  --theme-gradient-hover: linear-gradient(135deg, var(--color-infraction-dark) 0%, var(--color-infraction) 100%);
+}
+
+/* ===== SIGNALISATION MODULE ===== */
+[data-module="signalisation"] {
+  --theme-accent: var(--color-signalisation);
+  --theme-accent-light: var(--color-signalisation-light);
+  --theme-accent-dark: var(--color-signalisation-dark);
+  --theme-accent-rgb: var(--color-signalisation-rgb);
+  
+  --theme-gradient: linear-gradient(135deg, var(--color-signalisation) 0%, var(--color-signalisation-dark) 100%);
+  --theme-gradient-hover: linear-gradient(135deg, var(--color-signalisation-dark) 0%, var(--color-signalisation) 100%);
+}
+
+/* ===== REQUEST/DEMANDES MODULE ===== */
+[data-module="request"] {
+  --theme-accent: var(--color-request);
+  --theme-accent-light: var(--color-request-light);
+  --theme-accent-dark: var(--color-request-dark);
+  --theme-accent-rgb: var(--color-request-rgb);
+  
+  --theme-gradient: linear-gradient(135deg, var(--color-request) 0%, var(--color-request-dark) 100%);
+  --theme-gradient-hover: linear-gradient(135deg, var(--color-request-dark) 0%, var(--color-request) 100%);
+}
+
+/* ========================================
+   DARK MODE ADJUSTMENTS FOR MODULES
+   ======================================== 
+   Lighter accent colors for better contrast in dark mode
+   ======================================== */
+
+[data-theme="dark"][data-module="portal"],
+[data-theme="dark"][data-module="inspection"] {
+  --theme-accent: #60a5fa;
+  --theme-accent-light: #93c5fd;
+  --theme-accent-dark: #3b82f6;
+  --theme-accent-rgb: 96, 165, 250;
+  
+  --theme-gradient: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%);
+}
+
+[data-theme="dark"][data-module="infraction"] {
+  --theme-accent: #f87171;
+  --theme-accent-light: #fca5a5;
+  --theme-accent-dark: #ef4444;
+  --theme-accent-rgb: 248, 113, 113;
+  
+  --theme-gradient: linear-gradient(135deg, #ef4444 0%, #b91c1c 100%);
+}
+
+[data-theme="dark"][data-module="signalisation"] {
+  --theme-accent: #fbbf24;
+  --theme-accent-light: #fde68a;
+  --theme-accent-dark: #f59e0b;
+  --theme-accent-rgb: 251, 191, 36;
+  
+  --theme-gradient: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+}
+
+[data-theme="dark"][data-module="request"] {
+  --theme-accent: #a78bfa;
+  --theme-accent-light: #c4b5fd;
+  --theme-accent-dark: #8b5cf6;
+  --theme-accent-rgb: 167, 139, 250;
+  
+  --theme-gradient: linear-gradient(135deg, #8b5cf6 0%, #6d28d9 100%);
+}
+
+/* ========================================
+   MODULE-SPECIFIC VISUAL INDICATORS
+   ======================================== */
+
+/* Module badge in header (optional) */
+.module-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-1) var(--space-3);
+  background-color: rgba(var(--theme-accent-rgb), 0.15);
+  color: var(--theme-accent);
+  border-radius: var(--border-radius-full);
+  font-size: var(--text-sm);
+  font-weight: var(--font-medium);
+}
+
+[data-theme="dark"] .module-badge {
+  background-color: rgba(var(--theme-accent-rgb), 0.25);
+}
+
+/* Module accent border for cards */
+.card--module-accent {
+  border-top: 3px solid var(--theme-accent);
+}
+
+/* Module accent background for section headers */
+.section-header--accent {
+  background: var(--theme-gradient);
+  color: var(--color-white);
+}
