@@ -989,9 +989,6 @@
       if (!user) return;
 
       const newStatus = user.status === 'active' ? 'inactive' : 'active';
-      const action = newStatus === 'active' ? 'activer' : 'désactiver';
-
-      if (!window.confirm(`Voulez-vous vraiment ${action} ${user.name}?`)) return;
 
       try {
         await db.collection('inspectors').doc(userId).update({

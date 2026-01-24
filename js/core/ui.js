@@ -167,19 +167,27 @@ class Modal {
   }
 
   close() {
-    if (this.element) {
+    if (this.element && !this._closing) {
+      this._closing = true;
       this.element.classList.remove('is-active');
       document.body.classList.remove('modal-open');
       
       if (this.onClose) {
         this.onClose();
       }
+      this._closing = false;
     }
     return this;
   }
 
   destroy() {
-    this.close();
+    if (this._destroyed) return;
+    this._destroyed = true;
+    
+    if (this.element) {
+      this.element.classList.remove('is-active');
+      document.body.classList.remove('modal-open');
+    }
     if (this.element && this.element.parentNode) {
       this.element.parentNode.removeChild(this.element);
     }
@@ -222,6 +230,7 @@ class Modal {
  */
 function confirm(options) {
   return new Promise((resolve) => {
+    let resolved = false;
     const modal = new Modal({
       title: options.title || 'Confirmation',
       content: `
@@ -234,12 +243,18 @@ function confirm(options) {
       cancelText: options.cancelText || 'Annuler',
       confirmClass: options.confirmClass || 'btn-primary',
       onConfirm: () => {
-        resolve(true);
-        modal.destroy();
+        if (!resolved) {
+          resolved = true;
+          resolve(true);
+          modal.destroy();
+        }
       },
       onClose: () => {
-        resolve(false);
-        modal.destroy();
+        if (!resolved) {
+          resolved = true;
+          resolve(false);
+          modal.destroy();
+        }
       }
     });
 
