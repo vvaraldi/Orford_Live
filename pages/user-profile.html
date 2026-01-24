@@ -30,11 +30,7 @@
         <span>🏠</span>
         <span>Accueil</span>
       </a>
-      <a href="user-profile.html" class="nav__link is-active">
-        <span>👤</span>
-        <span>Mon profil</span>
-      </a>
-      <a href="user-management.html" class="nav__link" data-require-admin style="display: none;">
+      <a href="user-management.html" class="nav__link" data-require-admin id="admin-nav-link" style="display: none;">
         <span>⚙️</span>
         <span>Gestion</span>
       </a>
@@ -70,13 +66,9 @@
             <div class="user-menu__header-name" data-user-name>-</div>
             <div class="user-menu__header-email" data-user-email>-</div>
           </div>
-          <a href="user-profile.html" class="user-menu__item">
+          <a href="user-profile.html" class="user-menu__item is-active">
             <span>👤</span>
             <span>Mon profil</span>
-          </a>
-          <a href="user-management.html" class="user-menu__item" data-require-admin style="display: none;">
-            <span>⚙️</span>
-            <span>Gestion des utilisateurs</span>
           </a>
           <div class="user-menu__divider"></div>
           <button class="user-menu__item user-menu__item--danger" onclick="handleLogout()">
