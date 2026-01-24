@@ -1,0 +1,1485 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Tableau de bord des inspections - Orford Live">
+  <meta name="theme-color" content="#1b4b72">
+  <title>Inspection Dashboard - Orford Live</title>
+  
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🔍</text></svg>">
+  <link rel="stylesheet" href="../css/main.css">
+  
+  <style>
+    /* Dashboard specific styles */
+    .dashboard-stats {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+      gap: 1rem;
+      margin-bottom: 1.5rem;
+    }
+    
+    .stat-card {
+      background: var(--theme-surface);
+      border: 1px solid var(--theme-border);
+      border-radius: var(--radius-lg);
+      padding: 1rem;
+      text-align: center;
+    }
+    
+    .stat-card__value {
+      font-size: 2rem;
+      font-weight: 700;
+      color: var(--theme-accent);
+    }
+    
+    .stat-card__label {
+      font-size: 0.75rem;
+      color: var(--theme-text-secondary);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+    
+    .stat-card--success .stat-card__value { color: var(--color-success); }
+    .stat-card--warning .stat-card__value { color: var(--color-warning); }
+    .stat-card--danger .stat-card__value { color: var(--color-danger); }
+    
+    /* Map Container */
+    .map-section {
+      background: var(--theme-surface);
+      border: 1px solid var(--theme-border);
+      border-radius: var(--radius-lg);
+      overflow: hidden;
+      margin-bottom: 1.5rem;
+    }
+    
+    .map-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 1rem;
+      border-bottom: 1px solid var(--theme-border);
+      flex-wrap: wrap;
+      gap: 1rem;
+    }
+    
+    .map-header__title {
+      font-size: 1.125rem;
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+    
+    .map-controls {
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+      flex-wrap: wrap;
+    }
+    
+    .view-toggle {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      font-size: 0.875rem;
+    }
+    
+    .view-toggle__label {
+      color: var(--theme-text-secondary);
+    }
+    
+    .view-toggle__label.is-active {
+      color: var(--theme-accent);
+      font-weight: 600;
+    }
+    
+    .toggle-switch {
+      position: relative;
+      width: 50px;
+      height: 26px;
+    }
+    
+    .toggle-switch input {
+      opacity: 0;
+      width: 0;
+      height: 0;
+    }
+    
+    .toggle-switch__slider {
+      position: absolute;
+      cursor: pointer;
+      inset: 0;
+      background: var(--theme-border);
+      border-radius: 26px;
+      transition: 0.3s;
+    }
+    
+    .toggle-switch__slider::before {
+      content: '';
+      position: absolute;
+      height: 20px;
+      width: 20px;
+      left: 3px;
+      bottom: 3px;
+      background: var(--color-white);
+      border-radius: 50%;
+      transition: 0.3s;
+    }
+    
+    .toggle-switch input:checked + .toggle-switch__slider {
+      background: var(--theme-accent);
+    }
+    
+    .toggle-switch input:checked + .toggle-switch__slider::before {
+      transform: translateX(24px);
+    }
+    
+    .bulk-actions {
+      display: none;
+      gap: 0.5rem;
+    }
+    
+    .bulk-actions.show {
+      display: flex;
+    }
+    
+    /* Map container */
+    .map-container {
+      position: relative;
+      width: 100%;
+      overflow: auto;
+      background: var(--theme-surface-alt);
+    }
+    
+    .map-wrapper {
+      position: relative;
+      width: 1200px;
+      height: 900px;
+      margin: 0 auto;
+    }
+    
+    .map-image {
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+    }
+    
+    /* Map markers */
+    .map-marker {
+      position: absolute;
+      width: 28px;
+      height: 28px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.75rem;
+      font-weight: 700;
+      color: var(--color-white);
+      cursor: pointer;
+      transform: translate(-50%, -50%);
+      transition: all 0.2s ease;
+      z-index: 10;
+      border: 2px solid rgba(255,255,255,0.8);
+      box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+    }
+    
+    .map-marker:hover {
+      transform: translate(-50%, -50%) scale(1.2);
+      z-index: 20;
+    }
+    
+    /* Inspection view markers */
+    .map-marker--good { background: var(--color-success); }
+    .map-marker--warning { background: var(--color-warning); }
+    .map-marker--critical { background: var(--color-danger); }
+    .map-marker--not-inspected { background: var(--theme-text-lighter); }
+    
+    /* Status view markers */
+    .map-marker--open { background: #22c55e; }
+    .map-marker--closed { background: #ef4444; }
+    .map-marker--unknown { background: #9ca3af; }
+    
+    /* Shelter markers */
+    .map-marker--shelter {
+      width: 24px;
+      height: 24px;
+      border-radius: var(--radius-sm);
+    }
+    
+    /* Legend */
+    .map-legend {
+      display: flex;
+      gap: 1.5rem;
+      padding: 0.75rem 1rem;
+      background: var(--theme-surface-alt);
+      border-top: 1px solid var(--theme-border);
+      font-size: 0.75rem;
+      flex-wrap: wrap;
+    }
+    
+    .legend-item {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+    
+    .legend-dot {
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+    }
+    
+    .legend-dot--good { background: var(--color-success); }
+    .legend-dot--warning { background: var(--color-warning); }
+    .legend-dot--critical { background: var(--color-danger); }
+    .legend-dot--not-inspected { background: var(--theme-text-lighter); }
+    .legend-dot--open { background: #22c55e; }
+    .legend-dot--closed { background: #ef4444; }
+    .legend-dot--unknown { background: #9ca3af; }
+    
+    /* Recent inspections table */
+    .recent-section {
+      background: var(--theme-surface);
+      border: 1px solid var(--theme-border);
+      border-radius: var(--radius-lg);
+      overflow: hidden;
+    }
+    
+    .recent-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 1rem;
+      border-bottom: 1px solid var(--theme-border);
+    }
+    
+    .recent-header__title {
+      font-size: 1.125rem;
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+    
+    .inspection-row {
+      display: grid;
+      grid-template-columns: 1fr auto auto auto;
+      gap: 1rem;
+      padding: 0.75rem 1rem;
+      border-bottom: 1px solid var(--theme-border);
+      align-items: center;
+      cursor: pointer;
+      transition: background 0.15s ease;
+    }
+    
+    .inspection-row:hover {
+      background: var(--theme-surface-alt);
+    }
+    
+    .inspection-row:last-child {
+      border-bottom: none;
+    }
+    
+    .inspection-row__name {
+      font-weight: 500;
+    }
+    
+    .inspection-row__type {
+      font-size: 0.75rem;
+      color: var(--theme-text-secondary);
+    }
+    
+    .inspection-row__date {
+      font-size: 0.875rem;
+      color: var(--theme-text-secondary);
+    }
+    
+    .inspection-row__inspector {
+      font-size: 0.875rem;
+      color: var(--theme-text-secondary);
+    }
+    
+    /* Status badges */
+    .status-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.25rem;
+      padding: 0.25rem 0.75rem;
+      border-radius: var(--radius-full);
+      font-size: 0.75rem;
+      font-weight: 500;
+    }
+    
+    .status-badge--good { background: rgba(16, 185, 129, 0.15); color: #065f46; }
+    .status-badge--warning { background: rgba(245, 158, 11, 0.15); color: #92400e; }
+    .status-badge--critical { background: rgba(239, 68, 68, 0.15); color: #991b1b; }
+    .status-badge--open { background: rgba(34, 197, 94, 0.15); color: #166534; }
+    .status-badge--closed { background: rgba(239, 68, 68, 0.15); color: #991b1b; }
+    
+    /* Inspection Modal */
+    .inspection-modal {
+      display: none;
+      position: fixed;
+      inset: 0;
+      z-index: var(--z-modal);
+      background: rgba(0,0,0,0.5);
+      padding: 1rem;
+      overflow-y: auto;
+    }
+    
+    .inspection-modal.show {
+      display: flex;
+      align-items: flex-start;
+      justify-content: center;
+    }
+    
+    .inspection-modal__content {
+      background: var(--theme-surface);
+      border-radius: var(--radius-lg);
+      width: 100%;
+      max-width: 600px;
+      margin-top: 2rem;
+      overflow: hidden;
+    }
+    
+    .inspection-modal__header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 1rem 1.25rem;
+      border-bottom: 1px solid var(--theme-border);
+      background: var(--theme-surface-alt);
+    }
+    
+    .inspection-modal__title {
+      font-size: 1.125rem;
+      font-weight: 600;
+    }
+    
+    .inspection-modal__close {
+      background: none;
+      border: none;
+      font-size: 1.5rem;
+      cursor: pointer;
+      color: var(--theme-text-secondary);
+      padding: 0.25rem;
+      line-height: 1;
+    }
+    
+    .inspection-modal__body {
+      padding: 1.25rem;
+    }
+    
+    .detail-row {
+      display: flex;
+      justify-content: space-between;
+      padding: 0.5rem 0;
+      border-bottom: 1px solid var(--theme-border);
+    }
+    
+    .detail-row:last-child {
+      border-bottom: none;
+    }
+    
+    .detail-row__label {
+      color: var(--theme-text-secondary);
+      font-size: 0.875rem;
+    }
+    
+    .detail-row__value {
+      font-weight: 500;
+    }
+    
+    .detail-section {
+      margin-top: 1rem;
+    }
+    
+    .detail-section__title {
+      font-weight: 600;
+      margin-bottom: 0.5rem;
+      font-size: 0.875rem;
+      color: var(--theme-text-secondary);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+    
+    .issues-list {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+    }
+    
+    .issue-tag {
+      background: rgba(239, 68, 68, 0.1);
+      color: var(--color-danger);
+      padding: 0.25rem 0.75rem;
+      border-radius: var(--radius-full);
+      font-size: 0.75rem;
+    }
+    
+    .notes-box {
+      background: var(--theme-surface-alt);
+      padding: 0.75rem;
+      border-radius: var(--radius-md);
+      font-size: 0.875rem;
+      line-height: 1.5;
+    }
+    
+    .photos-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+      gap: 0.5rem;
+    }
+    
+    .photo-item {
+      position: relative;
+    }
+    
+    .photo-thumb {
+      width: 100%;
+      aspect-ratio: 1;
+      object-fit: cover;
+      border-radius: var(--radius-md);
+      cursor: pointer;
+    }
+    
+    .photo-location {
+      font-size: 0.625rem;
+      margin-top: 0.25rem;
+      display: flex;
+      gap: 0.5rem;
+    }
+    
+    .photo-location a {
+      color: var(--theme-accent);
+    }
+    
+    /* Context menu */
+    .context-menu {
+      display: none;
+      position: fixed;
+      background: var(--theme-surface);
+      border: 1px solid var(--theme-border);
+      border-radius: var(--radius-md);
+      box-shadow: var(--shadow-lg);
+      z-index: 1000;
+      min-width: 150px;
+      overflow: hidden;
+    }
+    
+    .context-menu.show {
+      display: block;
+    }
+    
+    .context-menu__item {
+      display: block;
+      width: 100%;
+      padding: 0.75rem 1rem;
+      text-align: left;
+      background: none;
+      border: none;
+      cursor: pointer;
+      font-size: 0.875rem;
+      transition: background 0.15s;
+    }
+    
+    .context-menu__item:hover {
+      background: var(--theme-surface-alt);
+    }
+    
+    .context-menu__divider {
+      height: 1px;
+      background: var(--theme-border);
+    }
+    
+    /* Responsive */
+    @media (max-width: 768px) {
+      .map-header {
+        flex-direction: column;
+        align-items: flex-start;
+      }
+      
+      .inspection-row {
+        grid-template-columns: 1fr;
+        gap: 0.5rem;
+      }
+      
+      .map-wrapper {
+        width: 100%;
+        height: auto;
+        min-height: 400px;
+      }
+    }
+  </style>
+</head>
+<body data-theme="light" data-module="inspection">
+  <a href="#main-content" class="skip-link">Aller au contenu principal</a>
+
+  <!-- Header -->
+  <header class="header">
+    <a href="../index.html" class="logo">
+      <span class="logo__icon">🔍</span>
+      <span class="logo__text">Inspection</span>
+    </a>
+
+    <nav class="nav">
+      <a href="../index.html" class="nav__link">
+        <span>🏠</span>
+        <span>Portail</span>
+      </a>
+      <a href="inspection-dashboard.html" class="nav__link is-active">
+        <span>📊</span>
+        <span>Dashboard</span>
+      </a>
+      
+      <div class="nav__divider"></div>
+      
+      <button class="theme-toggle" onclick="window.themeManager.toggle()" aria-label="Changer le thème">
+        <svg class="theme-toggle__icon theme-toggle__icon--moon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
+        </svg>
+        <svg class="theme-toggle__icon theme-toggle__icon--sun" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display: none;">
+          <circle cx="12" cy="12" r="5"></circle>
+          <line x1="12" y1="1" x2="12" y2="3"></line>
+          <line x1="12" y1="21" x2="12" y2="23"></line>
+          <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+          <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+          <line x1="1" y1="12" x2="3" y2="12"></line>
+          <line x1="21" y1="12" x2="23" y2="12"></line>
+          <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
+          <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+        </svg>
+      </button>
+
+      <div class="user-menu">
+        <button class="user-menu__trigger">
+          <span class="user-menu__avatar" data-user-initials>--</span>
+          <span class="user-menu__name" data-user-name>Chargement...</span>
+        </button>
+        <div class="user-menu__dropdown">
+          <div class="user-menu__header">
+            <div class="user-menu__header-name" data-user-name>-</div>
+            <div class="user-menu__header-email" data-user-email>-</div>
+          </div>
+          <a href="user-profile.html" class="user-menu__item">
+            <span>👤</span>
+            <span>Mon profil</span>
+          </a>
+          <div class="user-menu__divider"></div>
+          <button class="user-menu__item user-menu__item--danger" onclick="handleLogout()">
+            <span>🚪</span>
+            <span>Déconnexion</span>
+          </button>
+        </div>
+      </div>
+    </nav>
+
+    <button class="mobile-menu-btn" id="mobile-menu-btn" aria-label="Menu">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <line x1="3" y1="12" x2="21" y2="12"></line>
+        <line x1="3" y1="6" x2="21" y2="6"></line>
+        <line x1="3" y1="18" x2="21" y2="18"></line>
+      </svg>
+    </button>
+  </header>
+
+  <!-- Mobile Navigation -->
+  <div class="mobile-nav__backdrop" id="mobile-nav-backdrop"></div>
+  <nav class="mobile-nav" id="mobile-nav">
+    <div class="mobile-nav__header">
+      <a href="../index.html" class="mobile-nav__logo">
+        <span>🔍</span>
+        <span>Inspection</span>
+      </a>
+      <button class="mobile-nav__close" id="mobile-nav-close" aria-label="Fermer">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <line x1="18" y1="6" x2="6" y2="18"></line>
+          <line x1="6" y1="6" x2="18" y2="18"></line>
+        </svg>
+      </button>
+    </div>
+    
+    <div class="mobile-nav__user">
+      <div class="mobile-nav__user-name" data-user-name>-</div>
+      <div class="mobile-nav__user-role" data-user-role>-</div>
+    </div>
+
+    <div class="mobile-nav__section">
+      <a href="../index.html" class="mobile-nav__link">
+        <span class="mobile-nav__link-icon">🏠</span>
+        <span>Portail</span>
+      </a>
+      <a href="inspection-dashboard.html" class="mobile-nav__link is-active">
+        <span class="mobile-nav__link-icon">📊</span>
+        <span>Dashboard</span>
+      </a>
+      <a href="user-profile.html" class="mobile-nav__link">
+        <span class="mobile-nav__link-icon">👤</span>
+        <span>Mon profil</span>
+      </a>
+    </div>
+
+    <div class="mobile-nav__divider"></div>
+
+    <div class="mobile-nav__section">
+      <a href="#" class="mobile-nav__link" onclick="handleLogout(); return false;">
+        <span class="mobile-nav__link-icon">🚪</span>
+        <span>Déconnexion</span>
+      </a>
+    </div>
+  </nav>
+
+  <!-- Loading Screen -->
+  <div id="loading" class="page-loading">
+    <div class="loading-spinner"></div>
+    <p class="loading-text">Chargement du tableau de bord...</p>
+  </div>
+
+  <!-- Main Content -->
+  <main id="main-content" class="main" style="display: none;">
+    <div class="page-header">
+      <div class="page-header__content">
+        <h1 class="page-title">
+          <span class="page-title__icon">📊</span>
+          Tableau de bord
+        </h1>
+        <p class="page-subtitle">Vue d'ensemble des inspections et statuts</p>
+      </div>
+      <div class="page-header__actions">
+        <a href="inspection-trail-report.html" class="btn btn-primary">
+          <span>➕</span>
+          <span>Nouvelle inspection</span>
+        </a>
+      </div>
+    </div>
+
+    <!-- Statistics -->
+    <div class="dashboard-stats">
+      <div class="stat-card">
+        <div class="stat-card__value" id="stat-total">-</div>
+        <div class="stat-card__label">Total sentiers</div>
+      </div>
+      <div class="stat-card stat-card--success">
+        <div class="stat-card__value" id="stat-open">-</div>
+        <div class="stat-card__label">Ouverts</div>
+      </div>
+      <div class="stat-card stat-card--danger">
+        <div class="stat-card__value" id="stat-closed">-</div>
+        <div class="stat-card__label">Fermés</div>
+      </div>
+      <div class="stat-card stat-card--warning">
+        <div class="stat-card__value" id="stat-inspected-today">-</div>
+        <div class="stat-card__label">Inspectés aujourd'hui</div>
+      </div>
+    </div>
+
+    <!-- Map Section -->
+    <div class="map-section">
+      <div class="map-header">
+        <h2 class="map-header__title">
+          <span>🗺️</span>
+          <span>Carte des sentiers</span>
+        </h2>
+        <div class="map-controls">
+          <!-- View Toggle -->
+          <div class="view-toggle">
+            <span class="view-toggle__label" id="label-inspection">Inspection</span>
+            <label class="toggle-switch">
+              <input type="checkbox" id="view-toggle" onchange="toggleMapView()">
+              <span class="toggle-switch__slider"></span>
+            </label>
+            <span class="view-toggle__label" id="label-status">Statut</span>
+          </div>
+          
+          <!-- Bulk actions (admin only, status view) -->
+          <div class="bulk-actions" id="bulk-actions">
+            <button class="btn btn-sm btn-success" onclick="bulkSetStatus('open')">
+              <span>🟢</span> Tout ouvrir
+            </button>
+            <button class="btn btn-sm btn-danger" onclick="bulkSetStatus('closed')">
+              <span>🔴</span> Tout fermer
+            </button>
+          </div>
+        </div>
+      </div>
+      
+      <div class="map-container" id="map-container">
+        <div class="map-wrapper" id="map-wrapper">
+          <img src="../assets/map/map3.png" alt="Carte Mont Orford" class="map-image" id="map-image">
+          <!-- Markers will be added dynamically -->
+        </div>
+      </div>
+      
+      <!-- Legends -->
+      <div class="map-legend" id="legend-inspection">
+        <div class="legend-item">
+          <span class="legend-dot legend-dot--good"></span>
+          <span>Bon état</span>
+        </div>
+        <div class="legend-item">
+          <span class="legend-dot legend-dot--warning"></span>
+          <span>Attention</span>
+        </div>
+        <div class="legend-item">
+          <span class="legend-dot legend-dot--critical"></span>
+          <span>Critique</span>
+        </div>
+        <div class="legend-item">
+          <span class="legend-dot legend-dot--not-inspected"></span>
+          <span>Non inspecté</span>
+        </div>
+      </div>
+      
+      <div class="map-legend" id="legend-status" style="display: none;">
+        <div class="legend-item">
+          <span class="legend-dot legend-dot--open"></span>
+          <span>Ouvert</span>
+        </div>
+        <div class="legend-item">
+          <span class="legend-dot legend-dot--closed"></span>
+          <span>Fermé</span>
+        </div>
+        <div class="legend-item">
+          <span class="legend-dot legend-dot--unknown"></span>
+          <span>Inconnu</span>
+        </div>
+        <span style="margin-left: auto; font-size: 0.75rem; color: var(--theme-text-secondary);">
+          Clic droit sur un marqueur pour changer le statut (admin)
+        </span>
+      </div>
+    </div>
+
+    <!-- Recent Inspections -->
+    <div class="recent-section">
+      <div class="recent-header">
+        <h2 class="recent-header__title">
+          <span>📋</span>
+          <span>Inspections des 7 derniers jours</span>
+        </h2>
+        <a href="inspection-history.html" class="btn btn-secondary btn-sm">
+          Voir tout l'historique
+        </a>
+      </div>
+      
+      <div id="recent-inspections">
+        <div class="loading-state" id="recent-loading">
+          <div class="loading-spinner loading-spinner--sm"></div>
+          <p class="loading-text">Chargement...</p>
+        </div>
+      </div>
+      
+      <div class="empty-state" id="recent-empty" style="display: none;">
+        <div class="empty-state__icon">📋</div>
+        <h3 class="empty-state__title">Aucune inspection récente</h3>
+        <p class="empty-state__description">Aucune inspection n'a été enregistrée dans les 7 derniers jours.</p>
+      </div>
+    </div>
+  </main>
+
+  <!-- Inspection Detail Modal -->
+  <div class="inspection-modal" id="inspection-modal">
+    <div class="inspection-modal__content">
+      <div class="inspection-modal__header">
+        <h3 class="inspection-modal__title" id="modal-title">Détails de l'inspection</h3>
+        <button class="inspection-modal__close" onclick="closeInspectionModal()">✕</button>
+      </div>
+      <div class="inspection-modal__body" id="modal-body">
+        <!-- Content loaded dynamically -->
+      </div>
+    </div>
+  </div>
+
+  <!-- Context Menu (for right-click status change) -->
+  <div class="context-menu" id="context-menu">
+    <button class="context-menu__item" onclick="setTrailStatus('open')">
+      🟢 Ouvrir le sentier
+    </button>
+    <button class="context-menu__item" onclick="setTrailStatus('closed')">
+      🔴 Fermer le sentier
+    </button>
+  </div>
+
+  <!-- Footer -->
+  <footer class="footer footer--simple">
+    <div class="footer__content">
+      <p class="footer__copyright">© 2025 Patrouille Mont Orford</p>
+    </div>
+  </footer>
+
+  <!-- Firebase SDK -->
+  <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
+
+  <!-- Core JS -->
+  <script src="../js/core/config.js"></script>
+  <script src="../js/core/utils.js"></script>
+  <script src="../js/core/theme.js"></script>
+  <script src="../js/core/ui.js"></script>
+  <script src="../js/core/auth.js"></script>
+
+  <!-- Page Script -->
+  <script>
+    // State
+    let allTrails = [];
+    let allShelters = [];
+    let trailInspections = {};
+    let shelterInspections = {};
+    let inspectorsMap = new Map();
+    let currentView = 'inspection'; // 'inspection' or 'status'
+    let contextTrail = null;
+    let isAdminUser = false;
+
+    // ========================================
+    // DATA LOADING
+    // ========================================
+
+    async function loadDashboardData() {
+      try {
+        // Load trails
+        const trailsSnap = await db.collection('trails').get();
+        allTrails = [];
+        trailsSnap.forEach(doc => {
+          allTrails.push({ id: doc.id, ...doc.data() });
+        });
+
+        // Load shelters
+        const sheltersSnap = await db.collection('shelters').get();
+        allShelters = [];
+        sheltersSnap.forEach(doc => {
+          allShelters.push({ id: doc.id, ...doc.data() });
+        });
+
+        // Load inspectors for name resolution
+        const inspectorsSnap = await db.collection('inspectors').get();
+        inspectorsMap.clear();
+        inspectorsSnap.forEach(doc => {
+          inspectorsMap.set(doc.id, doc.data().name || doc.id);
+        });
+
+        // Load trail inspections (most recent per trail)
+        trailInspections = {};
+        const trailInspSnap = await db.collection('trail_inspections')
+          .orderBy('date', 'desc')
+          .get();
+        trailInspSnap.forEach(doc => {
+          const data = doc.data();
+          const trailId = data.trail_id;
+          if (!trailInspections[trailId]) {
+            trailInspections[trailId] = { id: doc.id, ...data };
+          }
+        });
+
+        // Also check 'inspections' collection
+        try {
+          const inspSnap = await db.collection('inspections')
+            .orderBy('date', 'desc')
+            .get();
+          inspSnap.forEach(doc => {
+            const data = doc.data();
+            const trailId = data.trail_id;
+            if (!trailInspections[trailId]) {
+              trailInspections[trailId] = { id: doc.id, ...data };
+            }
+          });
+        } catch(e) {}
+
+        // Load shelter inspections
+        shelterInspections = {};
+        const shelterInspSnap = await db.collection('shelter_inspections')
+          .orderBy('date', 'desc')
+          .get();
+        shelterInspSnap.forEach(doc => {
+          const data = doc.data();
+          const shelterId = data.shelter_id;
+          if (!shelterInspections[shelterId]) {
+            shelterInspections[shelterId] = { id: doc.id, ...data };
+          }
+        });
+
+        updateStatistics();
+        renderMapMarkers();
+        loadRecentInspections();
+
+      } catch (error) {
+        console.error('Error loading dashboard data:', error);
+        showMessage('Erreur lors du chargement des données.', 'error');
+      }
+    }
+
+    // ========================================
+    // STATISTICS
+    // ========================================
+
+    function updateStatistics() {
+      const totalTrails = allTrails.length;
+      let openCount = 0;
+      let closedCount = 0;
+      let inspectedToday = 0;
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+
+      allTrails.forEach(trail => {
+        const status = trail.status || 'unknown';
+        if (status === 'open') openCount++;
+        else if (status === 'closed') closedCount++;
+
+        const insp = trailInspections[trail.id];
+        if (insp && insp.date) {
+          const inspDate = insp.date.toDate ? insp.date.toDate() : new Date(insp.date);
+          if (inspDate >= today) inspectedToday++;
+        }
+      });
+
+      document.getElementById('stat-total').textContent = totalTrails;
+      document.getElementById('stat-open').textContent = openCount;
+      document.getElementById('stat-closed').textContent = closedCount;
+      document.getElementById('stat-inspected-today').textContent = inspectedToday;
+    }
+
+    // ========================================
+    // MAP RENDERING
+    // ========================================
+
+    function renderMapMarkers() {
+      const wrapper = document.getElementById('map-wrapper');
+      
+      // Remove existing markers
+      wrapper.querySelectorAll('.map-marker').forEach(m => m.remove());
+
+      // Render trail markers
+      allTrails.forEach(trail => {
+        if (!trail.coordinates) return;
+        
+        const marker = document.createElement('div');
+        const insp = trailInspections[trail.id];
+        
+        if (currentView === 'inspection') {
+          const condition = insp ? insp.condition : 'not-inspected';
+          marker.className = `map-marker map-marker--${condition}`;
+        } else {
+          const status = trail.status || 'unknown';
+          marker.className = `map-marker map-marker--${status}`;
+        }
+        
+        marker.style.left = `${trail.coordinates.left}px`;
+        marker.style.top = `${trail.coordinates.top}px`;
+        marker.textContent = trail.id.replace('trail_', '');
+        marker.title = trail.name;
+        marker.dataset.trailId = trail.id;
+        
+        // Click to open modal
+        marker.addEventListener('click', () => openTrailModal(trail.id));
+        
+        // Right-click for status change (admin only, status view)
+        marker.addEventListener('contextmenu', (e) => {
+          e.preventDefault();
+          if (isAdminUser && currentView === 'status') {
+            showContextMenu(e, trail);
+          }
+        });
+        
+        wrapper.appendChild(marker);
+      });
+
+      // Render shelter markers (inspection view only)
+      if (currentView === 'inspection') {
+        allShelters.forEach(shelter => {
+          if (!shelter.coordinates) return;
+          
+          const marker = document.createElement('div');
+          const insp = shelterInspections[shelter.id];
+          const condition = insp ? insp.condition : 'not-inspected';
+          
+          marker.className = `map-marker map-marker--shelter map-marker--${condition}`;
+          marker.style.left = `${shelter.coordinates.left}px`;
+          marker.style.top = `${shelter.coordinates.top}px`;
+          marker.textContent = '🏠';
+          marker.title = shelter.name;
+          marker.dataset.shelterId = shelter.id;
+          
+          marker.addEventListener('click', () => openShelterModal(shelter.id));
+          
+          wrapper.appendChild(marker);
+        });
+      }
+    }
+
+    // ========================================
+    // MAP VIEW TOGGLE
+    // ========================================
+
+    function toggleMapView() {
+      const toggle = document.getElementById('view-toggle');
+      const labelInsp = document.getElementById('label-inspection');
+      const labelStatus = document.getElementById('label-status');
+      const legendInsp = document.getElementById('legend-inspection');
+      const legendStatus = document.getElementById('legend-status');
+      const bulkActions = document.getElementById('bulk-actions');
+      
+      if (toggle.checked) {
+        currentView = 'status';
+        labelInsp.classList.remove('is-active');
+        labelStatus.classList.add('is-active');
+        legendInsp.style.display = 'none';
+        legendStatus.style.display = 'flex';
+        if (isAdminUser) bulkActions.classList.add('show');
+      } else {
+        currentView = 'inspection';
+        labelInsp.classList.add('is-active');
+        labelStatus.classList.remove('is-active');
+        legendInsp.style.display = 'flex';
+        legendStatus.style.display = 'none';
+        bulkActions.classList.remove('show');
+      }
+      
+      renderMapMarkers();
+    }
+
+    // ========================================
+    // CONTEXT MENU (RIGHT-CLICK)
+    // ========================================
+
+    function showContextMenu(e, trail) {
+      contextTrail = trail;
+      const menu = document.getElementById('context-menu');
+      menu.style.left = `${e.clientX}px`;
+      menu.style.top = `${e.clientY}px`;
+      menu.classList.add('show');
+    }
+
+    function hideContextMenu() {
+      document.getElementById('context-menu').classList.remove('show');
+      contextTrail = null;
+    }
+
+    async function setTrailStatus(status) {
+      if (!contextTrail) return;
+      hideContextMenu();
+      
+      try {
+        await db.collection('trails').doc(contextTrail.id).update({
+          status: status,
+          statusUpdatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+          statusUpdatedBy: currentUser.uid
+        });
+        
+        // Update local data
+        const trail = allTrails.find(t => t.id === contextTrail.id);
+        if (trail) trail.status = status;
+        
+        updateStatistics();
+        renderMapMarkers();
+        showMessage(`${contextTrail.name} ${status === 'open' ? 'ouvert' : 'fermé'}.`, 'success');
+      } catch (error) {
+        console.error('Error updating status:', error);
+        showMessage('Erreur lors de la mise à jour du statut.', 'error');
+      }
+    }
+
+    // ========================================
+    // BULK STATUS ACTIONS
+    // ========================================
+
+    async function bulkSetStatus(status) {
+      const action = status === 'open' ? 'ouvrir' : 'fermer';
+      if (!confirm(`Voulez-vous vraiment ${action} TOUS les sentiers?`)) return;
+      
+      try {
+        const batch = db.batch();
+        allTrails.forEach(trail => {
+          const ref = db.collection('trails').doc(trail.id);
+          batch.update(ref, {
+            status: status,
+            statusUpdatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+            statusUpdatedBy: currentUser.uid
+          });
+          trail.status = status;
+        });
+        
+        await batch.commit();
+        updateStatistics();
+        renderMapMarkers();
+        showMessage(`Tous les sentiers ont été ${status === 'open' ? 'ouverts' : 'fermés'}.`, 'success');
+      } catch (error) {
+        console.error('Error bulk update:', error);
+        showMessage('Erreur lors de la mise à jour.', 'error');
+      }
+    }
+
+    // ========================================
+    // INSPECTION MODAL
+    // ========================================
+
+    function openTrailModal(trailId) {
+      const trail = allTrails.find(t => t.id === trailId);
+      const insp = trailInspections[trailId];
+      
+      if (!trail) return;
+      
+      const modal = document.getElementById('inspection-modal');
+      const title = document.getElementById('modal-title');
+      const body = document.getElementById('modal-body');
+      
+      title.textContent = `🥾 ${trail.name}`;
+      
+      if (!insp) {
+        body.innerHTML = `
+          <div class="empty-state" style="padding: 2rem;">
+            <div class="empty-state__icon">📋</div>
+            <p>Aucune inspection disponible pour ce sentier.</p>
+          </div>
+        `;
+      } else {
+        const date = insp.date ? (insp.date.toDate ? insp.date.toDate() : new Date(insp.date)) : null;
+        const formattedDate = date ? formatDate(date) : 'Date inconnue';
+        const inspector = insp.inspector_name || inspectorsMap.get(insp.inspector_id) || 'Non spécifié';
+        const condition = insp.condition || 'unknown';
+        const trailStatus = insp.trail_status || trail.status || 'unknown';
+        
+        let issuesHtml = '';
+        if (insp.issues && insp.issues.length > 0) {
+          issuesHtml = `
+            <div class="detail-section">
+              <div class="detail-section__title">⚠️ Problèmes identifiés</div>
+              <div class="issues-list">
+                ${insp.issues.map(i => `<span class="issue-tag">${escapeHtml(i)}</span>`).join('')}
+              </div>
+            </div>
+          `;
+        }
+        
+        let notesHtml = '';
+        if (insp.notes && insp.notes.trim()) {
+          notesHtml = `
+            <div class="detail-section">
+              <div class="detail-section__title">📝 Notes</div>
+              <div class="notes-box">${escapeHtml(insp.notes).replace(/\n/g, '<br>')}</div>
+            </div>
+          `;
+        }
+        
+        let photosHtml = '';
+        if (insp.photos && insp.photos.length > 0) {
+          photosHtml = `
+            <div class="detail-section">
+              <div class="detail-section__title">📷 Photos (${insp.photos.length})</div>
+              <div class="photos-grid">
+                ${insp.photos.map((photo, idx) => {
+                  const url = typeof photo === 'string' ? photo : photo.url;
+                  const coords = typeof photo === 'object' ? photo.coordinates : null;
+                  let locHtml = '';
+                  if (coords) {
+                    locHtml = `
+                      <div class="photo-location">
+                        <a href="#" onclick="openPhotoMapModal(${coords.latitude}, ${coords.longitude}); return false;">Carte</a>
+                        <a href="https://www.google.com/maps?q=${coords.latitude},${coords.longitude}" target="_blank">Google</a>
+                      </div>
+                    `;
+                  }
+                  return `
+                    <div class="photo-item">
+                      <img src="${url}" alt="Photo ${idx+1}" class="photo-thumb" onclick="window.open('${url}', '_blank')">
+                      ${locHtml}
+                    </div>
+                  `;
+                }).join('')}
+              </div>
+            </div>
+          `;
+        }
+        
+        body.innerHTML = `
+          <div class="detail-row">
+            <span class="detail-row__label">Date d'inspection</span>
+            <span class="detail-row__value">${formattedDate}</span>
+          </div>
+          <div class="detail-row">
+            <span class="detail-row__label">Inspecteur</span>
+            <span class="detail-row__value">${escapeHtml(inspector)}</span>
+          </div>
+          <div class="detail-row">
+            <span class="detail-row__label">État général</span>
+            <span class="detail-row__value">
+              <span class="status-badge status-badge--${condition}">
+                ${condition === 'good' ? '✅ Bon' : condition === 'warning' ? '⚠️ Attention' : condition === 'critical' ? '❌ Critique' : '❓ Inconnu'}
+              </span>
+            </span>
+          </div>
+          <div class="detail-row">
+            <span class="detail-row__label">Statut du sentier</span>
+            <span class="detail-row__value">
+              <span class="status-badge status-badge--${trailStatus}">
+                ${trailStatus === 'open' ? '🟢 Ouvert' : trailStatus === 'closed' ? '🔴 Fermé' : '❓ Inconnu'}
+              </span>
+            </span>
+          </div>
+          ${issuesHtml}
+          ${notesHtml}
+          ${photosHtml}
+        `;
+      }
+      
+      modal.classList.add('show');
+      document.body.style.overflow = 'hidden';
+    }
+
+    function openShelterModal(shelterId) {
+      const shelter = allShelters.find(s => s.id === shelterId);
+      const insp = shelterInspections[shelterId];
+      
+      if (!shelter) return;
+      
+      const modal = document.getElementById('inspection-modal');
+      const title = document.getElementById('modal-title');
+      const body = document.getElementById('modal-body');
+      
+      title.textContent = `🏠 ${shelter.name}`;
+      
+      if (!insp) {
+        body.innerHTML = `
+          <div class="empty-state" style="padding: 2rem;">
+            <div class="empty-state__icon">📋</div>
+            <p>Aucune inspection disponible pour cet abri.</p>
+          </div>
+        `;
+      } else {
+        const date = insp.date ? (insp.date.toDate ? insp.date.toDate() : new Date(insp.date)) : null;
+        const formattedDate = date ? formatDate(date) : 'Date inconnue';
+        const inspector = insp.inspector_name || inspectorsMap.get(insp.inspector_id) || 'Non spécifié';
+        const condition = insp.condition || 'unknown';
+        
+        let issuesHtml = '';
+        if (insp.issues && insp.issues.length > 0) {
+          issuesHtml = `
+            <div class="detail-section">
+              <div class="detail-section__title">⚠️ Problèmes identifiés</div>
+              <div class="issues-list">
+                ${insp.issues.map(i => `<span class="issue-tag">${escapeHtml(i)}</span>`).join('')}
+              </div>
+            </div>
+          `;
+        }
+        
+        let notesHtml = '';
+        if (insp.notes && insp.notes.trim()) {
+          notesHtml = `
+            <div class="detail-section">
+              <div class="detail-section__title">📝 Notes</div>
+              <div class="notes-box">${escapeHtml(insp.notes).replace(/\n/g, '<br>')}</div>
+            </div>
+          `;
+        }
+        
+        let photosHtml = '';
+        if (insp.photos && insp.photos.length > 0) {
+          photosHtml = `
+            <div class="detail-section">
+              <div class="detail-section__title">📷 Photos (${insp.photos.length})</div>
+              <div class="photos-grid">
+                ${insp.photos.map((photo, idx) => {
+                  const url = typeof photo === 'string' ? photo : photo.url;
+                  const coords = typeof photo === 'object' ? photo.coordinates : null;
+                  let locHtml = '';
+                  if (coords) {
+                    locHtml = `
+                      <div class="photo-location">
+                        <a href="#" onclick="openPhotoMapModal(${coords.latitude}, ${coords.longitude}); return false;">Carte</a>
+                        <a href="https://www.google.com/maps?q=${coords.latitude},${coords.longitude}" target="_blank">Google</a>
+                      </div>
+                    `;
+                  }
+                  return `
+                    <div class="photo-item">
+                      <img src="${url}" alt="Photo ${idx+1}" class="photo-thumb" onclick="window.open('${url}', '_blank')">
+                      ${locHtml}
+                    </div>
+                  `;
+                }).join('')}
+              </div>
+            </div>
+          `;
+        }
+        
+        body.innerHTML = `
+          <div class="detail-row">
+            <span class="detail-row__label">Date d'inspection</span>
+            <span class="detail-row__value">${formattedDate}</span>
+          </div>
+          <div class="detail-row">
+            <span class="detail-row__label">Inspecteur</span>
+            <span class="detail-row__value">${escapeHtml(inspector)}</span>
+          </div>
+          <div class="detail-row">
+            <span class="detail-row__label">État général</span>
+            <span class="detail-row__value">
+              <span class="status-badge status-badge--${condition}">
+                ${condition === 'good' ? '✅ Bon' : condition === 'warning' ? '⚠️ Attention' : condition === 'critical' ? '❌ Critique' : '❓ Inconnu'}
+              </span>
+            </span>
+          </div>
+          ${issuesHtml}
+          ${notesHtml}
+          ${photosHtml}
+        `;
+      }
+      
+      modal.classList.add('show');
+      document.body.style.overflow = 'hidden';
+    }
+
+    function closeInspectionModal() {
+      document.getElementById('inspection-modal').classList.remove('show');
+      document.body.style.overflow = '';
+    }
+
+    // Photo map modal placeholder
+    function openPhotoMapModal(lat, lng) {
+      // For now, just open Google Maps
+      window.open(`https://www.google.com/maps?q=${lat},${lng}`, '_blank');
+    }
+
+    // ========================================
+    // RECENT INSPECTIONS
+    // ========================================
+
+    async function loadRecentInspections() {
+      const container = document.getElementById('recent-inspections');
+      const loadingEl = document.getElementById('recent-loading');
+      const emptyEl = document.getElementById('recent-empty');
+      
+      const sevenDaysAgo = new Date();
+      sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+      sevenDaysAgo.setHours(0, 0, 0, 0);
+      
+      try {
+        // Load recent trail inspections
+        let recentInspections = [];
+        
+        const trailSnap = await db.collection('trail_inspections')
+          .where('date', '>=', firebase.firestore.Timestamp.fromDate(sevenDaysAgo))
+          .orderBy('date', 'desc')
+          .limit(50)
+          .get();
+        
+        trailSnap.forEach(doc => {
+          const data = doc.data();
+          const trail = allTrails.find(t => t.id === data.trail_id);
+          recentInspections.push({
+            id: doc.id,
+            type: 'trail',
+            ...data,
+            locationName: trail ? trail.name : data.trail_id,
+            locationId: data.trail_id
+          });
+        });
+        
+        // Load recent shelter inspections
+        const shelterSnap = await db.collection('shelter_inspections')
+          .where('date', '>=', firebase.firestore.Timestamp.fromDate(sevenDaysAgo))
+          .orderBy('date', 'desc')
+          .limit(50)
+          .get();
+        
+        shelterSnap.forEach(doc => {
+          const data = doc.data();
+          const shelter = allShelters.find(s => s.id === data.shelter_id);
+          recentInspections.push({
+            id: doc.id,
+            type: 'shelter',
+            ...data,
+            locationName: shelter ? shelter.name : data.shelter_id,
+            locationId: data.shelter_id
+          });
+        });
+        
+        // Sort by date
+        recentInspections.sort((a, b) => {
+          const dateA = a.date?.toDate ? a.date.toDate() : new Date(a.date);
+          const dateB = b.date?.toDate ? b.date.toDate() : new Date(b.date);
+          return dateB - dateA;
+        });
+        
+        loadingEl.style.display = 'none';
+        
+        if (recentInspections.length === 0) {
+          emptyEl.style.display = 'flex';
+          return;
+        }
+        
+        // Render inspections
+        container.innerHTML = recentInspections.map(insp => {
+          const date = insp.date?.toDate ? insp.date.toDate() : new Date(insp.date);
+          const formattedDate = formatDate(date);
+          const inspector = insp.inspector_name || inspectorsMap.get(insp.inspector_id) || 'Non spécifié';
+          const condition = insp.condition || 'unknown';
+          const typeIcon = insp.type === 'trail' ? '🥾' : '🏠';
+          
+          return `
+            <div class="inspection-row" onclick="${insp.type === 'trail' ? `openTrailModal('${insp.locationId}')` : `openShelterModal('${insp.locationId}')`}">
+              <div>
+                <div class="inspection-row__name">${typeIcon} ${escapeHtml(insp.locationName)}</div>
+                <div class="inspection-row__type">${insp.type === 'trail' ? 'Sentier' : 'Abri'}</div>
+              </div>
+              <div class="inspection-row__date">${formattedDate}</div>
+              <div class="inspection-row__inspector">${escapeHtml(inspector)}</div>
+              <span class="status-badge status-badge--${condition}">
+                ${condition === 'good' ? '✅' : condition === 'warning' ? '⚠️' : condition === 'critical' ? '❌' : '❓'}
+              </span>
+            </div>
+          `;
+        }).join('');
+        
+      } catch (error) {
+        console.error('Error loading recent inspections:', error);
+        loadingEl.innerHTML = '<p style="color: var(--color-danger);">Erreur de chargement</p>';
+      }
+    }
+
+    // ========================================
+    // EVENT LISTENERS
+    // ========================================
+
+    document.addEventListener('click', (e) => {
+      // Close context menu on click outside
+      if (!e.target.closest('.context-menu') && !e.target.closest('.map-marker')) {
+        hideContextMenu();
+      }
+      
+      // Close modal on backdrop click
+      if (e.target.id === 'inspection-modal') {
+        closeInspectionModal();
+      }
+    });
+
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') {
+        closeInspectionModal();
+        hideContextMenu();
+      }
+    });
+
+    // ========================================
+    // INITIALIZATION
+    // ========================================
+
+    function initDashboard() {
+      // Set initial toggle label state
+      document.getElementById('label-inspection').classList.add('is-active');
+      
+      checkAuthStatus({
+        requireAuth: true,
+        requiredPermission: 'allowInspection',
+        onAuthenticated: (userData) => {
+          isAdminUser = userData.role === 'admin';
+          loadDashboardData();
+        }
+      });
+    }
+
+    document.addEventListener('DOMContentLoaded', initDashboard);
+  </script>
+</body>
+</html>
