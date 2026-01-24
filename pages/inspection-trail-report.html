@@ -6,757 +6,201 @@
   <meta name="description" content="Rapport d'inspection de sentier - Orford Live">
   <meta name="theme-color" content="#1b4b72">
   <title>Inspection Sentier - Orford Live</title>
-  
-  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🥾</text></svg>">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🔍</text></svg>">
   <link rel="stylesheet" href="../css/main.css">
-  
   <style>
-    /* Form-specific styles */
-    .form-card {
-      background: var(--theme-surface);
-      border: 1px solid var(--theme-border);
-      border-radius: var(--radius-lg);
-      overflow: hidden;
-      margin-bottom: 1.5rem;
-    }
-    
-    .form-card__header {
-      display: flex;
-      align-items: center;
-      gap: 0.75rem;
-      padding: 1rem 1.25rem;
-      background: var(--theme-surface-alt);
-      border-bottom: 1px solid var(--theme-border);
-      font-weight: 600;
-      font-size: 1rem;
-    }
-    
-    .form-card__body {
-      padding: 1.25rem;
-    }
-    
-    .form-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-      gap: 1rem;
-    }
-    
-    .form-grid--full {
-      grid-template-columns: 1fr;
-    }
-    
-    /* Trail info display */
-    .trail-info {
-      display: none;
-      background: var(--theme-surface-alt);
-      padding: 0.75rem 1rem;
-      border-radius: var(--radius-md);
-      margin-top: 0.75rem;
-      font-size: 0.875rem;
-    }
-    
-    .trail-info.show {
-      display: block;
-    }
-    
-    .trail-info__item {
-      display: flex;
-      justify-content: space-between;
-      padding: 0.25rem 0;
-    }
-    
-    .trail-info__label {
-      color: var(--theme-text-secondary);
-    }
-    
-    .current-status-badge {
-      display: inline-flex;
-      align-items: center;
-      gap: 0.25rem;
-      padding: 0.25rem 0.5rem;
-      border-radius: var(--radius-full);
-      font-size: 0.75rem;
-      font-weight: 500;
-    }
-    
-    .current-status-badge--open {
-      background: rgba(34, 197, 94, 0.15);
-      color: #166534;
-    }
-    
-    .current-status-badge--closed {
-      background: rgba(239, 68, 68, 0.15);
-      color: #991b1b;
-    }
-    
-    .current-status-badge--unknown {
-      background: rgba(156, 163, 175, 0.15);
-      color: #4b5563;
-    }
-    
-    /* Radio/Checkbox groups */
-    .radio-group, .checkbox-group {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 0.5rem;
-    }
-    
-    .radio-item, .checkbox-item {
-      position: relative;
-    }
-    
-    .radio-input, .checkbox-input {
-      position: absolute;
-      opacity: 0;
-      width: 0;
-      height: 0;
-    }
-    
-    .radio-label, .checkbox-label {
-      display: inline-flex;
-      align-items: center;
-      gap: 0.5rem;
-      padding: 0.625rem 1rem;
-      background: var(--theme-surface);
-      border: 2px solid var(--theme-border);
-      border-radius: var(--radius-md);
-      cursor: pointer;
-      transition: all 0.2s ease;
-      font-size: 0.875rem;
-    }
-    
-    .radio-label:hover, .checkbox-label:hover {
-      border-color: var(--theme-accent);
-    }
-    
-    .radio-input:checked + .radio-label,
-    .checkbox-input:checked + .checkbox-label {
-      border-color: var(--theme-accent);
-      background: rgba(var(--theme-accent-rgb), 0.1);
-    }
-    
-    /* Status specific colors */
-    .radio-label--open {
-      border-color: var(--color-success);
-    }
-    
-    .radio-input:checked + .radio-label--open {
-      background: rgba(16, 185, 129, 0.15);
-      border-color: var(--color-success);
-      color: #065f46;
-    }
-    
-    .radio-label--closed {
-      border-color: var(--color-danger);
-    }
-    
-    .radio-input:checked + .radio-label--closed {
-      background: rgba(239, 68, 68, 0.15);
-      border-color: var(--color-danger);
-      color: #991b1b;
-    }
-    
-    /* Condition colors */
-    .radio-label--good { border-color: var(--color-success); }
-    .radio-input:checked + .radio-label--good {
-      background: rgba(16, 185, 129, 0.15);
-      border-color: var(--color-success);
-      color: #065f46;
-    }
-    
-    .radio-label--warning { border-color: var(--color-warning); }
-    .radio-input:checked + .radio-label--warning {
-      background: rgba(245, 158, 11, 0.15);
-      border-color: var(--color-warning);
-      color: #92400e;
-    }
-    
-    .radio-label--critical { border-color: var(--color-danger); }
-    .radio-input:checked + .radio-label--critical {
-      background: rgba(239, 68, 68, 0.15);
-      border-color: var(--color-danger);
-      color: #991b1b;
-    }
-    
-    /* Photo upload */
-    .photo-upload-area {
-      border: 2px dashed var(--theme-border);
-      border-radius: var(--radius-lg);
-      padding: 2rem;
-      text-align: center;
-      cursor: pointer;
-      transition: all 0.2s ease;
-    }
-    
-    .photo-upload-area:hover,
-    .photo-upload-area.drag-over {
-      border-color: var(--theme-accent);
-      background: rgba(var(--theme-accent-rgb), 0.05);
-    }
-    
-    .photo-upload-area__icon {
-      font-size: 2.5rem;
-      margin-bottom: 0.5rem;
-    }
-    
-    .photo-upload-area__text {
-      font-weight: 500;
-      margin-bottom: 0.25rem;
-    }
-    
-    .photo-upload-area__hint {
-      font-size: 0.75rem;
-      color: var(--theme-text-secondary);
-    }
-    
-    .photo-preview-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
-      gap: 0.75rem;
-      margin-top: 1rem;
-    }
-    
-    .photo-preview {
-      position: relative;
-      aspect-ratio: 1;
-      border-radius: var(--radius-md);
-      overflow: hidden;
-      background: var(--theme-surface-alt);
-    }
-    
-    .photo-preview img {
-      width: 100%;
-      height: 100%;
-      object-fit: cover;
-    }
-    
-    .photo-preview__remove {
-      position: absolute;
-      top: 4px;
-      right: 4px;
-      width: 24px;
-      height: 24px;
-      background: rgba(0, 0, 0, 0.7);
-      color: white;
-      border: none;
-      border-radius: 50%;
-      cursor: pointer;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 1rem;
-      line-height: 1;
-    }
-    
-    .photo-preview__remove:hover {
-      background: var(--color-danger);
-    }
-    
-    /* Form actions */
-    .form-actions {
-      display: flex;
-      gap: 1rem;
-      margin-top: 1.5rem;
-      padding-top: 1.5rem;
-      border-top: 1px solid var(--theme-border);
-    }
-    
-    .form-actions .btn {
-      flex: 1;
-    }
-    
-    /* Success/Error messages */
-    .form-message {
-      display: none;
-      padding: 1rem;
-      border-radius: var(--radius-md);
-      margin-bottom: 1rem;
-    }
-    
-    .form-message.show {
-      display: flex;
-      align-items: center;
-      gap: 0.75rem;
-    }
-    
-    .form-message--success {
-      background: rgba(16, 185, 129, 0.15);
-      color: #065f46;
-      border: 1px solid rgba(16, 185, 129, 0.3);
-    }
-    
-    .form-message--error {
-      background: rgba(239, 68, 68, 0.15);
-      color: #991b1b;
-      border: 1px solid rgba(239, 68, 68, 0.3);
-    }
-    
-    /* Loading overlay */
-    .form-loading {
-      display: none;
-      position: fixed;
-      inset: 0;
-      background: rgba(0, 0, 0, 0.5);
-      z-index: 1000;
-      align-items: center;
-      justify-content: center;
-    }
-    
-    .form-loading.show {
-      display: flex;
-    }
-    
-    .form-loading__content {
-      background: var(--theme-surface);
-      padding: 2rem;
-      border-radius: var(--radius-lg);
-      text-align: center;
-    }
-    
-    /* Responsive */
-    @media (max-width: 640px) {
-      .form-actions {
-        flex-direction: column;
-      }
-      
-      .radio-group, .checkbox-group {
-        flex-direction: column;
-      }
-      
-      .radio-label, .checkbox-label {
-        width: 100%;
-        justify-content: flex-start;
-      }
-    }
+    .form-section { background: var(--theme-surface); border: 1px solid var(--theme-border); border-radius: var(--radius-lg); overflow: hidden; margin-bottom: 1.5rem; }
+    .form-section-header { display: flex; align-items: center; gap: 0.75rem; padding: 1rem 1.25rem; background: var(--theme-surface-alt); border-bottom: 1px solid var(--theme-border); font-weight: 600; }
+    .form-section-title { margin: 0; font-size: 1rem; font-weight: 600; }
+    .form-section-body { padding: 1.25rem; }
+    .form-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; }
+    .form-label-optional { font-weight: 400; color: var(--theme-text-secondary); font-size: 0.875rem; }
+    .form-label-required::after { content: ' *'; color: var(--color-danger); }
+    .radio-group { display: flex; flex-wrap: wrap; gap: 0.5rem; }
+    .radio-item { position: relative; }
+    .form-radio { position: absolute; opacity: 0; width: 0; height: 0; }
+    .radio-label { display: inline-flex; align-items: center; gap: 0.5rem; padding: 0.625rem 1rem; background: var(--theme-surface); border: 2px solid var(--theme-border); border-radius: var(--radius-md); cursor: pointer; transition: all 0.2s ease; font-size: 0.875rem; }
+    .radio-label:hover { border-color: var(--theme-accent); }
+    .form-radio:checked + .radio-label { border-color: var(--theme-accent); background: rgba(var(--theme-accent-rgb), 0.1); }
+    .radio-indicator { width: 16px; height: 16px; border-radius: 50%; border: 2px solid var(--theme-border); }
+    .radio-indicator.good { border-color: var(--color-success); background: rgba(16, 185, 129, 0.2); }
+    .radio-indicator.warning { border-color: var(--color-warning); background: rgba(245, 158, 11, 0.2); }
+    .radio-indicator.critical { border-color: var(--color-danger); background: rgba(239, 68, 68, 0.2); }
+    .form-radio:checked + .radio-label .radio-indicator.good { background: var(--color-success); }
+    .form-radio:checked + .radio-label .radio-indicator.warning { background: var(--color-warning); }
+    .form-radio:checked + .radio-label .radio-indicator.critical { background: var(--color-danger); }
+    .checkbox-group { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 0.5rem; }
+    .checkbox-item { position: relative; }
+    .form-checkbox { position: absolute; opacity: 0; width: 0; height: 0; }
+    .checkbox-label { display: flex; align-items: center; gap: 0.5rem; padding: 0.5rem 0.75rem; cursor: pointer; font-size: 0.875rem; border-radius: var(--radius-md); transition: background 0.15s; }
+    .checkbox-label:hover { background: var(--theme-surface-alt); }
+    .checkbox-indicator { width: 18px; height: 18px; border: 2px solid var(--theme-border); border-radius: var(--radius-sm); display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+    .form-checkbox:checked + .checkbox-label .checkbox-indicator { background: var(--theme-accent); border-color: var(--theme-accent); }
+    .form-checkbox:checked + .checkbox-label .checkbox-indicator::after { content: '✓'; color: white; font-size: 0.75rem; font-weight: bold; }
+    .file-upload-area { border: 2px dashed var(--theme-border); border-radius: var(--radius-lg); padding: 2rem; text-align: center; cursor: pointer; transition: all 0.2s ease; }
+    .file-upload-area:hover, .file-upload-area.drag-over { border-color: var(--theme-accent); background: rgba(var(--theme-accent-rgb), 0.05); }
+    .file-upload-icon { font-size: 2.5rem; margin-bottom: 0.5rem; }
+    .file-upload-text { font-weight: 500; margin-bottom: 0.25rem; }
+    .file-upload-hint { font-size: 0.75rem; color: var(--theme-text-secondary); }
+    .photo-preview-container { display: grid; grid-template-columns: repeat(auto-fill, minmax(100px, 1fr)); gap: 0.75rem; margin-top: 1rem; }
+    .photo-preview { position: relative; aspect-ratio: 1; border-radius: var(--radius-md); overflow: hidden; background: var(--theme-surface-alt); }
+    .photo-preview img { width: 100%; height: 100%; object-fit: cover; }
+    .photo-remove { position: absolute; top: 4px; right: 4px; width: 24px; height: 24px; background: rgba(0,0,0,0.7); color: white; border: none; border-radius: 50%; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 1rem; line-height: 1; }
+    .photo-remove:hover { background: var(--color-danger); }
+    .form-actions { display: flex; gap: 1rem; margin-top: 1.5rem; }
+    .alert { padding: 1rem 1.5rem; border-radius: var(--radius-md); margin-bottom: 1rem; border-left: 4px solid; display: none; }
+    .alert.show { display: block; }
+    .alert-success { background: rgba(16, 185, 129, 0.15); color: #065f46; border-left-color: var(--color-success); }
+    .alert-danger { background: rgba(239, 68, 68, 0.15); color: #991b1b; border-left-color: var(--color-danger); }
+    .form-loading-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 1000; align-items: center; justify-content: center; }
+    .form-loading-overlay.show { display: flex; }
+    .form-loading-content { background: var(--theme-surface); padding: 2rem; border-radius: var(--radius-lg); text-align: center; }
+    @media (max-width: 640px) { .form-actions { flex-direction: column; } .form-actions .btn { width: 100%; } .radio-group { flex-direction: column; } .radio-label { width: 100%; justify-content: flex-start; } }
   </style>
 </head>
 <body data-theme="light" data-module="inspection">
   <a href="#main-content" class="skip-link">Aller au contenu principal</a>
-
-  <!-- Header -->
   <header class="header">
-    <a href="../index.html" class="logo">
-      <span class="logo__icon">🔍</span>
-      <span class="logo__text">Inspection</span>
-    </a>
-
+    <a href="../index.html" class="logo"><span class="logo__icon">🔍</span><span class="logo__text">Inspection</span></a>
     <nav class="nav">
-      <a href="../index.html" class="nav__link">
-        <span>🏠</span>
-        <span>Portail</span>
-      </a>
-      <a href="inspection-dashboard.html" class="nav__link">
-        <span>📊</span>
-        <span>Dashboard</span>
-      </a>
-      
+      <a href="../index.html" class="nav__link"><span>🏠</span><span>Portail</span></a>
+      <a href="inspection-dashboard.html" class="nav__link"><span>📊</span><span>Dashboard</span></a>
       <div class="nav__divider"></div>
-      
       <button class="theme-toggle" onclick="window.themeManager.toggle()" aria-label="Changer le thème">
-        <svg class="theme-toggle__icon theme-toggle__icon--moon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
-        </svg>
-        <svg class="theme-toggle__icon theme-toggle__icon--sun" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display: none;">
-          <circle cx="12" cy="12" r="5"></circle>
-          <line x1="12" y1="1" x2="12" y2="3"></line>
-          <line x1="12" y1="21" x2="12" y2="23"></line>
-          <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
-          <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
-          <line x1="1" y1="12" x2="3" y2="12"></line>
-          <line x1="21" y1="12" x2="23" y2="12"></line>
-          <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
-          <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
-        </svg>
+        <svg class="theme-toggle__icon theme-toggle__icon--moon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg>
+        <svg class="theme-toggle__icon theme-toggle__icon--sun" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display: none;"><circle cx="12" cy="12" r="5"></circle><line x1="12" y1="1" x2="12" y2="3"></line><line x1="12" y1="21" x2="12" y2="23"></line><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line><line x1="1" y1="12" x2="3" y2="12"></line><line x1="21" y1="12" x2="23" y2="12"></line><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line></svg>
       </button>
-
       <div class="user-menu">
-        <button class="user-menu__trigger">
-          <span class="user-menu__avatar" data-user-initials>--</span>
-          <span class="user-menu__name" data-user-name>Chargement...</span>
-        </button>
+        <button class="user-menu__trigger"><span class="user-menu__avatar" data-user-initials>--</span><span class="user-menu__name" data-user-name>Chargement...</span></button>
         <div class="user-menu__dropdown">
-          <div class="user-menu__header">
-            <div class="user-menu__header-name" data-user-name>-</div>
-            <div class="user-menu__header-email" data-user-email>-</div>
-          </div>
-          <a href="user-profile.html" class="user-menu__item">
-            <span>👤</span>
-            <span>Mon profil</span>
-          </a>
+          <div class="user-menu__header"><div class="user-menu__header-name" data-user-name>-</div><div class="user-menu__header-email" data-user-email>-</div></div>
+          <a href="user-profile.html" class="user-menu__item"><span>👤</span><span>Mon profil</span></a>
           <div class="user-menu__divider"></div>
-          <button class="user-menu__item user-menu__item--danger" onclick="handleLogout()">
-            <span>🚪</span>
-            <span>Déconnexion</span>
-          </button>
+          <button class="user-menu__item user-menu__item--danger" onclick="handleLogout()"><span>🚪</span><span>Déconnexion</span></button>
         </div>
       </div>
     </nav>
-
-    <button class="mobile-menu-btn" id="mobile-menu-btn" aria-label="Menu">
-      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-        <line x1="3" y1="12" x2="21" y2="12"></line>
-        <line x1="3" y1="6" x2="21" y2="6"></line>
-        <line x1="3" y1="18" x2="21" y2="18"></line>
-      </svg>
-    </button>
+    <button class="mobile-menu-btn" id="mobile-menu-btn" aria-label="Menu"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="12" x2="21" y2="12"></line><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="18" x2="21" y2="18"></line></svg></button>
   </header>
-
-  <!-- Mobile Navigation -->
   <div class="mobile-nav__backdrop" id="mobile-nav-backdrop"></div>
   <nav class="mobile-nav" id="mobile-nav">
-    <div class="mobile-nav__header">
-      <a href="../index.html" class="mobile-nav__logo">
-        <span>🔍</span>
-        <span>Inspection</span>
-      </a>
-      <button class="mobile-nav__close" id="mobile-nav-close" aria-label="Fermer">
-        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <line x1="18" y1="6" x2="6" y2="18"></line>
-          <line x1="6" y1="6" x2="18" y2="18"></line>
-        </svg>
-      </button>
-    </div>
-    
-    <div class="mobile-nav__user">
-      <div class="mobile-nav__user-name" data-user-name>-</div>
-      <div class="mobile-nav__user-role" data-user-role>-</div>
-    </div>
-
-    <div class="mobile-nav__section">
-      <a href="../index.html" class="mobile-nav__link">
-        <span class="mobile-nav__link-icon">🏠</span>
-        <span>Portail</span>
-      </a>
-      <a href="inspection-dashboard.html" class="mobile-nav__link">
-        <span class="mobile-nav__link-icon">📊</span>
-        <span>Dashboard</span>
-      </a>
-      <a href="user-profile.html" class="mobile-nav__link">
-        <span class="mobile-nav__link-icon">👤</span>
-        <span>Mon profil</span>
-      </a>
-    </div>
-
+    <div class="mobile-nav__header"><a href="../index.html" class="mobile-nav__logo"><span>🔍</span><span>Inspection</span></a><button class="mobile-nav__close" id="mobile-nav-close" aria-label="Fermer"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg></button></div>
+    <div class="mobile-nav__user"><div class="mobile-nav__user-name" data-user-name>-</div><div class="mobile-nav__user-role" data-user-role>-</div></div>
+    <div class="mobile-nav__section"><a href="../index.html" class="mobile-nav__link"><span class="mobile-nav__link-icon">🏠</span><span>Portail</span></a><a href="inspection-dashboard.html" class="mobile-nav__link"><span class="mobile-nav__link-icon">📊</span><span>Dashboard</span></a><a href="user-profile.html" class="mobile-nav__link"><span class="mobile-nav__link-icon">👤</span><span>Mon profil</span></a></div>
     <div class="mobile-nav__divider"></div>
-
-    <div class="mobile-nav__section">
-      <a href="#" class="mobile-nav__link" onclick="handleLogout(); return false;">
-        <span class="mobile-nav__link-icon">🚪</span>
-        <span>Déconnexion</span>
-      </a>
-    </div>
+    <div class="mobile-nav__section"><a href="#" class="mobile-nav__link" onclick="handleLogout(); return false;"><span class="mobile-nav__link-icon">🚪</span><span>Déconnexion</span></a></div>
   </nav>
-
-  <!-- Loading Screen -->
-  <div id="loading" class="page-loading">
-    <div class="loading-spinner"></div>
-    <p class="loading-text">Chargement du formulaire...</p>
-  </div>
-
-  <!-- Form Loading Overlay -->
-  <div class="form-loading" id="form-loading">
-    <div class="form-loading__content">
-      <div class="loading-spinner"></div>
-      <p class="loading-text" id="loading-text">Enregistrement en cours...</p>
-    </div>
-  </div>
-
-  <!-- Main Content -->
+  <div id="loading" class="page-loading"><div class="loading-spinner"></div><p class="loading-text">Chargement du formulaire...</p></div>
+  <div class="form-loading-overlay" id="form-loading"><div class="form-loading-content"><div class="loading-spinner"></div><p class="loading-text" id="loading-text">Enregistrement en cours...</p></div></div>
   <main id="main-content" class="main main--narrow" style="display: none;">
-    <div class="page-header">
-      <div class="page-header__content">
-        <h1 class="page-title">
-          <span class="page-title__icon">🥾</span>
-          Inspection de sentier
-        </h1>
-        <p class="page-subtitle">Enregistrez une nouvelle inspection</p>
-      </div>
-    </div>
-
-    <!-- Messages -->
-    <div class="form-message form-message--success" id="success-message">
-      <span>✅</span>
-      <span id="success-text">Inspection enregistrée avec succès!</span>
-    </div>
-    
-    <div class="form-message form-message--error" id="error-message">
-      <span>❌</span>
-      <span id="error-text">Une erreur s'est produite.</span>
-    </div>
-
-    <form id="inspection-form">
-      <!-- Section 1: General Information -->
-      <div class="form-card">
-        <div class="form-card__header">
-          <span>📍</span>
-          <span>Informations générales</span>
-        </div>
-        <div class="form-card__body">
+    <div class="page-header"><div class="page-header__content"><h1 class="page-title">Inspection de sentier</h1><p class="page-subtitle">Enregistrez une nouvelle inspection</p></div></div>
+    <div class="alert alert-success" id="success-message"></div>
+    <div class="alert alert-danger" id="error-message"></div>
+    <form id="trail-inspection-form">
+      <div class="form-section">
+        <div class="form-section-header"><h2 class="form-section-title">📍 Informations générales</h2></div>
+        <div class="form-section-body">
           <div class="form-grid">
-            <div class="form-group">
-              <label class="form-label" for="trail-select">Sentier <span class="text-danger">*</span></label>
-              <select class="form-select" id="trail-select" required>
-                <option value="">Sélectionner un sentier</option>
-              </select>
-              
-              <div class="trail-info" id="trail-info">
-                <div class="trail-info__item">
-                  <span class="trail-info__label">Statut actuel:</span>
-                  <span id="current-status-badge">-</span>
-                </div>
+            <div class="form-group"><label class="form-label form-label-required" for="trail-select">Sentier</label><select class="form-select" id="trail-select" required><option value="">Sélectionner un sentier</option></select></div>
+            <div class="form-group"><label class="form-label" for="inspector-name">Inspecteur</label><input type="text" class="form-input" id="inspector-name" readonly><input type="hidden" id="inspector-id"></div>
+            <div class="form-group"><label class="form-label form-label-required" for="inspection-date">Date d'inspection</label><input type="date" class="form-input" id="inspection-date" required></div>
+            <div class="form-group"><label class="form-label form-label-required" for="inspection-time">Heure d'inspection</label><input type="time" class="form-input" id="inspection-time" required></div>
+          </div>
+        </div>
+      </div>
+      <div class="form-section">
+        <div class="form-section-header"><h2 class="form-section-title">🚪 Statut et état du sentier</h2></div>
+        <div class="form-section-body">
+          <div class="form-grid">
+            <div class="form-group"><label class="form-label form-label-required" id="status-label">Statut du sentier post inspection</label>
+              <div class="radio-group">
+                <div class="radio-item"><input type="radio" id="status-open" name="trail-status" value="open" class="form-radio" required><label for="status-open" class="radio-label"><span class="radio-indicator good"></span><span class="radio-text" id="status-open-text">🟢 À ouvrir</span></label></div>
+                <div class="radio-item"><input type="radio" id="status-closed" name="trail-status" value="closed" class="form-radio"><label for="status-closed" class="radio-label"><span class="radio-indicator critical"></span><span class="radio-text" id="status-closed-text">🔴 À fermer</span></label></div>
               </div>
             </div>
-            
-            <div class="form-group">
-              <label class="form-label" for="inspector-name">Inspecteur</label>
-              <input type="text" class="form-input" id="inspector-name" readonly>
-              <input type="hidden" id="inspector-id">
+            <div class="form-group"><label class="form-label form-label-required">État général</label>
+              <div class="radio-group">
+                <div class="radio-item"><input type="radio" id="condition-good" name="condition" value="good" class="form-radio" required><label for="condition-good" class="radio-label"><span class="radio-indicator good"></span><span class="radio-text">Bon état</span></label></div>
+                <div class="radio-item"><input type="radio" id="condition-warning" name="condition" value="warning" class="form-radio"><label for="condition-warning" class="radio-label"><span class="radio-indicator warning"></span><span class="radio-text">Attention requise</span></label></div>
+                <div class="radio-item"><input type="radio" id="condition-critical" name="condition" value="critical" class="form-radio"><label for="condition-critical" class="radio-label"><span class="radio-indicator critical"></span><span class="radio-text">État critique</span></label></div>
+              </div>
             </div>
           </div>
-          
-          <div class="form-grid">
-            <div class="form-group">
-              <label class="form-label" for="inspection-date">Date <span class="text-danger">*</span></label>
-              <input type="date" class="form-input" id="inspection-date" required>
-            </div>
-            
-            <div class="form-group">
-              <label class="form-label" for="inspection-time">Heure <span class="text-danger">*</span></label>
-              <input type="time" class="form-input" id="inspection-time" required>
+          <div class="form-group" style="margin-top: 1rem;"><label class="form-label">Conditions de neige <span class="form-label-optional">(optionnel)</span></label>
+            <div class="radio-group">
+              <div class="radio-item"><input type="radio" id="snow-good" name="snow-condition" value="good" class="form-radio"><label for="snow-good" class="radio-label"><span class="radio-indicator good"></span><span class="radio-text">Bonnes conditions</span></label></div>
+              <div class="radio-item"><input type="radio" id="snow-warning" name="snow-condition" value="warning" class="form-radio"><label for="snow-warning" class="radio-label"><span class="radio-indicator warning"></span><span class="radio-text">Conditions moyennes</span></label></div>
+              <div class="radio-item"><input type="radio" id="snow-critical" name="snow-condition" value="critical" class="form-radio"><label for="snow-critical" class="radio-label"><span class="radio-indicator critical"></span><span class="radio-text">Mauvaises conditions</span></label></div>
+              <div class="radio-item"><input type="radio" id="snow-none" name="snow-condition" value="none" class="form-radio"><label for="snow-none" class="radio-label"><span class="radio-indicator"></span><span class="radio-text">Non évalué</span></label></div>
             </div>
           </div>
         </div>
       </div>
-
-      <!-- Section 2: Trail Status -->
-      <div class="form-card">
-        <div class="form-card__header">
-          <span>🚦</span>
-          <span>Statut du sentier post-inspection</span>
-        </div>
-        <div class="form-card__body">
+      <div class="form-section">
+        <div class="form-section-header"><h2 class="form-section-title">⚠️ Problèmes identifiés</h2></div>
+        <div class="form-section-body">
           <div class="form-group">
-            <label class="form-label">Le sentier doit être: <span class="text-danger">*</span></label>
-            <div class="radio-group">
-              <input type="radio" name="trail-status" value="open" id="status-open" class="radio-input" required>
-              <label for="status-open" class="radio-label radio-label--open">
-                <span>🟢</span>
-                <span id="status-open-text">À ouvrir</span>
-              </label>
-              
-              <input type="radio" name="trail-status" value="closed" id="status-closed" class="radio-input">
-              <label for="status-closed" class="radio-label radio-label--closed">
-                <span>🔴</span>
-                <span id="status-closed-text">À fermer</span>
-              </label>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <!-- Section 3: General Condition -->
-      <div class="form-card">
-        <div class="form-card__header">
-          <span>📋</span>
-          <span>État général du sentier</span>
-        </div>
-        <div class="form-card__body">
-          <div class="form-group">
-            <label class="form-label">Condition générale: <span class="text-danger">*</span></label>
-            <div class="radio-group">
-              <input type="radio" name="condition" value="good" id="condition-good" class="radio-input" required>
-              <label for="condition-good" class="radio-label radio-label--good">
-                <span>✅</span>
-                <span>Bonnes conditions</span>
-              </label>
-              
-              <input type="radio" name="condition" value="warning" id="condition-warning" class="radio-input">
-              <label for="condition-warning" class="radio-label radio-label--warning">
-                <span>⚠️</span>
-                <span>Conditions moyennes</span>
-              </label>
-              
-              <input type="radio" name="condition" value="critical" id="condition-critical" class="radio-input">
-              <label for="condition-critical" class="radio-label radio-label--critical">
-                <span>❌</span>
-                <span>Mauvaises conditions</span>
-              </label>
-            </div>
-          </div>
-          
-          <div class="form-group" style="margin-top: 1rem;">
-            <label class="form-label">Conditions de neige (optionnel):</label>
-            <div class="radio-group">
-              <input type="radio" name="snow-condition" value="good" id="snow-good" class="radio-input">
-              <label for="snow-good" class="radio-label radio-label--good">
-                <span>❄️</span>
-                <span>Bonne neige</span>
-              </label>
-              
-              <input type="radio" name="snow-condition" value="warning" id="snow-warning" class="radio-input">
-              <label for="snow-warning" class="radio-label radio-label--warning">
-                <span>❄️</span>
-                <span>Neige moyenne</span>
-              </label>
-              
-              <input type="radio" name="snow-condition" value="critical" id="snow-critical" class="radio-input">
-              <label for="snow-critical" class="radio-label radio-label--critical">
-                <span>❄️</span>
-                <span>Mauvaise neige</span>
-              </label>
-              
-              <input type="radio" name="snow-condition" value="none" id="snow-none" class="radio-input">
-              <label for="snow-none" class="radio-label">
-                <span>➖</span>
-                <span>Non évalué</span>
-              </label>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <!-- Section 4: Issues -->
-      <div class="form-card">
-        <div class="form-card__header">
-          <span>⚠️</span>
-          <span>Problèmes identifiés</span>
-        </div>
-        <div class="form-card__body">
-          <div class="form-group">
-            <label class="form-label">Cochez les problèmes observés:</label>
             <div class="checkbox-group">
-              <input type="checkbox" id="issue-icy" value="Glace sur le sentier" class="checkbox-input">
-              <label for="issue-icy" class="checkbox-label">🧊 Glace sur le sentier</label>
-              
-              <input type="checkbox" id="issue-erosion" value="Érosion du sentier" class="checkbox-input">
-              <label for="issue-erosion" class="checkbox-label">🏔️ Érosion du sentier</label>
-              
-              <input type="checkbox" id="issue-fallen" value="Arbres/branches tombés" class="checkbox-input">
-              <label for="issue-fallen" class="checkbox-label">🌲 Arbres/branches tombés</label>
-              
-              <input type="checkbox" id="issue-obstacles" value="Obstacles sur le sentier" class="checkbox-input">
-              <label for="issue-obstacles" class="checkbox-label">⛰️ Obstacles sur le sentier</label>
-              
-              <input type="checkbox" id="issue-signage" value="Signalisation manquante/endommagée" class="checkbox-input">
-              <label for="issue-signage" class="checkbox-label">🪧 Signalisation endommagée</label>
-              
-              <input type="checkbox" id="issue-muddy" value="Sentier boueux" class="checkbox-input">
-              <label for="issue-muddy" class="checkbox-label">💧 Sentier boueux</label>
-              
-              <input type="checkbox" id="issue-flooded" value="Sentier inondé" class="checkbox-input">
-              <label for="issue-flooded" class="checkbox-label">🌊 Sentier inondé</label>
+              <div class="checkbox-item"><input type="checkbox" id="issue-icy" value="Glace sur le sentier" class="form-checkbox"><label for="issue-icy" class="checkbox-label"><span class="checkbox-indicator"></span>Glace sur le sentier</label></div>
+              <div class="checkbox-item"><input type="checkbox" id="issue-erosion" value="Érosion du sentier" class="form-checkbox"><label for="issue-erosion" class="checkbox-label"><span class="checkbox-indicator"></span>Érosion du sentier</label></div>
+              <div class="checkbox-item"><input type="checkbox" id="issue-fallen" value="Arbres/branches tombés" class="form-checkbox"><label for="issue-fallen" class="checkbox-label"><span class="checkbox-indicator"></span>Arbres/branches tombés</label></div>
+              <div class="checkbox-item"><input type="checkbox" id="issue-obstacles" value="Obstacles sur le sentier" class="form-checkbox"><label for="issue-obstacles" class="checkbox-label"><span class="checkbox-indicator"></span>Obstacles sur le sentier</label></div>
+              <div class="checkbox-item"><input type="checkbox" id="issue-signage" value="Signalisation manquante/endommagée" class="form-checkbox"><label for="issue-signage" class="checkbox-label"><span class="checkbox-indicator"></span>Signalisation manquante/endommagée</label></div>
             </div>
           </div>
-          
-          <div class="form-group" style="margin-top: 1rem;">
-            <label class="form-label" for="other-issues">Autres problèmes</label>
-            <textarea class="form-textarea" id="other-issues" rows="2" placeholder="Décrivez tout autre problème observé..."></textarea>
-          </div>
+          <div class="form-group" style="margin-top: 1rem;"><label class="form-label" for="other-issues">Autres problèmes</label><textarea class="form-textarea" id="other-issues" rows="3" placeholder="Décrivez tout autre problème non listé ci-dessus..."></textarea></div>
         </div>
       </div>
-
-      <!-- Section 5: Photos -->
-      <div class="form-card">
-        <div class="form-card__header">
-          <span>📷</span>
-          <span>Documentation photographique</span>
-        </div>
-        <div class="form-card__body">
-          <div class="photo-upload-area" id="photo-upload">
-            <div class="photo-upload-area__icon">📷</div>
-            <p class="photo-upload-area__text">Cliquez ou déposez des photos ici</p>
-            <p class="photo-upload-area__hint">JPG, PNG • Max 10 MB par photo • Max 10 photos</p>
-          </div>
-          <input type="file" id="file-input" multiple accept="image/*" style="display: none;">
-          
-          <div class="photo-preview-grid" id="photo-preview"></div>
-        </div>
-      </div>
-
-      <!-- Section 6: Notes -->
-      <div class="form-card">
-        <div class="form-card__header">
-          <span>📝</span>
-          <span>Notes et commentaires</span>
-        </div>
-        <div class="form-card__body">
+      <div class="form-section">
+        <div class="form-section-header"><h2 class="form-section-title">📷 Documentation photographique</h2></div>
+        <div class="form-section-body">
           <div class="form-group">
-            <label class="form-label" for="comments">Notes additionnelles</label>
-            <textarea class="form-textarea" id="comments" rows="4" placeholder="Ajoutez toute information pertinente concernant l'inspection..."></textarea>
+            <div class="file-upload-area" id="photo-upload"><div class="file-upload-content"><div class="file-upload-icon">📷</div><p class="file-upload-text">Déposez des photos ici ou cliquez pour parcourir</p><p class="file-upload-hint">Format accepté: JPG, PNG • Taille max: 10 MB par photo</p></div><input type="file" id="file-input" multiple accept="image/*" style="display: none;"></div>
+            <div class="photo-preview-container" id="preview-container"></div>
           </div>
         </div>
       </div>
-
-      <!-- Form Actions -->
+      <div class="form-section">
+        <div class="form-section-header"><h2 class="form-section-title">📝 Notes et commentaires</h2></div>
+        <div class="form-section-body"><div class="form-group"><label class="form-label" for="comments">Notes additionnelles</label><textarea class="form-textarea" id="comments" rows="4" placeholder="Ajoutez toute information pertinente concernant l'inspection..."></textarea></div></div>
+      </div>
       <div class="form-actions">
-        <button type="button" class="btn btn-secondary" onclick="handleCancel()">
-          <span>❌</span>
-          <span>Annuler</span>
-        </button>
-        <button type="submit" class="btn btn-primary" id="submit-btn">
-          <span>✅</span>
-          <span>Enregistrer l'inspection</span>
-        </button>
+        <button type="button" class="btn btn-secondary" id="cancel-action">Annuler</button>
+        <button type="submit" class="btn btn-primary" id="submit-btn">Enregistrer l'inspection</button>
       </div>
     </form>
   </main>
-
-  <!-- Footer -->
-  <footer class="footer footer--simple">
-    <div class="footer__content">
-      <p class="footer__copyright">© 2025 Patrouille Mont Orford</p>
-    </div>
-  </footer>
-
-  <!-- Firebase SDK -->
+  <footer class="footer footer--simple"><div class="footer__content"><p class="footer__copyright">© 2025 Patrouille Mont Orford</p></div></footer>
   <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-storage-compat.js"></script>
-
-  <!-- Core JS -->
   <script src="../js/core/config.js"></script>
   <script src="../js/core/utils.js"></script>
   <script src="../js/core/theme.js"></script>
   <script src="../js/core/ui.js"></script>
   <script src="../js/core/auth.js"></script>
-
-  <!-- Page Script -->
   <script>
-    // State
-    let allTrails = [];
-    let selectedFiles = [];
-    let currentTrailStatus = null;
-    let storage = null;
-
-    // DOM Elements
-    const form = document.getElementById('inspection-form');
+    let selectedFiles = [], currentTrailStatus = null, storage = null;
+    const form = document.getElementById('trail-inspection-form');
     const trailSelect = document.getElementById('trail-select');
-    const trailInfo = document.getElementById('trail-info');
     const inspectorName = document.getElementById('inspector-name');
     const inspectorId = document.getElementById('inspector-id');
     const inspectionDate = document.getElementById('inspection-date');
     const inspectionTime = document.getElementById('inspection-time');
     const photoUpload = document.getElementById('photo-upload');
     const fileInput = document.getElementById('file-input');
-    const photoPreview = document.getElementById('photo-preview');
+    const previewContainer = document.getElementById('preview-container');
+    const comments = document.getElementById('comments');
+    const otherIssues = document.getElementById('other-issues');
     const submitBtn = document.getElementById('submit-btn');
+    const successMessage = document.getElementById('success-message');
+    const errorMessage = document.getElementById('error-message');
 
-    // ========================================
-    // INITIALIZATION
-    // ========================================
-
-    async function initTrailReport() {
-      // Initialize Firebase Storage
+    function initTrailInspection() {
       storage = firebase.storage();
-      
-      // Set current date/time
       setCurrentDateTime();
-      
-      // Bind events
       bindEvents();
-      
-      // Check auth and load data
       checkAuthStatus({
         requireAuth: true,
         requiredPermission: 'allowInspection',
@@ -770,380 +214,142 @@
 
     function setCurrentDateTime() {
       const now = new Date();
-      const year = now.getFullYear();
-      const month = (now.getMonth() + 1).toString().padStart(2, '0');
-      const day = now.getDate().toString().padStart(2, '0');
-      inspectionDate.value = `${year}-${month}-${day}`;
+      inspectionDate.value = `${now.getFullYear()}-${(now.getMonth()+1).toString().padStart(2,'0')}-${now.getDate().toString().padStart(2,'0')}`;
       inspectionTime.value = now.toTimeString().substring(0, 5);
     }
 
     function bindEvents() {
-      // Form submission
       form.addEventListener('submit', handleSubmit);
-      
-      // Trail selection
-      trailSelect.addEventListener('change', handleTrailChange);
-      
-      // Photo upload
+      document.getElementById('cancel-action').addEventListener('click', () => {
+        if (confirm('Êtes-vous sûr de vouloir annuler?')) window.location.href = 'inspection-dashboard.html';
+      });
+      trailSelect.addEventListener('change', updateStatusOptionsForTrail);
       photoUpload.addEventListener('click', () => fileInput.click());
-      photoUpload.addEventListener('dragover', handleDragOver);
-      photoUpload.addEventListener('dragleave', handleDragLeave);
-      photoUpload.addEventListener('drop', handleDrop);
-      fileInput.addEventListener('change', handleFileSelect);
+      photoUpload.addEventListener('dragover', e => { e.preventDefault(); photoUpload.classList.add('drag-over'); });
+      photoUpload.addEventListener('dragleave', e => { e.preventDefault(); photoUpload.classList.remove('drag-over'); });
+      photoUpload.addEventListener('drop', e => { e.preventDefault(); photoUpload.classList.remove('drag-over'); processFiles(Array.from(e.dataTransfer.files).filter(f => f.type.startsWith('image/'))); });
+      fileInput.addEventListener('change', e => { processFiles(Array.from(e.target.files)); fileInput.value = ''; });
     }
-
-    // ========================================
-    // DATA LOADING
-    // ========================================
 
     async function loadTrails() {
       try {
         const snapshot = await db.collection('trails').orderBy('name').get();
-        allTrails = [];
-        
-        snapshot.forEach(doc => {
-          allTrails.push({ id: doc.id, ...doc.data() });
-        });
-        
-        // Populate select
         trailSelect.innerHTML = '<option value="">Sélectionner un sentier</option>';
-        allTrails.forEach(trail => {
-          const option = document.createElement('option');
-          option.value = trail.id;
-          option.textContent = trail.name;
-          trailSelect.appendChild(option);
+        snapshot.forEach(doc => {
+          const t = doc.data();
+          const diffMap = {'easy':'Facile','medium':'Intermédiaire','hard':'Difficile'};
+          const opt = document.createElement('option');
+          opt.value = doc.id;
+          opt.textContent = `${t.name} (${t.length} km - ${diffMap[t.difficulty] || t.difficulty || 'Non spécifié'})`;
+          opt.dataset.status = t.status || 'unknown';
+          trailSelect.appendChild(opt);
         });
-        
-      } catch (error) {
-        console.error('Error loading trails:', error);
-        showError('Erreur lors du chargement des sentiers.');
-      }
+      } catch (e) { console.error('Error loading trails:', e); showError('Erreur lors du chargement des sentiers'); }
     }
 
-    // ========================================
-    // TRAIL SELECTION
-    // ========================================
-
-    async function handleTrailChange() {
+    async function updateStatusOptionsForTrail() {
       const trailId = trailSelect.value;
-      
+      const statusLabel = document.getElementById('status-label');
       if (!trailId) {
-        trailInfo.classList.remove('show');
+        setStatusLabels('🟢 À ouvrir', '🔴 À fermer');
+        statusLabel.innerHTML = 'Statut du sentier post inspection';
         currentTrailStatus = null;
         return;
       }
-      
-      const trail = allTrails.find(t => t.id === trailId);
-      if (!trail) return;
-      
-      // Get current trail status
-      currentTrailStatus = trail.status || 'unknown';
-      
-      // Update status badge
-      const statusBadge = document.getElementById('current-status-badge');
-      if (currentTrailStatus === 'open') {
-        statusBadge.innerHTML = '<span class="current-status-badge current-status-badge--open">🟢 Ouvert</span>';
-      } else if (currentTrailStatus === 'closed') {
-        statusBadge.innerHTML = '<span class="current-status-badge current-status-badge--closed">🔴 Fermé</span>';
-      } else {
-        statusBadge.innerHTML = '<span class="current-status-badge current-status-badge--unknown">❓ Inconnu</span>';
-      }
-      
-      // Update status labels based on current status
-      updateStatusLabels();
-      
-      // Show trail info
-      trailInfo.classList.add('show');
+      try {
+        const trailDoc = await db.collection('trails').doc(trailId).get();
+        currentTrailStatus = trailDoc.exists ? (trailDoc.data().status || 'unknown') : 'unknown';
+        if (currentTrailStatus === 'open') {
+          statusLabel.innerHTML = 'Statut du sentier post inspection <span style="font-weight:normal;color:#10b981;">(actuellement ouvert)</span>';
+          setStatusLabels('🟢 Laisser ouvert', '🔴 À fermer');
+          document.getElementById('status-open').checked = true;
+        } else if (currentTrailStatus === 'closed') {
+          statusLabel.innerHTML = 'Statut du sentier post inspection <span style="font-weight:normal;color:#ef4444;">(actuellement fermé)</span>';
+          setStatusLabels('🟢 À ouvrir', '🔴 Laisser fermé');
+          document.getElementById('status-closed').checked = true;
+        } else {
+          statusLabel.innerHTML = 'Statut du sentier post inspection <span style="font-weight:normal;color:#6b7280;">(statut inconnu)</span>';
+          setStatusLabels('🟢 À ouvrir', '🔴 À fermer');
+        }
+      } catch (e) { console.error('Error:', e); statusLabel.innerHTML = 'Statut du sentier post inspection'; setStatusLabels('🟢 À ouvrir', '🔴 À fermer'); }
     }
 
-    function updateStatusLabels() {
-      const openText = document.getElementById('status-open-text');
-      const closedText = document.getElementById('status-closed-text');
-      
-      if (currentTrailStatus === 'open') {
-        openText.textContent = 'Garder ouvert';
-        closedText.textContent = 'À fermer';
-      } else if (currentTrailStatus === 'closed') {
-        openText.textContent = 'À ouvrir';
-        closedText.textContent = 'Laisser fermé';
-        // Pre-select "Laisser fermé"
-        document.getElementById('status-closed').checked = true;
-      } else {
-        openText.textContent = 'À ouvrir';
-        closedText.textContent = 'À fermer';
-      }
-    }
-
-    // ========================================
-    // PHOTO HANDLING
-    // ========================================
-
-    function handleDragOver(e) {
-      e.preventDefault();
-      photoUpload.classList.add('drag-over');
-    }
-
-    function handleDragLeave(e) {
-      e.preventDefault();
-      photoUpload.classList.remove('drag-over');
-    }
-
-    function handleDrop(e) {
-      e.preventDefault();
-      photoUpload.classList.remove('drag-over');
-      const files = Array.from(e.dataTransfer.files).filter(f => f.type.startsWith('image/'));
-      processFiles(files);
-    }
-
-    function handleFileSelect(e) {
-      const files = Array.from(e.target.files);
-      processFiles(files);
-      fileInput.value = '';
+    function setStatusLabels(o, c) {
+      document.getElementById('status-open-text').textContent = o;
+      document.getElementById('status-closed-text').textContent = c;
     }
 
     function processFiles(files) {
-      files.forEach(file => {
-        if (file.size > 10 * 1024 * 1024) {
-          showError(`${file.name} est trop volumineux (max 10 MB)`);
-          return;
-        }
-        
-        if (selectedFiles.length >= 10) {
-          showError('Maximum 10 photos autorisées');
-          return;
-        }
-        
-        selectedFiles.push(file);
-        createPhotoPreview(file);
+      files.forEach(f => {
+        if (f.size > 10*1024*1024) { showError(`${f.name} trop volumineux (max 10MB)`); return; }
+        if (selectedFiles.length >= 10) { showError('Maximum 10 photos'); return; }
+        selectedFiles.push(f);
+        const preview = document.createElement('div'); preview.className = 'photo-preview';
+        const img = document.createElement('img'); const url = URL.createObjectURL(f); img.src = url; img.alt = f.name;
+        const btn = document.createElement('button'); btn.type = 'button'; btn.className = 'photo-remove'; btn.innerHTML = '×';
+        btn.onclick = () => { const i = selectedFiles.indexOf(f); if (i > -1) selectedFiles.splice(i, 1); preview.remove(); URL.revokeObjectURL(url); };
+        preview.appendChild(img); preview.appendChild(btn); previewContainer.appendChild(preview);
       });
     }
-
-    function createPhotoPreview(file) {
-      const preview = document.createElement('div');
-      preview.className = 'photo-preview';
-      
-      const img = document.createElement('img');
-      const url = URL.createObjectURL(file);
-      img.src = url;
-      img.alt = file.name;
-      
-      const removeBtn = document.createElement('button');
-      removeBtn.type = 'button';
-      removeBtn.className = 'photo-preview__remove';
-      removeBtn.innerHTML = '×';
-      removeBtn.onclick = () => {
-        const index = selectedFiles.indexOf(file);
-        if (index > -1) selectedFiles.splice(index, 1);
-        preview.remove();
-        URL.revokeObjectURL(url);
-      };
-      
-      preview.appendChild(img);
-      preview.appendChild(removeBtn);
-      photoPreview.appendChild(preview);
-    }
-
-    // ========================================
-    // FORM SUBMISSION
-    // ========================================
 
     async function handleSubmit(e) {
       e.preventDefault();
-      
-      // Validate
-      if (!validateForm()) return;
-      
-      // Show loading
-      showFormLoading(true, 'Enregistrement de l\'inspection...');
-      
+      hideMessages();
+      if (!trailSelect.value) { showError('Veuillez sélectionner un sentier'); return; }
+      if (!form.querySelector('input[name="trail-status"]:checked')) { showError('Veuillez sélectionner le statut du sentier'); return; }
+      if (!form.querySelector('input[name="condition"]:checked')) { showError('Veuillez sélectionner l\'état général'); return; }
+      setFormLoading(true, 'Enregistrement...');
       try {
-        // Collect form data
-        const formData = collectFormData();
-        
-        // Upload photos
-        if (selectedFiles.length > 0) {
-          showFormLoading(true, 'Téléversement des photos...');
-          formData.photos = await uploadPhotos();
-        }
-        
-        // Save inspection
-        showFormLoading(true, 'Enregistrement...');
-        await saveInspection(formData);
-        
-        // Success
-        const trailName = trailSelect.options[trailSelect.selectedIndex].text;
-        const statusText = formData.trail_status === 'open' ? 'ouvert' : 'fermé';
-        showSuccess(`Inspection enregistrée! ${trailName} est maintenant ${statusText}.`);
-        
-        // Reset form after delay
-        setTimeout(() => {
-          resetForm();
-        }, 2000);
-        
-      } catch (error) {
-        console.error('Error submitting:', error);
-        showError('Erreur lors de l\'enregistrement: ' + error.message);
-      } finally {
-        showFormLoading(false);
-      }
-    }
-
-    function validateForm() {
-      // Check trail selection
-      if (!trailSelect.value) {
-        showError('Veuillez sélectionner un sentier.');
-        trailSelect.focus();
-        return false;
-      }
-      
-      // Check trail status
-      const statusSelected = form.querySelector('input[name="trail-status"]:checked');
-      if (!statusSelected) {
-        showError('Veuillez sélectionner le statut du sentier (Ouvert/Fermé).');
-        return false;
-      }
-      
-      // Check condition
-      const conditionSelected = form.querySelector('input[name="condition"]:checked');
-      if (!conditionSelected) {
-        showError('Veuillez sélectionner l\'état général du sentier.');
-        return false;
-      }
-      
-      return true;
-    }
-
-    function collectFormData() {
-      const issues = [];
-      form.querySelectorAll('input[type="checkbox"]:checked').forEach(cb => {
-        if (cb.value) issues.push(cb.value);
-      });
-      
-      const otherIssues = document.getElementById('other-issues').value.trim();
-      if (otherIssues) issues.push(otherIssues);
-      
-      // Create timestamp from date/time
-      const dateStr = inspectionDate.value;
-      const timeStr = inspectionTime.value;
-      const dateTime = new Date(`${dateStr}T${timeStr}`);
-      
-      return {
-        trail_id: trailSelect.value,
-        inspector_id: inspectorId.value,
-        inspector_name: inspectorName.value,
-        date: firebase.firestore.Timestamp.fromDate(dateTime),
-        previous_trail_status: currentTrailStatus || 'unknown',
-        trail_status: form.querySelector('input[name="trail-status"]:checked').value,
-        condition: form.querySelector('input[name="condition"]:checked').value,
-        snow_condition: form.querySelector('input[name="snow-condition"]:checked')?.value || null,
-        issues: issues,
-        notes: document.getElementById('comments').value.trim(),
-        photos: [],
-        createdAt: firebase.firestore.FieldValue.serverTimestamp()
-      };
-    }
-
-    async function uploadPhotos() {
-      const inspectionId = Date.now();
-      const uploadPromises = selectedFiles.map(async (file, index) => {
-        const fileName = `inspections/trails/${inspectionId}/${index}-${file.name}`;
-        const storageRef = storage.ref(fileName);
-        
-        // Upload file
-        const snapshot = await storageRef.put(file);
-        const downloadURL = await snapshot.ref.getDownloadURL();
-        
-        // Return photo object
-        return {
-          url: downloadURL,
-          filename: file.name,
-          coordinates: null, // Could add EXIF extraction here
-          timestamp: null
+        const issues = [];
+        form.querySelectorAll('input[type="checkbox"]:checked').forEach(cb => { if (cb.value) issues.push(cb.value); });
+        if (otherIssues.value.trim()) issues.push(otherIssues.value.trim());
+        const dateTime = new Date(`${inspectionDate.value}T${inspectionTime.value}`);
+        const formData = {
+          trail_id: trailSelect.value,
+          inspector_id: inspectorId.value,
+          inspector_name: inspectorName.value,
+          date: firebase.firestore.Timestamp.fromDate(dateTime),
+          previous_trail_status: currentTrailStatus || 'unknown',
+          trail_status: form.querySelector('input[name="trail-status"]:checked').value,
+          condition: form.querySelector('input[name="condition"]:checked').value,
+          snow_condition: form.querySelector('input[name="snow-condition"]:checked')?.value || null,
+          issues: issues,
+          notes: comments.value.trim(),
+          photos: [],
+          createdAt: firebase.firestore.FieldValue.serverTimestamp()
         };
-      });
-      
-      return Promise.all(uploadPromises);
+        if (selectedFiles.length > 0) {
+          setFormLoading(true, 'Téléversement des photos...');
+          const inspectionId = Date.now();
+          formData.photos = await Promise.all(selectedFiles.map(async (f, i) => {
+            const ref = storage.ref(`inspections/trails/${inspectionId}/${i}-${f.name}`);
+            const snap = await ref.put(f);
+            return { url: await snap.ref.getDownloadURL(), filename: f.name, coordinates: null, timestamp: null };
+          }));
+        }
+        setFormLoading(true, 'Enregistrement...');
+        const batch = db.batch();
+        const inspRef = db.collection('trail_inspections').doc();
+        batch.set(inspRef, formData);
+        batch.update(db.collection('trails').doc(formData.trail_id), { status: formData.trail_status, lastUpdated: firebase.firestore.FieldValue.serverTimestamp(), lastInspectionId: inspRef.id });
+        await batch.commit();
+        const trailName = trailSelect.options[trailSelect.selectedIndex].text.split(' (')[0];
+        showSuccess(`Inspection enregistrée! ${trailName} est maintenant ${formData.trail_status === 'open' ? 'ouvert' : 'fermé'}.`);
+        setTimeout(() => { form.reset(); selectedFiles = []; previewContainer.innerHTML = ''; currentTrailStatus = null; setCurrentDateTime(); hideMessages(); document.getElementById('status-label').innerHTML = 'Statut du sentier post inspection'; setStatusLabels('🟢 À ouvrir', '🔴 À fermer'); }, 2000);
+      } catch (e) { console.error('Error:', e); showError('Erreur: ' + e.message); }
+      finally { setFormLoading(false); }
     }
 
-    async function saveInspection(formData) {
-      const batch = db.batch();
-      
-      // Save inspection document
-      const inspectionRef = db.collection('trail_inspections').doc();
-      batch.set(inspectionRef, formData);
-      
-      // Update trail status
-      const trailRef = db.collection('trails').doc(formData.trail_id);
-      batch.update(trailRef, {
-        status: formData.trail_status,
-        lastUpdated: firebase.firestore.FieldValue.serverTimestamp(),
-        lastInspectionId: inspectionRef.id
-      });
-      
-      await batch.commit();
-      console.log('Inspection saved:', inspectionRef.id);
+    function setFormLoading(show, text = 'Chargement...') {
+      document.getElementById('loading-text').textContent = text;
+      document.getElementById('form-loading').classList.toggle('show', show);
+      submitBtn.disabled = show;
     }
+    function showSuccess(msg) { hideMessages(); successMessage.textContent = msg; successMessage.classList.add('show'); successMessage.scrollIntoView({behavior:'smooth',block:'center'}); }
+    function showError(msg) { hideMessages(); errorMessage.textContent = msg; errorMessage.classList.add('show'); errorMessage.scrollIntoView({behavior:'smooth',block:'center'}); }
+    function hideMessages() { successMessage.classList.remove('show'); errorMessage.classList.remove('show'); }
 
-    function resetForm() {
-      form.reset();
-      selectedFiles = [];
-      photoPreview.innerHTML = '';
-      trailInfo.classList.remove('show');
-      currentTrailStatus = null;
-      setCurrentDateTime();
-      hideMessages();
-    }
-
-    function handleCancel() {
-      if (confirm('Êtes-vous sûr de vouloir annuler? Les données non enregistrées seront perdues.')) {
-        window.location.href = 'inspection-dashboard.html';
-      }
-    }
-
-    // ========================================
-    // UI HELPERS
-    // ========================================
-
-    function showFormLoading(show, text = 'Chargement...') {
-      const loadingEl = document.getElementById('form-loading');
-      const loadingText = document.getElementById('loading-text');
-      loadingText.textContent = text;
-      
-      if (show) {
-        loadingEl.classList.add('show');
-        submitBtn.disabled = true;
-      } else {
-        loadingEl.classList.remove('show');
-        submitBtn.disabled = false;
-      }
-    }
-
-    function showSuccess(message) {
-      hideMessages();
-      const el = document.getElementById('success-message');
-      document.getElementById('success-text').textContent = message;
-      el.classList.add('show');
-      el.scrollIntoView({ behavior: 'smooth', block: 'center' });
-    }
-
-    function showError(message) {
-      hideMessages();
-      const el = document.getElementById('error-message');
-      document.getElementById('error-text').textContent = message;
-      el.classList.add('show');
-      el.scrollIntoView({ behavior: 'smooth', block: 'center' });
-    }
-
-    function hideMessages() {
-      document.getElementById('success-message').classList.remove('show');
-      document.getElementById('error-message').classList.remove('show');
-    }
-
-    // ========================================
-    // INITIALIZE
-    // ========================================
-
-    document.addEventListener('DOMContentLoaded', initTrailReport);
+    document.addEventListener('DOMContentLoaded', initTrailInspection);
   </script>
 </body>
 </html>
