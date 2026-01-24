@@ -856,16 +856,16 @@
             </div>
           </td>
           <td data-label="Statut">
-            <span class="badge ${user.status === 'active' ? 'badge-success' : 'badge-secondary'}">
+            <span class="badge ${user.status === 'active' ? 'badge-success' : 'badge-secondary'}" 
+                  style="cursor: pointer;" 
+                  onclick="toggleUserStatus('${user.id}')" 
+                  title="Cliquer pour ${user.status === 'active' ? 'désactiver' : 'activer'}">
               ${user.status === 'active' ? 'Actif' : 'Inactif'}
             </span>
           </td>
           <td class="table-cell--actions" data-label="Actions">
             <div class="user-table__actions">
               <button class="btn btn-ghost btn-icon btn-icon--sm" onclick="editUser('${user.id}')" title="Modifier">✏️</button>
-              <button class="btn btn-ghost btn-icon btn-icon--sm" onclick="toggleUserStatus('${user.id}')" title="${user.status === 'active' ? 'Désactiver' : 'Activer'}">
-                ${user.status === 'active' ? '🚫' : '✅'}
-              </button>
             </div>
           </td>
         </tr>
