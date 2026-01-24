@@ -26,10 +26,10 @@
     .toggle-switch input:checked + .toggle-switch__slider { background: var(--theme-accent); }
     .toggle-switch input:checked + .toggle-switch__slider::before { transform: translateX(24px); }
 
-    /* Map container - CRITICAL: match original app's approach */
-    .map-container { position: relative; width: 100%; overflow: auto; background: var(--theme-surface-alt); max-height: 680px; }
-    .map-wrapper { position: relative; width: auto; height: auto; display: inline-block; }
-    .map-image { display: block; width: auto; height: auto; max-width: none; max-height: 650px; }
+    /* Map container - scrollable with natural image size for correct marker positioning */
+    .map-container { position: relative; width: 100%; overflow: auto; background: var(--theme-surface-alt); max-height: 700px; }
+    .map-wrapper { position: relative; display: inline-block; }
+    .map-image { display: block; width: auto; height: auto; max-width: none; }
 
     /* Map markers - positioned absolutely with pixel coordinates */
     .map-marker { position: absolute; width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 14px; font-weight: 700; color: white; cursor: pointer; transform: translate(-50%, -50%); transition: transform 0.2s ease; z-index: 10; border: 2px solid white; box-shadow: 0 2px 6px rgba(0,0,0,0.3); }
