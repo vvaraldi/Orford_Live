@@ -85,8 +85,11 @@
     .detail-section { margin-top: 1.25rem; }
     .detail-section__title { font-weight: 600; margin-bottom: 0.75rem; display: flex; align-items: center; gap: 0.5rem; }
     .detail-photos { display: grid; grid-template-columns: repeat(auto-fill, minmax(100px, 1fr)); gap: 0.75rem; }
-    .detail-photo { aspect-ratio: 1; border-radius: var(--radius-md); overflow: hidden; cursor: pointer; }
-    .detail-photo img { width: 100%; height: 100%; object-fit: cover; }
+    .detail-photo { text-align: center; }
+    .detail-photo img { width: 100%; aspect-ratio: 1; object-fit: cover; border-radius: var(--radius-md); cursor: pointer; }
+    .photo-location { font-size: 0.7rem; margin-top: 0.25rem; display: flex; gap: 0.5rem; justify-content: center; }
+    .photo-location a { color: var(--theme-accent); text-decoration: none; }
+    .photo-location a:hover { text-decoration: underline; }
     .detail-notes { background: var(--theme-surface-alt); padding: 0.75rem 1rem; border-radius: var(--radius-md); font-size: 0.875rem; white-space: pre-wrap; }
     .issues-list { display: flex; flex-wrap: wrap; gap: 0.5rem; }
     .issue-tag { background: rgba(239, 68, 68, 0.1); color: #991b1b; padding: 0.25rem 0.5rem; border-radius: var(--radius-sm); font-size: 0.75rem; }
@@ -709,7 +712,10 @@
       if (insp.photos && insp.photos.length > 0) {
         html += `<div class="detail-section"><div class="detail-section__title">📷 Photos (${insp.photos.length})</div><div class="detail-photos">${insp.photos.map(p => {
           const url = typeof p === 'string' ? p : p.url;
-          return `<div class="detail-photo" onclick="window.open('${url}','_blank')"><img src="${url}" alt="Photo"></div>`;
+          const coords = typeof p === 'object' ? p.coordinates : null;
+          let loc = '';
+          if (coords) loc = `<div class="photo-location"><a href="#" onclick="openPhotoLocationModal(${coords.latitude},${coords.longitude});return false;">Carte locale</a> <a href="https://www.google.com/maps?q=${coords.latitude},${coords.longitude}" target="_blank">Google</a></div>`;
+          return `<div class="detail-photo"><img src="${url}" alt="Photo" onclick="window.open('${url}','_blank')">${loc}</div>`;
         }).join('')}</div></div>`;
       }
 
@@ -766,6 +772,85 @@
       div.textContent = text;
       return div.innerHTML;
     }
+
+    // Photo location modal - using affine transformation from original app
+    const PhotoMapModal = (function() {
+      // Map calibration points from original app (3 corners)
+      const MAP_WIDTH = 800, MAP_HEIGHT = 700;
+      const calibration = {
+        topLeft:    { lat: 45.296611, lon: -72.243361, x: 0, y: 0 },
+        topRight:   { lat: 45.325861, lon: -72.249972, x: MAP_WIDTH, y: 0 },
+        bottomLeft: { lat: 45.299444, lon: -72.205667, x: 0, y: MAP_HEIGHT }
+      };
+      
+      // Calculate affine transformation matrix using Cramer's rule
+      function solveSystem(m) {
+        const det = m[0][0] * (m[1][1] * m[2][2] - m[1][2] * m[2][1])
+                  - m[0][1] * (m[1][0] * m[2][2] - m[1][2] * m[2][0])
+                  + m[0][2] * (m[1][0] * m[2][1] - m[1][1] * m[2][0]);
+        if (Math.abs(det) < 1e-10) return [0, 0, 0];
+        const detX = m[0][3] * (m[1][1] * m[2][2] - m[1][2] * m[2][1])
+                   - m[0][1] * (m[1][3] * m[2][2] - m[1][2] * m[2][3])
+                   + m[0][2] * (m[1][3] * m[2][1] - m[1][1] * m[2][3]);
+        const detY = m[0][0] * (m[1][3] * m[2][2] - m[1][2] * m[2][3])
+                   - m[0][3] * (m[1][0] * m[2][2] - m[1][2] * m[2][0])
+                   + m[0][2] * (m[1][0] * m[2][3] - m[1][3] * m[2][0]);
+        const detZ = m[0][0] * (m[1][1] * m[2][3] - m[1][3] * m[2][1])
+                   - m[0][1] * (m[1][0] * m[2][3] - m[1][3] * m[2][0])
+                   + m[0][3] * (m[1][0] * m[2][1] - m[1][1] * m[2][0]);
+        return [detX / det, detY / det, detZ / det];
+      }
+      
+      const p1 = calibration.topLeft, p2 = calibration.topRight, p3 = calibration.bottomLeft;
+      const matrixX = [[p1.lat, p1.lon, 1, p1.x], [p2.lat, p2.lon, 1, p2.x], [p3.lat, p3.lon, 1, p3.x]];
+      const matrixY = [[p1.lat, p1.lon, 1, p1.y], [p2.lat, p2.lon, 1, p2.y], [p3.lat, p3.lon, 1, p3.y]];
+      const coeffsX = solveSystem(matrixX);
+      const coeffsY = solveSystem(matrixY);
+      const transform = { a: coeffsX[0], b: coeffsX[1], c: coeffsX[2], d: coeffsY[0], e: coeffsY[1], f: coeffsY[2] };
+      
+      function gpsToPixel(lat, lon) {
+        const x = Math.round(transform.a * lat + transform.b * lon + transform.c);
+        const y = Math.round(transform.d * lat + transform.e * lon + transform.f);
+        return { x: Math.max(0, Math.min(MAP_WIDTH, x)), y: Math.max(0, Math.min(MAP_HEIGHT, y)) };
+      }
+      
+      function open(lat, lon) {
+        let modal = document.getElementById('photo-map-modal');
+        if (!modal) {
+          document.body.insertAdjacentHTML('beforeend', `
+            <div class="detail-modal" id="photo-map-modal">
+              <div class="detail-modal__content" style="max-width:900px;">
+                <div class="detail-modal__header"><h3 class="detail-modal__title">📍 Localisation de la photo</h3><button class="detail-modal__close" onclick="PhotoMapModal.close()">×</button></div>
+                <div class="detail-modal__body" style="padding:0;">
+                  <div style="overflow:auto;max-height:60vh;"><div id="photo-map-wrap" style="position:relative;display:inline-block;"><img src="../assets/map/map3.png" style="display:block;width:auto;height:auto;max-width:none;"><div id="photo-marker" style="position:absolute;width:20px;height:20px;background:red;border:3px solid white;border-radius:50%;transform:translate(-50%,-50%);box-shadow:0 2px 8px rgba(0,0,0,0.4);"></div></div></div>
+                  <div id="photo-coords" style="padding:1rem;background:var(--theme-surface-alt);border-top:1px solid var(--theme-border);"></div>
+                </div>
+                <div class="detail-modal__footer"><a id="photo-google-link" href="#" target="_blank" class="btn btn-primary">🗺️ Google Maps</a><button class="btn btn-secondary" onclick="PhotoMapModal.close()">Fermer</button></div>
+              </div>
+            </div>
+          `);
+          modal = document.getElementById('photo-map-modal');
+          modal.addEventListener('click', e => { if (e.target.id === 'photo-map-modal') PhotoMapModal.close(); });
+        }
+        const pixel = gpsToPixel(lat, lon);
+        document.getElementById('photo-marker').style.left = pixel.x + 'px';
+        document.getElementById('photo-marker').style.top = pixel.y + 'px';
+        document.getElementById('photo-coords').innerHTML = `<strong>GPS:</strong> ${lat.toFixed(6)}°, ${lon.toFixed(6)}°`;
+        document.getElementById('photo-google-link').href = `https://www.google.com/maps?q=${lat},${lon}`;
+        modal.classList.add('show');
+        document.body.style.overflow = 'hidden';
+        const wrap = document.getElementById('photo-map-wrap').parentElement;
+        wrap.scrollLeft = Math.max(0, pixel.x - wrap.clientWidth/2);
+        wrap.scrollTop = Math.max(0, pixel.y - wrap.clientHeight/2);
+      }
+      function close() {
+        const modal = document.getElementById('photo-map-modal');
+        if (modal) { modal.classList.remove('show'); document.body.style.overflow = ''; }
+      }
+      return { open, close };
+    })();
+    window.openPhotoLocationModal = PhotoMapModal.open;
+    window.PhotoMapModal = PhotoMapModal;
 
     document.addEventListener('DOMContentLoaded', initHistory);
   </script>

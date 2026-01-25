@@ -179,6 +179,7 @@
   <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-storage-compat.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/exif-js@2.3.0/exif.min.js"></script>
   <script src="../js/core/config.js"></script>
   <script src="../js/core/utils.js"></script>
   <script src="../js/core/theme.js"></script>
@@ -323,12 +324,24 @@
           createdAt: firebase.firestore.FieldValue.serverTimestamp()
         };
         if (selectedFiles.length > 0) {
-          setFormLoading(true, 'Téléversement des photos...');
+          setFormLoading(true, 'Extraction des métadonnées et téléversement...');
           const inspectionId = Date.now();
           formData.photos = await Promise.all(selectedFiles.map(async (f, i) => {
+            // Extract GPS coordinates from EXIF
+            let coordinates = null;
+            let timestamp = null;
+            try {
+              const exifData = await extractExifData(f);
+              if (exifData) {
+                coordinates = extractGpsFromExif(exifData);
+                timestamp = extractTimestampFromExif(exifData);
+              }
+            } catch (e) { console.warn('EXIF extraction failed:', e); }
+            
+            // Upload to storage
             const ref = storage.ref(`inspections/trails/${inspectionId}/${i}-${f.name}`);
             const snap = await ref.put(f);
-            return { url: await snap.ref.getDownloadURL(), filename: f.name, coordinates: null, timestamp: null };
+            return { url: await snap.ref.getDownloadURL(), filename: f.name, coordinates, timestamp };
           }));
         }
         setFormLoading(true, 'Enregistrement...');
@@ -352,6 +365,46 @@
     function showSuccess(msg) { hideMessages(); successMessage.textContent = msg; successMessage.classList.add('show'); successMessage.scrollIntoView({behavior:'smooth',block:'center'}); }
     function showError(msg) { hideMessages(); errorMessage.textContent = msg; errorMessage.classList.add('show'); errorMessage.scrollIntoView({behavior:'smooth',block:'center'}); }
     function hideMessages() { successMessage.classList.remove('show'); errorMessage.classList.remove('show'); }
+
+    // EXIF extraction helpers
+    function extractExifData(file) {
+      return new Promise((resolve) => {
+        if (typeof EXIF === 'undefined') { resolve(null); return; }
+        EXIF.getData(file, function() {
+          const tags = EXIF.getAllTags(this);
+          resolve(tags && Object.keys(tags).length > 0 ? tags : null);
+        });
+      });
+    }
+    
+    function extractGpsFromExif(exifData) {
+      if (!exifData) return null;
+      const lat = exifData.GPSLatitude, latRef = exifData.GPSLatitudeRef;
+      const lon = exifData.GPSLongitude, lonRef = exifData.GPSLongitudeRef;
+      if (!lat || !lon || !latRef || !lonRef) return null;
+      try {
+        const toDecimal = (dms, ref) => {
+          const d = typeof dms[0] === 'object' ? dms[0].numerator / dms[0].denominator : dms[0];
+          const m = typeof dms[1] === 'object' ? dms[1].numerator / dms[1].denominator : dms[1];
+          const s = typeof dms[2] === 'object' ? dms[2].numerator / dms[2].denominator : dms[2];
+          let dec = d + m/60 + s/3600;
+          if (ref === 'S' || ref === 'W') dec = -dec;
+          return Math.round(dec * 1000000) / 1000000;
+        };
+        return { latitude: toDecimal(lat, latRef), longitude: toDecimal(lon, lonRef) };
+      } catch (e) { return null; }
+    }
+    
+    function extractTimestampFromExif(exifData) {
+      if (!exifData) return null;
+      const dateStr = exifData.DateTimeOriginal || exifData.DateTimeDigitized || exifData.DateTime;
+      if (!dateStr) return null;
+      const match = dateStr.match(/^(\d{4}):(\d{2}):(\d{2})\s+(\d{2}):(\d{2}):(\d{2})$/);
+      if (!match) return null;
+      const [, y, mo, d, h, mi, s] = match;
+      const date = new Date(parseInt(y), parseInt(mo)-1, parseInt(d), parseInt(h), parseInt(mi), parseInt(s));
+      return isNaN(date.getTime()) ? null : date.toISOString();
+    }
 
     document.addEventListener('DOMContentLoaded', initTrailInspection);
   </script>
