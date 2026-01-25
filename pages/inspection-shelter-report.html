@@ -349,9 +349,16 @@
         const shelterName = shelterSelect.options[shelterSelect.selectedIndex].text;
         showSuccess(`Inspection de l'abri "${shelterName}" enregistrée avec succès!`);
         
+        // Save inspector info before reset
+        const savedInspectorName = inspectorName.value;
+        const savedInspectorId = inspectorId.value;
+        
         // Reset form after delay
         setTimeout(() => { 
           form.reset(); 
+          // Restore inspector info
+          inspectorName.value = savedInspectorName;
+          inspectorId.value = savedInspectorId;
           selectedFiles = []; 
           previewContainer.innerHTML = ''; 
           setCurrentDateTime(); 

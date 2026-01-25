@@ -352,7 +352,22 @@
         await batch.commit();
         const trailName = trailSelect.options[trailSelect.selectedIndex].text.split(' (')[0];
         showSuccess(`Inspection enregistrée! ${trailName} est maintenant ${formData.trail_status === 'open' ? 'ouvert' : 'fermé'}.`);
-        setTimeout(() => { form.reset(); selectedFiles = []; previewContainer.innerHTML = ''; currentTrailStatus = null; setCurrentDateTime(); hideMessages(); document.getElementById('status-label').innerHTML = 'Statut du sentier post inspection'; setStatusLabels('🟢 À ouvrir', '🔴 À fermer'); }, 2000);
+        // Save inspector info before reset
+        const savedInspectorName = inspectorName.value;
+        const savedInspectorId = inspectorId.value;
+        setTimeout(() => { 
+          form.reset(); 
+          // Restore inspector info
+          inspectorName.value = savedInspectorName;
+          inspectorId.value = savedInspectorId;
+          selectedFiles = []; 
+          previewContainer.innerHTML = ''; 
+          currentTrailStatus = null; 
+          setCurrentDateTime(); 
+          hideMessages(); 
+          document.getElementById('status-label').innerHTML = 'Statut du sentier post inspection'; 
+          setStatusLabels('🟢 À ouvrir', '🔴 À fermer'); 
+        }, 2000);
       } catch (e) { console.error('Error:', e); showError('Erreur: ' + e.message); }
       finally { setFormLoading(false); }
     }
