@@ -270,7 +270,6 @@
     let currentView = 'inspection'; // 'inspection' or 'status'
     let contextTrailId = null;
     let isAdmin = false;
-    let currentUserData = null;
 
     // Init
     function initDashboard() {
@@ -278,7 +277,6 @@
         requireAuth: true,
         requiredPermission: 'allowInspection',
         onAuthenticated: async (userData) => {
-          currentUserData = userData;
           isAdmin = userData.role === 'admin' || userData.role === 'system_admin';
           await loadDashboardData();
         }
@@ -445,7 +443,7 @@
         const inspectionData = {
           trail_id: contextTrailId,
           inspector_id: currentUser.uid,
-          inspector_name: currentUserData?.name || currentUser.email,
+          inspector_name: window.currentUserData?.name || currentUser.email,
           date: firebase.firestore.Timestamp.fromDate(now),
           trail_status: status,
           condition: lastInsp.condition || 'good',
@@ -472,8 +470,11 @@
         if (trail) trail.status = status;
         trailInspections[contextTrailId] = { id: inspRef.id, ...inspectionData };
         
+        // Refresh all views
         updateStatistics();
         renderMapMarkers();
+        updateLegend();
+        loadRecentInspections();
         hideContextMenu();
       } catch (e) { console.error('Error:', e); alert('Erreur: ' + e.message); }
     }
@@ -505,7 +506,7 @@
             const inspectionData = {
               trail_id: t.id,
               inspector_id: currentUser.uid,
-              inspector_name: currentUserData?.name || currentUser.email,
+              inspector_name: window.currentUserData?.name || currentUser.email,
               date: firebase.firestore.Timestamp.fromDate(now),
               trail_status: status,
               condition: lastInsp.condition || 'good',
@@ -535,6 +536,8 @@
         
         updateStatistics();
         renderMapMarkers();
+        updateLegend();
+        loadRecentInspections();
         alert(`✅ ${allTrails.length} sentiers ${status === 'open' ? 'ouverts' : 'fermés'} avec succès!\n\n${allTrails.length} inspections créées.`);
       } catch (e) { 
         console.error('Error:', e); 
