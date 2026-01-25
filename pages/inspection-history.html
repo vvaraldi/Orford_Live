@@ -289,6 +289,10 @@
     let sortDirection = 'desc';
     let filtersVisible = true;
     let isAdmin = false;
+    
+    // Store native browser functions before any library can override them
+    const nativeAlert = window.alert.bind(window);
+    const nativeConfirm = window.confirm.bind(window);
 
     // Elements
     const tableBody = document.getElementById('inspections-table');
@@ -760,15 +764,15 @@
       const insp = allInspections.find(i => i.id === id);
       if (!insp) {
         console.log('Inspection not found:', id);
-        window.alert('Inspection non trouvée');
+        nativeAlert('Inspection non trouvée');
         return;
       }
 
       const locationName = insp.location || 'lieu inconnu';
       console.log('Showing confirm for:', locationName);
       
-      // Use native confirm - check if it returns a Promise (some environments override it)
-      let userConfirmed = window.confirm(`Êtes-vous sûr de vouloir supprimer cette inspection de "${locationName}"?\n\nCette action est irréversible.`);
+      // Use native confirm
+      let userConfirmed = nativeConfirm(`Êtes-vous sûr de vouloir supprimer cette inspection de "${locationName}"?\n\nCette action est irréversible.`);
       
       // If confirm returns a Promise, await it
       if (userConfirmed && typeof userConfirmed.then === 'function') {
@@ -819,10 +823,10 @@
         filteredInspections = filteredInspections.filter(i => i.id !== id);
         updateDisplay();
 
-        window.alert('Inspection supprimée avec succès');
+        nativeAlert('Inspection supprimée avec succès');
       } catch (e) {
         console.error('Error deleting:', e);
-        window.alert('Erreur lors de la suppression: ' + e.message);
+        nativeAlert('Erreur lors de la suppression: ' + e.message);
       } finally {
         deleteInProgress = false;
         console.log('Delete process finished');
