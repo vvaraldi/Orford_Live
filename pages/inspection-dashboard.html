@@ -270,6 +270,7 @@
     let currentView = 'inspection'; // 'inspection' or 'status'
     let contextTrailId = null;
     let isAdmin = false;
+    let currentUserData = null;
 
     // Init
     function initDashboard() {
@@ -277,6 +278,7 @@
         requireAuth: true,
         requiredPermission: 'allowInspection',
         onAuthenticated: async (userData) => {
+          currentUserData = userData;
           isAdmin = userData.role === 'admin' || userData.role === 'system_admin';
           await loadDashboardData();
         }
@@ -435,13 +437,41 @@
     async function setTrailStatus(status) {
       if (!contextTrailId) return;
       try {
-        await db.collection('trails').doc(contextTrailId).update({
-          status: status,
-          statusUpdatedAt: firebase.firestore.FieldValue.serverTimestamp(),
-          statusUpdatedBy: currentUser.uid
-        });
         const trail = allTrails.find(t => t.id === contextTrailId);
+        const lastInsp = trailInspections[contextTrailId] || {};
+        const now = new Date();
+        
+        // Create inspection record for history
+        const inspectionData = {
+          trail_id: contextTrailId,
+          inspector_id: currentUser.uid,
+          inspector_name: currentUserData?.name || currentUser.email,
+          date: firebase.firestore.Timestamp.fromDate(now),
+          trail_status: status,
+          condition: lastInsp.condition || 'good',
+          snow_condition: lastInsp.snow_condition || null,
+          issues: lastInsp.issues || [],
+          notes: "Changement de statut rapide suite à évènement (météo ou autre)",
+          photos: [],
+          createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+          isQuickToggle: true
+        };
+        
+        // Batch: create inspection + update trail
+        const batch = db.batch();
+        const inspRef = db.collection('trail_inspections').doc();
+        batch.set(inspRef, inspectionData);
+        batch.update(db.collection('trails').doc(contextTrailId), {
+          status: status,
+          lastUpdated: firebase.firestore.FieldValue.serverTimestamp(),
+          lastInspectionId: inspRef.id
+        });
+        await batch.commit();
+        
+        // Update local state
         if (trail) trail.status = status;
+        trailInspections[contextTrailId] = { id: inspRef.id, ...inspectionData };
+        
         updateStatistics();
         renderMapMarkers();
         hideContextMenu();
@@ -449,21 +479,67 @@
     }
 
     async function bulkSetStatus(status) {
-      if (!confirm(`Êtes-vous sûr de vouloir ${status === 'open' ? 'ouvrir' : 'fermer'} tous les sentiers?`)) return;
+      const action = status === 'open' ? 'ouvrir' : 'fermer';
+      if (!confirm(`Êtes-vous sûr de vouloir ${action} tous les ${allTrails.length} sentiers?\n\nCette action créera une inspection pour chaque sentier.`)) return;
+      
       try {
-        const batch = db.batch();
-        allTrails.forEach(t => {
-          batch.update(db.collection('trails').doc(t.id), {
-            status: status,
-            statusUpdatedAt: firebase.firestore.FieldValue.serverTimestamp(),
-            statusUpdatedBy: currentUser.uid
+        const now = new Date();
+        const comment = status === 'open' 
+          ? 'Ouverture de toutes les pistes en une seule fois pour réinitialiser la montagne'
+          : 'Fermeture de toutes les pistes en une seule fois pour réinitialiser la montagne';
+        
+        // Firebase batch limit is 500 operations, we do 2 per trail
+        const BATCH_SIZE = 200;
+        const chunks = [];
+        for (let i = 0; i < allTrails.length; i += BATCH_SIZE) {
+          chunks.push(allTrails.slice(i, i + BATCH_SIZE));
+        }
+        
+        for (const chunk of chunks) {
+          const batch = db.batch();
+          
+          chunk.forEach(t => {
+            const lastInsp = trailInspections[t.id] || {};
+            
+            // Create inspection record for each trail
+            const inspectionData = {
+              trail_id: t.id,
+              inspector_id: currentUser.uid,
+              inspector_name: currentUserData?.name || currentUser.email,
+              date: firebase.firestore.Timestamp.fromDate(now),
+              trail_status: status,
+              condition: lastInsp.condition || 'good',
+              snow_condition: lastInsp.snow_condition || null,
+              issues: lastInsp.issues || [],
+              notes: comment,
+              photos: [],
+              createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+              isBulkToggle: true
+            };
+            
+            const inspRef = db.collection('trail_inspections').doc();
+            batch.set(inspRef, inspectionData);
+            batch.update(db.collection('trails').doc(t.id), {
+              status: status,
+              lastUpdated: firebase.firestore.FieldValue.serverTimestamp(),
+              lastInspectionId: inspRef.id
+            });
+            
+            // Update local state
+            t.status = status;
+            trailInspections[t.id] = { id: inspRef.id, ...inspectionData };
           });
-          t.status = status;
-        });
-        await batch.commit();
+          
+          await batch.commit();
+        }
+        
         updateStatistics();
         renderMapMarkers();
-      } catch (e) { console.error('Error:', e); alert('Erreur: ' + e.message); }
+        alert(`✅ ${allTrails.length} sentiers ${status === 'open' ? 'ouverts' : 'fermés'} avec succès!\n\n${allTrails.length} inspections créées.`);
+      } catch (e) { 
+        console.error('Error:', e); 
+        alert('Erreur: ' + e.message); 
+      }
     }
 
     // Modals

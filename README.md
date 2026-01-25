@@ -4,7 +4,6 @@ All in one app for inspection, signalisation, infraction, ...
 
 
 Phase 2: Inspection Module
-2.1Inspection dashboardTrail/shelter status overview with map
 2.2Trail report formCreate/edit trail inspections
 2.3Shelter report formCreate/edit shelter inspections
 2.4Inspection historyFilterable list with pagination
