@@ -588,8 +588,8 @@
         return `<tr>
           <td><div>${dateStr}</div><div style="font-size:0.75rem;color:var(--theme-text-secondary);">${timeStr}</div></td>
           <td><span class="${typeClass}">${typeLabel}</span></td>
-          <td>${escapeHtml(insp.location)}</td>
-          <td>${escapeHtml(insp.inspector)}</td>
+          <td>${escapeHtml(insp.location || 'Inconnu')}</td>
+          <td>${escapeHtml(insp.inspector || 'Inconnu')}</td>
           <td>${conditionBadge}</td>
           <td><span class="badge badge-secondary">📷 ${photoCount}</span></td>
           <td><div class="action-btns"><button class="btn btn-sm btn-primary" onclick="viewDetails('${insp.id}')" title="Voir détails">👁️</button>${isAdmin ? `<button class="btn btn-sm btn-danger" onclick="deleteInspection('${insp.id}')" title="Supprimer">🗑️</button>` : ''}</div></td>
@@ -719,7 +719,7 @@
         }).join('')}</div></div>`;
       }
 
-      modalTitle.textContent = `Inspection - ${insp.location}`;
+      modalTitle.textContent = `Inspection - ${insp.location || 'Lieu inconnu'}`;
       modalBody.innerHTML = html;
       detailModal.classList.add('show');
       document.body.style.overflow = 'hidden';
@@ -733,9 +733,17 @@
     async function deleteInspection(id) {
       if (!isAdmin) return;
       const insp = allInspections.find(i => i.id === id);
-      if (!insp) return;
+      if (!insp) {
+        alert('Inspection non trouvée');
+        return;
+      }
 
-      if (!confirm(`Êtes-vous sûr de vouloir supprimer cette inspection de "${insp.location}"?\n\nCette action est irréversible.`)) return;
+      const locationName = insp.location || 'lieu inconnu';
+      const confirmMessage = `Êtes-vous sûr de vouloir supprimer cette inspection de "${locationName}"?\n\nCette action est irréversible.`;
+      
+      if (!confirm(confirmMessage)) {
+        return;
+      }
 
       try {
         const collection = insp.type === 'trail' ? 'trail_inspections' : 'shelter_inspections';
@@ -745,8 +753,10 @@
           for (const photo of insp.photos) {
             try {
               const url = typeof photo === 'string' ? photo : photo.url;
-              const storageRef = firebase.storage().refFromURL(url);
-              await storageRef.delete();
+              if (url) {
+                const storageRef = firebase.storage().refFromURL(url);
+                await storageRef.delete();
+              }
             } catch (e) { console.warn('Could not delete photo:', e); }
           }
         }
