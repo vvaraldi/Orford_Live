@@ -4,6 +4,7 @@ All in one app for inspection, signalisation, infraction, ...
 
 
 Phase 2: Inspection Module
+2.5 Manage the delete in the history... make sure it deletes the picture too
 2.6Inspection adminStatistics & data management
 
 Phase 3: Infraction Module

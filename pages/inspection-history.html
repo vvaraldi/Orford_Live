@@ -592,7 +592,7 @@
           <td>${escapeHtml(insp.inspector || 'Inconnu')}</td>
           <td>${conditionBadge}</td>
           <td><span class="badge badge-secondary">📷 ${photoCount}</span></td>
-          <td><div class="action-btns"><button class="btn btn-sm btn-primary" onclick="viewDetails('${insp.id}')" title="Voir détails">👁️</button>${isAdmin ? `<button class="btn btn-sm btn-danger" onclick="deleteInspection('${insp.id}')" title="Supprimer">🗑️</button>` : ''}</div></td>
+          <td><div class="action-btns"><button class="btn btn-sm btn-primary" onclick="viewDetails('${insp.id}')" title="Voir détails">👁️</button>${isAdmin ? `<button class="btn btn-sm btn-danger" onclick="deleteInspection('${insp.id}', event)" title="Supprimer">🗑️</button>` : ''}</div></td>
         </tr>`;
       }).join('');
 
@@ -730,7 +730,21 @@
       document.body.style.overflow = '';
     }
 
-    async function deleteInspection(id) {
+    let deleteInProgress = false;
+    
+    async function deleteInspection(id, event) {
+      // Prevent double-click and event bubbling
+      if (event) {
+        event.preventDefault();
+        event.stopPropagation();
+      }
+      
+      // Prevent multiple simultaneous deletes
+      if (deleteInProgress) {
+        console.log('Delete already in progress');
+        return;
+      }
+      
       if (!isAdmin) return;
       const insp = allInspections.find(i => i.id === id);
       if (!insp) {
@@ -741,9 +755,14 @@
       const locationName = insp.location || 'lieu inconnu';
       const confirmMessage = `Êtes-vous sûr de vouloir supprimer cette inspection de "${locationName}"?\n\nCette action est irréversible.`;
       
-      if (!confirm(confirmMessage)) {
+      const userConfirmed = confirm(confirmMessage);
+      if (!userConfirmed) {
+        console.log('User cancelled deletion');
         return;
       }
+      
+      // Set flag to prevent double execution
+      deleteInProgress = true;
 
       try {
         const collection = insp.type === 'trail' ? 'trail_inspections' : 'shelter_inspections';
@@ -773,6 +792,8 @@
       } catch (e) {
         console.error('Error deleting:', e);
         alert('Erreur lors de la suppression: ' + e.message);
+      } finally {
+        deleteInProgress = false;
       }
     }
 
