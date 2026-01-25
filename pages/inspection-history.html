@@ -733,42 +733,64 @@
     let deleteInProgress = false;
     
     async function deleteInspection(id, event) {
+      console.log('=== DELETE CALLED ===', id, 'deleteInProgress:', deleteInProgress);
+      
       // Prevent double-click and event bubbling
       if (event) {
         event.preventDefault();
         event.stopPropagation();
+        event.stopImmediatePropagation();
+        // Disable the button immediately
+        if (event.target) {
+          event.target.disabled = true;
+        }
       }
       
       // Prevent multiple simultaneous deletes
       if (deleteInProgress) {
-        console.log('Delete already in progress');
+        console.log('Delete already in progress, aborting');
         return;
       }
       
-      if (!isAdmin) return;
+      if (!isAdmin) {
+        console.log('Not admin, aborting');
+        return;
+      }
+      
       const insp = allInspections.find(i => i.id === id);
       if (!insp) {
+        console.log('Inspection not found:', id);
         alert('Inspection non trouvée');
         return;
       }
 
       const locationName = insp.location || 'lieu inconnu';
-      const confirmMessage = `Êtes-vous sûr de vouloir supprimer cette inspection de "${locationName}"?\n\nCette action est irréversible.`;
+      console.log('Showing confirm for:', locationName);
       
-      const userConfirmed = confirm(confirmMessage);
+      const userConfirmed = window.confirm(`Êtes-vous sûr de vouloir supprimer cette inspection de "${locationName}"?\n\nCette action est irréversible.`);
+      
+      console.log('User confirmed:', userConfirmed);
+      
       if (!userConfirmed) {
-        console.log('User cancelled deletion');
+        console.log('User cancelled');
+        // Re-enable button
+        if (event && event.target) {
+          event.target.disabled = false;
+        }
         return;
       }
       
       // Set flag to prevent double execution
       deleteInProgress = true;
+      console.log('Starting deletion...');
 
       try {
         const collection = insp.type === 'trail' ? 'trail_inspections' : 'shelter_inspections';
+        console.log('Deleting from collection:', collection);
         
         // Delete photos from storage
         if (insp.photos && insp.photos.length > 0) {
+          console.log('Deleting', insp.photos.length, 'photos');
           for (const photo of insp.photos) {
             try {
               const url = typeof photo === 'string' ? photo : photo.url;
@@ -781,7 +803,9 @@
         }
 
         // Delete document
+        console.log('Deleting document:', id);
         await db.collection(collection).doc(id).delete();
+        console.log('Document deleted successfully');
 
         // Update local state
         allInspections = allInspections.filter(i => i.id !== id);
@@ -794,6 +818,7 @@
         alert('Erreur lors de la suppression: ' + e.message);
       } finally {
         deleteInProgress = false;
+        console.log('Delete process finished');
       }
     }
 
