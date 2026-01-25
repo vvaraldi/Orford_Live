@@ -760,19 +760,26 @@
       const insp = allInspections.find(i => i.id === id);
       if (!insp) {
         console.log('Inspection not found:', id);
-        alert('Inspection non trouvée');
+        window.alert('Inspection non trouvée');
         return;
       }
 
       const locationName = insp.location || 'lieu inconnu';
       console.log('Showing confirm for:', locationName);
       
-      const userConfirmed = window.confirm(`Êtes-vous sûr de vouloir supprimer cette inspection de "${locationName}"?\n\nCette action est irréversible.`);
+      // Use native confirm - check if it returns a Promise (some environments override it)
+      let userConfirmed = window.confirm(`Êtes-vous sûr de vouloir supprimer cette inspection de "${locationName}"?\n\nCette action est irréversible.`);
       
-      console.log('User confirmed:', userConfirmed);
+      // If confirm returns a Promise, await it
+      if (userConfirmed && typeof userConfirmed.then === 'function') {
+        console.log('Confirm returned a Promise, awaiting...');
+        userConfirmed = await userConfirmed;
+      }
       
-      if (!userConfirmed) {
-        console.log('User cancelled');
+      console.log('User confirmed:', userConfirmed, typeof userConfirmed);
+      
+      if (userConfirmed !== true) {
+        console.log('User cancelled or invalid response');
         // Re-enable button
         if (event && event.target) {
           event.target.disabled = false;
@@ -812,10 +819,10 @@
         filteredInspections = filteredInspections.filter(i => i.id !== id);
         updateDisplay();
 
-        alert('Inspection supprimée avec succès');
+        window.alert('Inspection supprimée avec succès');
       } catch (e) {
         console.error('Error deleting:', e);
-        alert('Erreur lors de la suppression: ' + e.message);
+        window.alert('Erreur lors de la suppression: ' + e.message);
       } finally {
         deleteInProgress = false;
         console.log('Delete process finished');
