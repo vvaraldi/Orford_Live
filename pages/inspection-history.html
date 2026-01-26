@@ -109,6 +109,8 @@
       .data-table { font-size: 0.8rem; }
       .data-table th, .data-table td { padding: 0.5rem; }
     }
+    @keyframes slideIn { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+    @keyframes slideOut { from { transform: translateX(0); opacity: 1; } to { transform: translateX(100%); opacity: 0; } }
   </style>
 </head>
 <body data-theme="light" data-module="inspection">
@@ -303,6 +305,21 @@
     const detailModal = document.getElementById('detail-modal');
     const modalTitle = document.getElementById('modal-title');
     const modalBody = document.getElementById('modal-body');
+
+    // Debug: Intercept any call to alert to find source of "undefined"
+    (function() {
+      const origAlert = window.alert;
+      window.alert = function(msg) {
+        console.log('=== ALERT INTERCEPTED ===');
+        console.log('Message:', msg);
+        console.log('Stack trace:', new Error().stack);
+        if (msg === undefined || msg === 'undefined') {
+          console.error('UNDEFINED ALERT - Stack:', new Error().stack);
+          return; // Don't show undefined alerts
+        }
+        return origAlert.call(window, msg);
+      };
+    })();
 
     // Init
     function initHistory() {
@@ -823,14 +840,40 @@
         filteredInspections = filteredInspections.filter(i => i.id !== id);
         updateDisplay();
 
-        nativeAlert('Inspection supprimée avec succès');
+        // Show success toast instead of alert
+        showToast('Inspection supprimée avec succès', 'success');
       } catch (e) {
         console.error('Error deleting:', e);
-        nativeAlert('Erreur lors de la suppression: ' + e.message);
+        showToast('Erreur lors de la suppression: ' + e.message, 'error');
       } finally {
         deleteInProgress = false;
         console.log('Delete process finished');
       }
+    }
+    
+    // Simple toast notification
+    function showToast(message, type = 'info') {
+      console.log('showToast called:', message, type);
+      // Remove existing toast
+      const existing = document.querySelector('.toast-notification');
+      if (existing) existing.remove();
+      
+      const toast = document.createElement('div');
+      toast.className = `toast-notification toast-${type}`;
+      toast.style.cssText = `
+        position: fixed; top: 20px; right: 20px; z-index: 9999;
+        padding: 1rem 1.5rem; border-radius: 8px; 
+        background: ${type === 'success' ? '#10b981' : type === 'error' ? '#ef4444' : '#3b82f6'};
+        color: white; font-weight: 500; box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+        animation: slideIn 0.3s ease;
+      `;
+      toast.textContent = message;
+      document.body.appendChild(toast);
+      
+      setTimeout(() => {
+        toast.style.animation = 'slideOut 0.3s ease';
+        setTimeout(() => toast.remove(), 300);
+      }, 3000);
     }
 
     function escapeHtml(text) {
