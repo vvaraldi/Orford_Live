@@ -898,13 +898,16 @@
     async function scanOrphans() {
       const resultsEl = document.getElementById('orphan-results');
       const btnDelete = document.getElementById('btn-delete-orphans');
+      const btnScan = document.getElementById('btn-scan-orphans');
       
-      resultsEl.innerHTML = '<p>Analyse en cours...</p>';
+      resultsEl.innerHTML = '<p>🔍 Analyse en cours... Cela peut prendre quelques minutes.</p>';
       resultsEl.style.display = 'block';
       btnDelete.disabled = true;
+      btnScan.disabled = true;
       
       try {
-        // Get all photo URLs from inspections
+        // Step 1: Get all photo URLs from inspections
+        showMessage('Récupération des photos référencées...', 'info');
         const validUrls = new Set();
         
         const trailSnap = await db.collection('trail_inspections').get();
@@ -925,24 +928,94 @@
           });
         });
         
-        // List files in storage (this requires listing permission)
-        // Note: Firebase Storage listing requires rules to allow it
-        // For now, we'll show a message that this feature requires proper setup
+        console.log(`Found ${validUrls.size} valid photo URLs in database`);
         
-        resultsEl.innerHTML = `
-          <p><strong>${validUrls.size}</strong> photos référencées dans la base de données.</p>
-          <p style="color: var(--theme-text-secondary); font-size: 0.875rem;">
-            Note: La détection complète des orphelins nécessite des permissions de listing sur Firebase Storage. 
-            Contactez l'administrateur système pour activer cette fonctionnalité.
-          </p>
-        `;
+        // Step 2: List all files in storage
+        showMessage('Analyse du stockage Firebase...', 'info');
+        const storage = firebase.storage();
+        const storageFiles = [];
         
-        orphanFiles = [];
-        btnDelete.disabled = true;
+        // Scan the inspections folder recursively
+        async function listAllFiles(ref) {
+          try {
+            const result = await ref.listAll();
+            
+            // Add all files
+            for (const item of result.items) {
+              try {
+                const url = await item.getDownloadURL();
+                storageFiles.push({
+                  ref: item,
+                  path: item.fullPath,
+                  url: url
+                });
+              } catch (e) {
+                console.warn('Could not get URL for:', item.fullPath, e);
+              }
+            }
+            
+            // Recursively scan subdirectories
+            for (const prefix of result.prefixes) {
+              await listAllFiles(prefix);
+            }
+          } catch (e) {
+            console.warn('Error listing:', ref.fullPath, e);
+          }
+        }
+        
+        // Scan inspections/trails and inspections/shelters folders
+        await listAllFiles(storage.ref('inspections/trails'));
+        await listAllFiles(storage.ref('inspections/shelters'));
+        
+        console.log(`Found ${storageFiles.length} files in storage`);
+        
+        // Step 3: Find orphans (files in storage not in database)
+        orphanFiles = storageFiles.filter(file => !validUrls.has(file.url));
+        
+        console.log(`Found ${orphanFiles.length} orphan files`);
+        
+        // Step 4: Display results
+        hideMessages();
+        if (orphanFiles.length === 0) {
+          resultsEl.innerHTML = `
+            <p style="color: var(--color-success);">✅ Aucun fichier orphelin trouvé!</p>
+            <p style="font-size: 0.875rem; color: var(--theme-text-secondary);">
+              ${validUrls.size} photos référencées • ${storageFiles.length} fichiers dans le stockage
+            </p>
+          `;
+          btnDelete.disabled = true;
+        } else {
+          resultsEl.innerHTML = `
+            <p style="color: var(--color-warning);">⚠️ <strong>${orphanFiles.length}</strong> fichier(s) orphelin(s) trouvé(s)</p>
+            <p style="font-size: 0.875rem; color: var(--theme-text-secondary);">
+              ${validUrls.size} photos référencées • ${storageFiles.length} fichiers dans le stockage
+            </p>
+            <details style="margin-top: 0.5rem;">
+              <summary style="cursor: pointer; color: var(--theme-accent);">Voir la liste des fichiers orphelins</summary>
+              <ul style="font-size: 0.8rem; max-height: 200px; overflow-y: auto; margin-top: 0.5rem; padding-left: 1.5rem;">
+                ${orphanFiles.map(f => `<li>${escapeHtml(f.path)}</li>`).join('')}
+              </ul>
+            </details>
+          `;
+          btnDelete.disabled = false;
+        }
         
       } catch (e) {
         console.error('Error scanning:', e);
-        resultsEl.innerHTML = `<p style="color: var(--color-danger);">Erreur: ${e.message}</p>`;
+        hideMessages();
+        resultsEl.innerHTML = `<p style="color: var(--color-danger);">❌ Erreur: ${e.message}</p>`;
+        
+        // Check if it's a permission error
+        if (e.code === 'storage/unauthorized') {
+          resultsEl.innerHTML += `
+            <p style="font-size: 0.875rem; color: var(--theme-text-secondary);">
+              Les règles Firebase Storage doivent autoriser le listing. Ajoutez cette règle:<br>
+              <code style="background: var(--theme-surface-alt); padding: 0.25rem 0.5rem; border-radius: 4px;">allow list: if request.auth != null;</code>
+            </p>
+          `;
+        }
+      } finally {
+        btnScan.disabled = false;
       }
     }
 
@@ -955,8 +1028,46 @@
       }
       if (userConfirmed !== true) return;
       
-      // Implementation would go here
-      showSuccess('Fonctionnalité en cours de développement.');
+      const resultsEl = document.getElementById('orphan-results');
+      const btnDelete = document.getElementById('btn-delete-orphans');
+      btnDelete.disabled = true;
+      
+      try {
+        let deleted = 0;
+        let errors = 0;
+        
+        for (const file of orphanFiles) {
+          try {
+            await file.ref.delete();
+            deleted++;
+            if (deleted % 5 === 0) {
+              showMessage(`Suppression: ${deleted}/${orphanFiles.length}...`, 'info');
+            }
+          } catch (e) {
+            console.warn('Could not delete:', file.path, e);
+            errors++;
+          }
+        }
+        
+        hideMessages();
+        orphanFiles = [];
+        
+        if (errors === 0) {
+          showSuccess(`${deleted} fichier(s) orphelin(s) supprimé(s) avec succès.`);
+        } else {
+          showMessage(`${deleted} fichier(s) supprimé(s), ${errors} erreur(s).`, 'warning');
+        }
+        
+        resultsEl.innerHTML = `<p style="color: var(--color-success);">✅ Nettoyage terminé. ${deleted} fichier(s) supprimé(s).</p>`;
+        
+        // Update db stats
+        updateDbStats();
+        
+      } catch (e) {
+        console.error('Error deleting orphans:', e);
+        showError('Erreur lors de la suppression: ' + e.message);
+        btnDelete.disabled = false;
+      }
     }
 
     function showMessage(msg, type) {
