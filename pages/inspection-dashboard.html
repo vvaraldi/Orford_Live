@@ -136,6 +136,7 @@
       <a href="inspection-trail-report.html" class="nav__link"><span>Rapport sentier</span></a>
       <a href="inspection-shelter-report.html" class="nav__link"><span>Rapport abri</span></a>
       <a href="inspection-history.html" class="nav__link"><span>Historique</span></a>
+      <a href="inspection-admin.html" class="nav__link nav__link--admin" style="display:none;"><span>Admin</span></a>
       <div class="nav__divider"></div>
       <button class="theme-toggle" onclick="window.themeManager.toggle()" aria-label="Changer le thème">
         <svg class="theme-toggle__icon theme-toggle__icon--moon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg>
@@ -165,6 +166,7 @@
       <a href="inspection-trail-report.html" class="mobile-nav__link"><span class="mobile-nav__link-icon">📝</span><span>Rapport sentier</span></a>
       <a href="inspection-shelter-report.html" class="mobile-nav__link"><span class="mobile-nav__link-icon">📝</span><span>Rapport abri</span></a>
       <a href="inspection-history.html" class="mobile-nav__link"><span class="mobile-nav__link-icon">📋</span><span>Historique</span></a>
+      <a href="inspection-admin.html" class="mobile-nav__link mobile-nav__link--admin" style="display:none;"><span class="mobile-nav__link-icon">⚙️</span><span>Admin</span></a>
       <a href="user-profile.html" class="mobile-nav__link"><span class="mobile-nav__link-icon">👤</span><span>Mon profil</span></a>
     </div>
     <div class="mobile-nav__divider"></div>
@@ -278,6 +280,10 @@
         requiredPermission: 'allowInspection',
         onAuthenticated: async (userData) => {
           isAdmin = userData.role === 'admin' || userData.role === 'system_admin';
+          // Show admin nav links if user is admin
+          if (isAdmin) {
+            document.querySelectorAll('.nav__link--admin, .mobile-nav__link--admin').forEach(el => el.style.display = '');
+          }
           await loadDashboardData();
         }
       });
