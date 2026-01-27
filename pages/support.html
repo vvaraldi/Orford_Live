@@ -615,7 +615,10 @@
     async function openDetailModal(requestId) {
       currentRequestId = requestId;
       const request = allRequests.find(r => r.id === requestId);
-      if (!request) return;
+      if (!request) {
+        console.error('Request not found:', requestId);
+        return;
+      }
 
       // Title
       document.getElementById('detail-title').textContent = request.title;
@@ -637,12 +640,16 @@
       // Admin controls
       setupAdminControls(request);
 
-      // Load comments
-      await loadComments(requestId);
+      // Reset comments area
+      document.getElementById('comments-list').innerHTML = '<div class="comments-empty">Chargement...</div>';
+      document.getElementById('comments-count').textContent = '(0)';
 
-      // Show modal
+      // Show modal first
       document.getElementById('detail-modal').classList.add('show');
       document.body.style.overflow = 'hidden';
+
+      // Load comments after modal is shown (non-blocking)
+      loadComments(requestId);
     }
 
     function closeDetailModal() {
