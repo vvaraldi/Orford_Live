@@ -505,7 +505,10 @@
 
       // Bind click events
       container.querySelectorAll('.request-card').forEach(card => {
-        card.addEventListener('click', () => openDetailModal(card.dataset.id));
+        card.addEventListener('click', (e) => {
+          console.log('Card clicked, id:', card.dataset.id);
+          openDetailModal(card.dataset.id);
+        });
       });
     }
 
@@ -613,43 +616,55 @@
 
     // Detail Modal
     async function openDetailModal(requestId) {
+      console.log('openDetailModal called with:', requestId);
+      console.log('allRequests:', allRequests);
+      
       currentRequestId = requestId;
       const request = allRequests.find(r => r.id === requestId);
+      console.log('Found request:', request);
+      
       if (!request) {
         console.error('Request not found:', requestId);
         return;
       }
 
-      // Title
-      document.getElementById('detail-title').textContent = request.title;
+      try {
+        // Title
+        document.getElementById('detail-title').textContent = request.title;
 
-      // Badges
-      document.getElementById('detail-badges').innerHTML = `
-        <span class="badge badge-type-${request.type}">${typeLabels[request.type] || request.type}</span>
-        <span class="badge badge-priority-${request.priority}">${priorityLabels[request.priority] || request.priority}</span>
-        <span class="badge badge-status-${request.status}">${statusLabels[request.status] || request.status}</span>
-      `;
+        // Badges
+        document.getElementById('detail-badges').innerHTML = `
+          <span class="badge badge-type-${request.type}">${typeLabels[request.type] || request.type}</span>
+          <span class="badge badge-priority-${request.priority}">${priorityLabels[request.priority] || request.priority}</span>
+          <span class="badge badge-status-${request.status}">${statusLabels[request.status] || request.status}</span>
+        `;
 
-      // Meta
-      const date = request.createdAt?.toDate ? request.createdAt.toDate().toLocaleDateString('fr-CA', { year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : 'Date inconnue';
-      document.getElementById('detail-meta').innerHTML = `Par <strong>${escapeHtml(request.createdByName || 'Inconnu')}</strong> • ${date}`;
+        // Meta
+        const date = request.createdAt?.toDate ? request.createdAt.toDate().toLocaleDateString('fr-CA', { year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : 'Date inconnue';
+        document.getElementById('detail-meta').innerHTML = `Par <strong>${escapeHtml(request.createdByName || 'Inconnu')}</strong> • ${date}`;
 
-      // Description
-      document.getElementById('detail-description').textContent = request.description;
+        // Description
+        document.getElementById('detail-description').textContent = request.description;
 
-      // Admin controls
-      setupAdminControls(request);
+        // Admin controls
+        setupAdminControls(request);
 
-      // Reset comments area
-      document.getElementById('comments-list').innerHTML = '<div class="comments-empty">Chargement...</div>';
-      document.getElementById('comments-count').textContent = '(0)';
+        // Reset comments area
+        document.getElementById('comments-list').innerHTML = '<div class="comments-empty">Chargement...</div>';
+        document.getElementById('comments-count').textContent = '(0)';
 
-      // Show modal first
-      document.getElementById('detail-modal').classList.add('show');
-      document.body.style.overflow = 'hidden';
+        // Show modal first
+        const modal = document.getElementById('detail-modal');
+        console.log('Modal element:', modal);
+        modal.classList.add('show');
+        console.log('Modal classes after add:', modal.className);
+        document.body.style.overflow = 'hidden';
 
-      // Load comments after modal is shown (non-blocking)
-      loadComments(requestId);
+        // Load comments after modal is shown (non-blocking)
+        loadComments(requestId);
+      } catch (e) {
+        console.error('Error in openDetailModal:', e);
+      }
     }
 
     function closeDetailModal() {

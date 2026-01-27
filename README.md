@@ -1,10 +1,8 @@
 # Orford_Live
 All in one app for inspection, signalisation, infraction, ...
 
-Phase 1: request Module
-1.1 Request Form
-
-Phase 2: should add a card for administration (rather than having a link in the nav bar).
+Phase 2: request Module
+2.1 Request Form debug
 
 Phase 3: Infraction Module
 3.1 Infraction reportForm with QR scanner
