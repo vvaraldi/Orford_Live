@@ -30,10 +30,6 @@
         <span>🏠</span>
         <span>Accueil</span>
       </a>
-      <a href="pages/user-management.html" class="nav__link" data-require-admin id="admin-nav-link" style="display: none;">
-        <span>⚙️</span>
-        <span>Gestion</span>
-      </a>
       
       <div class="nav__divider"></div>
       
@@ -119,10 +115,6 @@
       <a href="pages/user-profile.html" class="mobile-nav__link">
         <span class="mobile-nav__link-icon">👤</span>
         <span>Mon profil</span>
-      </a>
-      <a href="pages/user-management.html" class="mobile-nav__link" data-require-admin style="display: none;">
-        <span class="mobile-nav__link-icon">⚙️</span>
-        <span>Gestion des utilisateurs</span>
       </a>
     </div>
 
@@ -236,6 +228,15 @@
         actionText: 'Accéder au support'
       },
       {
+        id: 'admin',
+        title: 'Administration',
+        icon: '⚙️',
+        description: 'Gestion des utilisateurs, export de données et paramètres du système.',
+        url: 'pages/user-management.html',
+        requireAdmin: true, // Special flag for admin-only
+        actionText: 'Accéder à l\'administration'
+      },
+      {
         id: 'status',
         title: 'Statut Randonnée',
         icon: '🗺️',
@@ -256,7 +257,14 @@
 
       appGrid.innerHTML = '';
 
+      const isAdmin = userData.role === 'admin' || userData.role === 'system_admin';
+
       portalApps.forEach(app => {
+        // Check admin-only apps
+        if (app.requireAdmin && !isAdmin) {
+          return; // Skip admin-only cards for non-admins
+        }
+
         // Check permission
         let hasAccess = true;
         if (app.permission) {
