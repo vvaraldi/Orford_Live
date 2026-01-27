@@ -163,18 +163,6 @@
           <div class="stat-card__value" id="stat-inspections-with-issues">-</div>
           <div class="stat-card__sub" id="stat-issues-percentage">-</div>
         </div>
-      </div>
-
-      <!-- Trail Status -->
-      <div class="stats-grid">
-        <div class="stat-card">
-          <div class="stat-card__label">Sentiers ouverts</div>
-          <div class="stat-card__value" style="color: var(--color-success);" id="stat-trails-open">-</div>
-        </div>
-        <div class="stat-card">
-          <div class="stat-card__label">Sentiers fermés</div>
-          <div class="stat-card__value" style="color: var(--color-danger);" id="stat-trails-closed">-</div>
-        </div>
         <div class="stat-card">
           <div class="stat-card__label">Moy. inspections/inspecteur</div>
           <div class="stat-card__value" id="stat-avg-per-inspector">-</div>
@@ -204,7 +192,7 @@
 
       <!-- Inspector Ranking -->
       <div class="chart-section">
-        <div class="chart-section__title">🏆 Classement des inspecteurs</div>
+        <div class="chart-section__title">🏆 Classement des inspecteurs (par nombre d'inspections)</div>
         <div style="overflow-x: auto;">
           <table class="data-table" id="inspector-ranking">
             <thead>
@@ -214,6 +202,25 @@
                 <th style="text-align: right;">Inspections</th>
                 <th style="text-align: right;">Photos</th>
                 <th style="text-align: right;">Problèmes signalés</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Word Count Ranking -->
+      <div class="chart-section">
+        <div class="chart-section__title">✍️ Classement des inspecteurs (par nombre de mots dans les notes)</div>
+        <div style="overflow-x: auto;">
+          <table class="data-table" id="word-count-ranking">
+            <thead>
+              <tr>
+                <th style="width: 60px;">Rang</th>
+                <th>Inspecteur</th>
+                <th style="text-align: right;">Total mots</th>
+                <th style="text-align: right;">Moy. mots/inspection</th>
+                <th style="text-align: right;">Inspections</th>
               </tr>
             </thead>
             <tbody></tbody>
@@ -469,15 +476,6 @@
       document.getElementById('stat-issues-percentage').textContent = 
         allInspections.length > 0 ? `${Math.round(inspectionsWithIssues / allInspections.length * 100)}% des inspections` : '-';
       
-      // Trail status
-      let openTrails = 0, closedTrails = 0;
-      trails.forEach(t => {
-        if (t.status === 'open') openTrails++;
-        else if (t.status === 'closed') closedTrails++;
-      });
-      document.getElementById('stat-trails-open').textContent = openTrails;
-      document.getElementById('stat-trails-closed').textContent = closedTrails;
-      
       // Avg per inspector
       const inspectorCounts = {};
       allInspections.forEach(i => {
@@ -489,6 +487,9 @@
       
       // Inspector ranking
       renderInspectorRanking(allInspections);
+      
+      // Word count ranking
+      renderWordCountRanking(allInspections);
       
       // Outlier photo
       renderOutlierPhoto();
@@ -518,6 +519,48 @@
           <td style="text-align: right; font-weight: 600;">${s.inspections}</td>
           <td style="text-align: right;">${s.photos}</td>
           <td style="text-align: right;">${s.issues}</td>
+        </tr>`;
+      }).join('');
+    }
+
+    function countWords(text) {
+      if (!text || typeof text !== 'string') return 0;
+      return text.trim().split(/\s+/).filter(w => w.length > 0).length;
+    }
+
+    function renderWordCountRanking(allInspections) {
+      const stats = {};
+      allInspections.forEach(i => {
+        if (!stats[i.inspector]) {
+          stats[i.inspector] = { totalWords: 0, inspections: 0 };
+        }
+        stats[i.inspector].inspections++;
+        // Count words in notes
+        stats[i.inspector].totalWords += countWords(i.notes);
+        // Also count words in detail fields for shelters
+        if (i.type === 'shelter') {
+          stats[i.inspector].totalWords += countWords(i.cleanliness_details);
+          stats[i.inspector].totalWords += countWords(i.accessibility_details);
+        }
+      });
+      
+      const sorted = Object.entries(stats)
+        .map(([name, data]) => ({ 
+          name, 
+          ...data, 
+          avgWords: data.inspections > 0 ? (data.totalWords / data.inspections).toFixed(1) : 0 
+        }))
+        .sort((a, b) => b.totalWords - a.totalWords);
+      
+      const tbody = document.querySelector('#word-count-ranking tbody');
+      tbody.innerHTML = sorted.map((s, i) => {
+        const rankClass = i === 0 ? 'rank-1' : i === 1 ? 'rank-2' : i === 2 ? 'rank-3' : 'rank-other';
+        return `<tr>
+          <td><span class="rank-badge ${rankClass}">${i + 1}</span></td>
+          <td>${escapeHtml(s.name)}</td>
+          <td style="text-align: right; font-weight: 600;">${s.totalWords.toLocaleString()}</td>
+          <td style="text-align: right;">${s.avgWords}</td>
+          <td style="text-align: right;">${s.inspections}</td>
         </tr>`;
       }).join('');
     }
