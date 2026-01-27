@@ -493,10 +493,7 @@
 
       // Bind click events
       container.querySelectorAll('.request-card').forEach(card => {
-        card.addEventListener('click', (e) => {
-          console.log('Card clicked, id:', card.dataset.id);
-          openDetailModal(card.dataset.id);
-        });
+        card.addEventListener('click', () => openDetailModal(card.dataset.id));
       });
     }
 
@@ -604,17 +601,10 @@
 
     // Detail Modal
     async function openDetailModal(requestId) {
-      console.log('openDetailModal called with:', requestId);
-      console.log('allRequests:', allRequests);
-      
       currentRequestId = requestId;
       const request = allRequests.find(r => r.id === requestId);
-      console.log('Found request:', request);
       
-      if (!request) {
-        console.error('Request not found:', requestId);
-        return;
-      }
+      if (!request) return;
 
       try {
         // Title
@@ -641,11 +631,8 @@
         document.getElementById('comments-list').innerHTML = '<div class="comments-empty">Chargement...</div>';
         document.getElementById('comments-count').textContent = '(0)';
 
-        // Show modal first
-        const modal = document.getElementById('detail-modal');
-        console.log('Modal element:', modal);
-        modal.classList.add('is-active');
-        console.log('Modal classes after add:', modal.className);
+        // Show modal
+        document.getElementById('detail-modal').classList.add('is-active');
         document.body.style.overflow = 'hidden';
 
         // Load comments after modal is shown (non-blocking)
