@@ -1,8 +1,6 @@
 # Orford_Live
 All in one app for inspection, signalisation, infraction, ...
 
-Phase 3: Infraction Module
-
 Phase 4: Signalisation Module
 4.1 Signalisation reportStatus/photo capture form
 4.2 Signalisation adminList, resolve, archive

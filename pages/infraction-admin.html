@@ -59,6 +59,7 @@
     <a href="../index.html" class="logo"><span class="logo__icon">🚨</span><span class="logo__text">Infractions</span></a>
     <nav class="nav">
       <a href="../index.html" class="nav__link"><span>🏠</span><span>Portail</span></a>
+      <div class="nav__divider"></div>
       <a href="infraction-report.html" class="nav__link"><span>📝</span><span>Rapport</span></a>
       <a href="infraction-admin.html" class="nav__link is-active"><span>📋</span><span>Gestion</span></a>
       <div class="nav__divider"></div>
@@ -86,6 +87,9 @@
     <div class="mobile-nav__user"><div class="mobile-nav__user-name" data-user-name>-</div><div class="mobile-nav__user-role" data-user-role>-</div></div>
     <div class="mobile-nav__section">
       <a href="../index.html" class="mobile-nav__link"><span class="mobile-nav__link-icon">🏠</span><span>Portail</span></a>
+    </div>
+    <div class="mobile-nav__divider"></div>
+    <div class="mobile-nav__section">
       <a href="infraction-report.html" class="mobile-nav__link"><span class="mobile-nav__link-icon">📝</span><span>Rapport</span></a>
       <a href="infraction-admin.html" class="mobile-nav__link is-active"><span class="mobile-nav__link-icon">📋</span><span>Gestion</span></a>
     </div>
@@ -313,19 +317,21 @@
       const modifiedStr = inf.modifiedAt?.toDate?.()?.toLocaleDateString('fr-CA', { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) || '';
       
       const location = inf.trail 
-        ? `${inf.sectorName || inf.sector} - ${inf.trail}${inf.offPiste ? ' (Hors-piste)' : ''}`
-        : (inf.sectorName || inf.sector || '-') + (inf.offPiste ? ' (Hors-piste)' : '');
+        ? `${inf.sector} - ${inf.trail}${inf.offPiste ? ' (Hors-piste)' : ''}`
+        : (inf.sector || '-') + (inf.offPiste ? ' (Hors-piste)' : '');
       
+      // Photo
       let photoHtml = '<p style="color:var(--theme-text-secondary);">Aucune photo</p>';
-      if (inf.photoUrl) {
-        photoHtml = `<img src="${inf.photoUrl}" class="detail-photo" alt="Photo" onclick="window.open('${inf.photoUrl}', '_blank')">`;
+      if (inf.offenderImageUrl) {
+        photoHtml = `<img src="${inf.offenderImageUrl}" class="detail-photo" alt="Photo" onclick="window.open('${inf.offenderImageUrl}', '_blank')">`;
       }
       
+      // QR Code
       let qrHtml = '<p style="color:var(--theme-text-secondary);">Aucun QR code</p>';
-      if (inf.qrCodeData) {
-        qrHtml = `<div class="qr-data-display"><span class="qr-data-label">Données</span><span class="qr-data-value">${escapeHtml(inf.qrCodeData)}</span></div>`;
-        if (inf.qrCodeImageUrl) {
-          qrHtml += `<img src="${inf.qrCodeImageUrl}" class="detail-qr" alt="QR Code" style="margin-top:0.5rem;">`;
+      if (inf.offenderQRCode) {
+        qrHtml = `<div class="qr-data-display"><span class="qr-data-label">Données</span><span class="qr-data-value">${escapeHtml(inf.offenderQRCode)}</span></div>`;
+        if (inf.offenderQRImageUrl) {
+          qrHtml += `<img src="${inf.offenderQRImageUrl}" class="detail-qr" alt="QR Code" style="margin-top:0.5rem;">`;
         }
       }
       
@@ -336,7 +342,7 @@
           <div class="detail-grid">
             <div class="detail-item"><strong>Date/Heure:</strong> ${dateStr}</div>
             <div class="detail-item"><strong>Patrouilleur:</strong> ${escapeHtml(inf.patrolName || '-')}</div>
-            <div class="detail-item"><strong>Infraction:</strong> ${FAULT_LABELS[inf.fault] || inf.fault || '-'}</div>
+            <div class="detail-item"><strong>Infraction:</strong> ${inf.faultDisplayName || FAULT_LABELS[inf.fault] || inf.fault || '-'}</div>
             <div class="detail-item"><strong>Pratique:</strong> ${PRACTICE_LABELS[inf.practice] || inf.practice || 'Non spécifié'}</div>
             <div class="detail-item"><strong>Localisation:</strong> ${escapeHtml(location)}</div>
             <div class="detail-item"><strong>Statut:</strong> ${inf.archived ? 'Archivée' : 'Active'}</div>
@@ -359,10 +365,10 @@
           ${qrHtml}
         </div>
         
-        ${inf.comments ? `
+        ${inf.offenceType ? `
         <div class="detail-section">
           <h4>Commentaires du patrouilleur</h4>
-          <div class="detail-description">${escapeHtml(inf.comments)}</div>
+          <div class="detail-description">${escapeHtml(inf.offenceType)}</div>
         </div>
         ` : ''}
         
@@ -374,7 +380,7 @@
         <div class="detail-section">
           <h4>Sanction et commentaires administratifs</h4>
           <div class="admin-field">
-            <textarea class="form-input" id="admin-comments" rows="4" placeholder="Entrez les commentaires et sanctions...">${escapeHtml(inf.commentsAndSanctionAdmin || '')}</textarea>
+            <textarea class="form-input" id="admin-comments" rows="4" placeholder="Entrez les commentaires et sanctions...">${escapeHtml(inf.adminComments || '')}</textarea>
             ${inf.timestampModificationAdmin ? `<p class="admin-note">Dernière modification admin: ${inf.timestampModificationAdmin.toDate?.()?.toLocaleDateString('fr-CA', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) || ''}</p>` : ''}
           </div>
         </div>
@@ -406,12 +412,12 @@
       if (!currentInfractionId) return;
       
       const offenderName = document.getElementById('admin-offender-name').value.trim();
-      const comments = document.getElementById('admin-comments').value.trim();
+      const adminComments = document.getElementById('admin-comments').value.trim();
       
       try {
         await db.collection('infractions').doc(currentInfractionId).update({
           offenderName: offenderName,
-          commentsAndSanctionAdmin: comments,
+          adminComments: adminComments,
           timestampModificationAdmin: firebase.firestore.FieldValue.serverTimestamp()
         });
         
