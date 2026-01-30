@@ -1,0 +1,860 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Rapport d'infraction - Orford Live">
+  <meta name="theme-color" content="#dc2626">
+  <title>Rapport d'infraction - Orford Live</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🚨</text></svg>">
+  <link rel="stylesheet" href="../css/main.css">
+  <!-- QR Code Scanner Library -->
+  <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+  <style>
+    /* Form Row */
+    .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+    @media (max-width: 640px) { .form-row { grid-template-columns: 1fr; } }
+
+    /* Photo/QR Capture */
+    .capture-container { display: flex; flex-direction: column; gap: 0.75rem; }
+    .capture-preview { display: none; flex-direction: column; gap: 0.5rem; align-items: flex-start; }
+    .capture-preview.show { display: flex; }
+    .capture-preview img { max-width: 200px; max-height: 150px; border-radius: var(--radius-md); border: 1px solid var(--theme-border); }
+    
+    /* QR Scanner */
+    .qr-scanner-container { display: none; margin-top: 0.5rem; }
+    .qr-scanner-container.show { display: block; }
+    #qr-reader { width: 100%; max-width: 400px; }
+    #qr-reader video { border-radius: var(--radius-md); }
+    .qr-data-display { background: var(--theme-surface-alt); padding: 0.75rem; border-radius: var(--radius-md); margin-top: 0.5rem; }
+    .qr-data-label { font-size: 0.75rem; color: var(--theme-text-secondary); display: block; margin-bottom: 0.25rem; }
+    .qr-data-value { font-family: monospace; font-size: 0.875rem; word-break: break-all; }
+
+    /* Checkbox inline */
+    .checkbox-inline { display: flex; align-items: center; gap: 0.5rem; margin-top: 0.5rem; }
+    .checkbox-inline input[type="checkbox"] { width: 18px; height: 18px; }
+
+    /* Duplicate button container */
+    .duplicate-container { margin-top: 0.75rem; display: none; }
+    .duplicate-container.show { display: block; }
+
+    /* Invalid styling */
+    .is-invalid { border-color: var(--color-danger) !important; box-shadow: 0 0 0 2px rgba(220, 38, 38, 0.2) !important; }
+    .btn.is-invalid { border-color: var(--color-danger) !important; }
+  </style>
+</head>
+<body data-theme="light" data-module="infraction">
+  <a href="#main-content" class="skip-link">Aller au contenu principal</a>
+
+  <!-- Header -->
+  <header class="header">
+    <a href="../index.html" class="logo"><span class="logo__icon">🚨</span><span class="logo__text">Infractions</span></a>
+    <nav class="nav">
+      <a href="../index.html" class="nav__link"><span>🏠</span><span>Portail</span></a>
+      <a href="infraction-report.html" class="nav__link is-active"><span>📝</span><span>Rapport</span></a>
+      <a href="infraction-admin.html" class="nav__link nav__link--admin" style="display:none;"><span>📋</span><span>Gestion</span></a>
+      <div class="nav__divider"></div>
+      <button class="theme-toggle" onclick="window.themeManager.toggle()" aria-label="Changer le thème">
+        <svg class="theme-toggle__icon theme-toggle__icon--moon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg>
+        <svg class="theme-toggle__icon theme-toggle__icon--sun" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display:none;"><circle cx="12" cy="12" r="5"></circle><line x1="12" y1="1" x2="12" y2="3"></line><line x1="12" y1="21" x2="12" y2="23"></line><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line><line x1="1" y1="12" x2="3" y2="12"></line><line x1="21" y1="12" x2="23" y2="12"></line><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line></svg>
+      </button>
+      <div class="user-menu">
+        <button class="user-menu__trigger"><span class="user-menu__avatar" data-user-initials>--</span><span class="user-menu__name" data-user-name>Chargement...</span></button>
+        <div class="user-menu__dropdown">
+          <div class="user-menu__header"><div class="user-menu__header-name" data-user-name>-</div><div class="user-menu__header-email" data-user-email>-</div></div>
+          <a href="user-profile.html" class="user-menu__item"><span>👤</span><span>Mon profil</span></a>
+          <div class="user-menu__divider"></div>
+          <button class="user-menu__item user-menu__item--danger" onclick="handleLogout()"><span>🚪</span><span>Déconnexion</span></button>
+        </div>
+      </div>
+    </nav>
+    <button class="mobile-menu-btn" id="mobile-menu-btn" aria-label="Menu"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="12" x2="21" y2="12"></line><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="18" x2="21" y2="18"></line></svg></button>
+  </header>
+
+  <!-- Mobile Navigation -->
+  <div class="mobile-nav__backdrop" id="mobile-nav-backdrop"></div>
+  <nav class="mobile-nav" id="mobile-nav">
+    <div class="mobile-nav__header"><a href="../index.html" class="mobile-nav__logo"><span>🚨</span><span>Infractions</span></a><button class="mobile-nav__close" id="mobile-nav-close" aria-label="Fermer"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg></button></div>
+    <div class="mobile-nav__user"><div class="mobile-nav__user-name" data-user-name>-</div><div class="mobile-nav__user-role" data-user-role>-</div></div>
+    <div class="mobile-nav__section">
+      <a href="../index.html" class="mobile-nav__link"><span class="mobile-nav__link-icon">🏠</span><span>Portail</span></a>
+      <a href="infraction-report.html" class="mobile-nav__link is-active"><span class="mobile-nav__link-icon">📝</span><span>Rapport</span></a>
+      <a href="infraction-admin.html" class="mobile-nav__link mobile-nav__link--admin" style="display:none;"><span class="mobile-nav__link-icon">📋</span><span>Gestion</span></a>
+    </div>
+    <div class="mobile-nav__divider"></div>
+    <div class="mobile-nav__section"><a href="#" class="mobile-nav__link" onclick="handleLogout(); return false;"><span class="mobile-nav__link-icon">🚪</span><span>Déconnexion</span></a></div>
+  </nav>
+
+  <!-- Loading -->
+  <div id="loading" class="page-loading"><div class="loading-spinner"></div><p class="loading-text">Chargement...</p></div>
+
+  <!-- Main Content -->
+  <main id="main-content" class="main" style="display: none;">
+    <div class="page-header"><div class="page-header__content"><h1 class="page-title">Rapport d'infraction</h1><p class="page-subtitle">Enregistrer une infraction constatée</p></div></div>
+
+    <!-- Report Selector -->
+    <section class="content-section">
+      <div class="section-card">
+        <div class="section-card__header"><h2 class="section-card__title">📋 Rapport existant ou nouveau</h2></div>
+        <div class="section-card__body">
+          <div class="form-group">
+            <select class="form-select" id="report-selector">
+              <option value="new">+ Nouveau rapport</option>
+            </select>
+          </div>
+          <div class="duplicate-container" id="duplicate-container">
+            <button type="button" class="btn btn-secondary" id="duplicate-btn">📋 Dupliquer ce rapport</button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Report Form -->
+    <section class="content-section">
+      <form id="infraction-form" class="section-card">
+        <div class="section-card__header"><h2 class="section-card__title">📝 Détails de l'infraction</h2></div>
+        <div class="section-card__body">
+          
+          <!-- Patrouilleur (auto) -->
+          <div class="form-group">
+            <label class="form-label">Patrouilleur</label>
+            <input type="text" class="form-input" id="patrol-name" readonly>
+          </div>
+
+          <!-- Date / Heure -->
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label" for="offence-date">Date <span class="form-required">*</span></label>
+              <input type="date" class="form-input" id="offence-date" required>
+            </div>
+            <div class="form-group">
+              <label class="form-label" for="offence-time">Heure <span class="form-required">*</span></label>
+              <input type="time" class="form-input" id="offence-time" required>
+            </div>
+          </div>
+
+          <!-- Contrevenant -->
+          <div class="form-group">
+            <label class="form-label" for="offender-name">Contrevenant <span class="form-required">*</span> <span class="form-hint">(ou QR code obligatoire)</span></label>
+            <input type="text" class="form-input" id="offender-name" placeholder="Nom de famille puis Prénom">
+          </div>
+
+          <!-- QR Code Scanner -->
+          <div class="form-group">
+            <label class="form-label">QR Code du pass <span class="form-required">*</span> <span class="form-hint">(ou nom obligatoire)</span></label>
+            <div class="capture-container">
+              <button type="button" class="btn btn-secondary" id="scan-qr-btn">📱 Scanner un QR Code</button>
+              <div class="qr-scanner-container" id="qr-scanner-container">
+                <div id="qr-reader"></div>
+                <button type="button" class="btn btn-secondary btn-sm" id="stop-qr-btn" style="margin-top:0.5rem;">Arrêter le scan</button>
+              </div>
+              <div class="capture-preview" id="qr-preview">
+                <div class="qr-data-display">
+                  <span class="qr-data-label">Données du QR Code</span>
+                  <span class="qr-data-value" id="qr-data-display">-</span>
+                </div>
+                <img id="qr-image-preview" alt="QR Code" style="display:none;">
+                <button type="button" class="btn btn-danger btn-sm" id="remove-qr-btn">✕ Supprimer le QR Code</button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Photo -->
+          <div class="form-group">
+            <label class="form-label">Photo <span class="form-hint">(optionnel)</span></label>
+            <div class="capture-container">
+              <input type="file" id="photo-input" accept="image/*" capture="environment" style="display:none;">
+              <button type="button" class="btn btn-secondary" id="capture-photo-btn">📷 Prendre une photo</button>
+              <div class="capture-preview" id="photo-preview-container">
+                <img id="photo-preview" alt="Aperçu">
+                <button type="button" class="btn btn-danger btn-sm" id="remove-photo-btn">✕ Supprimer</button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Type d'infraction -->
+          <div class="form-group">
+            <label class="form-label" for="fault-select">Infraction <span class="form-required">*</span></label>
+            <select class="form-select" id="fault-select" required>
+              <option value="">-- Sélectionner le type d'infraction --</option>
+              <option value="downhill">Downhill</option>
+              <option value="saut-dangereux">Saut dangereux</option>
+              <option value="ski-hors-piste">Ski hors piste</option>
+              <option value="ski-piste-fermee">Ski piste fermée</option>
+              <option value="saut-des-chaises">Saut des chaises</option>
+              <option value="manoeuvre-dangereuse">Manoeuvre dangereuse</option>
+              <option value="autres">Autres (voir commentaire)</option>
+            </select>
+          </div>
+
+          <!-- Localisation -->
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label" for="sector-select">Secteur <span class="form-required">*</span></label>
+              <select class="form-select" id="sector-select" required>
+                <option value="">-- Sélectionner un secteur --</option>
+                <option value="mont-orford">Mont-Orford</option>
+                <option value="giroux-nord">Mont Giroux Nord</option>
+                <option value="giroux-est">Mont Giroux Est</option>
+                <option value="alfred-desrochers">Mont Alfred-DesRochers</option>
+                <option value="remontees">Remontées mécaniques</option>
+                <option value="randonnee-alpine">Randonnée alpine</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label class="form-label" for="trail-select">Piste / Sentier <span class="form-hint">(optionnel)</span></label>
+              <select class="form-select" id="trail-select">
+                <option value="">-- Sélectionner d'abord un secteur --</option>
+              </select>
+            </div>
+          </div>
+
+          <!-- Hors-piste checkbox -->
+          <div class="checkbox-inline">
+            <input type="checkbox" id="off-piste">
+            <label for="off-piste">Hors-piste</label>
+          </div>
+
+          <!-- Pratique -->
+          <div class="form-group" style="margin-top: 1rem;">
+            <label class="form-label" for="practice-select">Pratique <span class="form-hint">(optionnel)</span></label>
+            <select class="form-select" id="practice-select">
+              <option value="">-- Non spécifié --</option>
+              <option value="ski">Ski</option>
+              <option value="snowboard">Snowboard</option>
+              <option value="raquette">Raquette</option>
+              <option value="autres">Autres</option>
+            </select>
+          </div>
+
+          <!-- Commentaires -->
+          <div class="form-group">
+            <label class="form-label" for="comments">Commentaires <span class="form-hint">(optionnel)</span></label>
+            <textarea class="form-input" id="comments" rows="3" placeholder="Description ou détails supplémentaires..."></textarea>
+          </div>
+
+        </div>
+        <div class="section-card__footer">
+          <button type="button" class="btn btn-secondary" id="reset-btn">Réinitialiser</button>
+          <button type="submit" class="btn btn-primary" id="save-btn">Enregistrer</button>
+          <button type="button" class="btn btn-primary" id="modify-btn" style="display:none;">Modifier</button>
+        </div>
+      </form>
+    </section>
+  </main>
+
+  <!-- Footer -->
+  <footer class="footer footer--simple"><div class="footer__content"><p class="footer__copyright">© 2025 Patrouille Mont Orford</p></div></footer>
+
+  <!-- Scripts -->
+  <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-storage-compat.js"></script>
+  <script src="../js/core/config.js"></script>
+  <script src="../js/core/utils.js"></script>
+  <script src="../js/core/theme.js"></script>
+  <script src="../js/core/ui.js"></script>
+  <script src="../js/core/auth.js"></script>
+  <script>
+    // Trails data
+    const TRAILS_DATA = {
+      'mont-orford': {
+        name: 'Mont-Orford',
+        trails: ['Trois Ruisseaux','Grande Coulée','Inter','Maxi','4 KM','Escapade','Boisée','Balade','Connection','Passe-Partout','Belette','L\'Initiation','Mini-Passe','Super','Contour','L\'Intrépide','Passe de l\'Ours','Chevreuil','Porc-Épic','Passe à Liguori','Petit Canyon','L\'Orignal','L\'Écureuil','Arcade','L\'Entre-Deux','Diversion','Rochers Jumeaux','Express','Passe','Parc familial']
+      },
+      'giroux-nord': {
+        name: 'Mont Giroux Nord',
+        trails: ['Magog','Familiale','Jean-d\'Avignon','Pente Douce','Magnum','Parc principal','Parc Découverte','La 45','Mitaine','La Passe 45','Forêt magique','Accès','L\'Alternative','Petite Coulée','Gagnon','Bowen','Lièvre','Adams']
+      },
+      'giroux-est': {
+        name: 'Mont Giroux Est',
+        trails: ['Sherbrooke','Slalom','Passe Montagne','Labrecque','Lacroix','Dubreuil','Boogie','Sasquatch','Nicolas Fontaine','Lloyd Langlois']
+      },
+      'alfred-desrochers': {
+        name: 'Mont Alfred-DesRochers',
+        trails: ['Petite Ours','Descente','Le Lien','Ookpic','Grande-Allée','Cascade','Toussiski']
+      },
+      'remontees': {
+        name: 'Remontées mécaniques',
+        trails: ['Rapido','Hybride','Alfred-Desrochers','Quad Giroux Nord','Quad Giroux Est','Tapis Giroux Nord 1','Tapis Giroux Nord 2']
+      },
+      'randonnee-alpine': {
+        name: 'Randonnée alpine',
+        trails: ['La tortue','Le Renard','Le tracé du Lynx','Le lièvre','Le campagnol','La mille-Pattes','L\'hermine','L\'alouette','L\'adams','La carcajou','L\'urubu']
+      }
+    };
+
+    const FAULT_LABELS = {
+      'downhill': 'Downhill',
+      'saut-dangereux': 'Saut dangereux',
+      'ski-hors-piste': 'Ski hors piste',
+      'ski-piste-fermee': 'Ski piste fermée',
+      'saut-des-chaises': 'Saut des chaises',
+      'manoeuvre-dangereuse': 'Manoeuvre dangereuse',
+      'autres': 'Autres (voir commentaire)'
+    };
+
+    // State
+    let currentInfractionId = null;
+    let isNewReport = true;
+    let photoFile = null;
+    let photoUrl = null;
+    let qrCodeData = null;
+    let qrCodeImageData = null;
+    let qrCodeImageUrl = null;
+    let html5QrCode = null;
+    let userInfractions = [];
+
+    // Elements
+    let reportSelector, duplicateContainer, duplicateBtn;
+    let patrolName, offenceDate, offenceTime, offenderName, faultSelect;
+    let sectorSelect, trailSelect, offPiste, practiceSelect, comments;
+    let photoInput, capturePhotoBtn, photoPreviewContainer, photoPreview, removePhotoBtn;
+    let scanQrBtn, stopQrBtn, qrScannerContainer, qrPreview, qrDataDisplay, qrImagePreview, removeQrBtn;
+    let saveBtn, modifyBtn, resetBtn;
+
+    function initInfractionReport() {
+      bindElements();
+      bindEvents();
+      
+      checkAuthStatus({
+        requireAuth: true,
+        requiredPermission: 'allowInfraction',
+        permissionDefault: false,
+        onAuthenticated: (userData) => {
+          // Show admin links if admin
+          if (userData.role === 'admin' || userData.role === 'system_admin') {
+            document.querySelectorAll('.nav__link--admin, .mobile-nav__link--admin').forEach(el => el.style.display = '');
+          }
+          setDefaultValues();
+          loadUserInfractions();
+        }
+      });
+    }
+
+    function bindElements() {
+      reportSelector = document.getElementById('report-selector');
+      duplicateContainer = document.getElementById('duplicate-container');
+      duplicateBtn = document.getElementById('duplicate-btn');
+      
+      patrolName = document.getElementById('patrol-name');
+      offenceDate = document.getElementById('offence-date');
+      offenceTime = document.getElementById('offence-time');
+      offenderName = document.getElementById('offender-name');
+      faultSelect = document.getElementById('fault-select');
+      sectorSelect = document.getElementById('sector-select');
+      trailSelect = document.getElementById('trail-select');
+      offPiste = document.getElementById('off-piste');
+      practiceSelect = document.getElementById('practice-select');
+      comments = document.getElementById('comments');
+      
+      photoInput = document.getElementById('photo-input');
+      capturePhotoBtn = document.getElementById('capture-photo-btn');
+      photoPreviewContainer = document.getElementById('photo-preview-container');
+      photoPreview = document.getElementById('photo-preview');
+      removePhotoBtn = document.getElementById('remove-photo-btn');
+      
+      scanQrBtn = document.getElementById('scan-qr-btn');
+      stopQrBtn = document.getElementById('stop-qr-btn');
+      qrScannerContainer = document.getElementById('qr-scanner-container');
+      qrPreview = document.getElementById('qr-preview');
+      qrDataDisplay = document.getElementById('qr-data-display');
+      qrImagePreview = document.getElementById('qr-image-preview');
+      removeQrBtn = document.getElementById('remove-qr-btn');
+      
+      saveBtn = document.getElementById('save-btn');
+      modifyBtn = document.getElementById('modify-btn');
+      resetBtn = document.getElementById('reset-btn');
+    }
+
+    function bindEvents() {
+      // Report selector
+      reportSelector.addEventListener('change', handleReportChange);
+      duplicateBtn.addEventListener('click', duplicateReport);
+      
+      // Sector/trail
+      sectorSelect.addEventListener('change', populateTrails);
+      
+      // Photo
+      capturePhotoBtn.addEventListener('click', () => photoInput.click());
+      photoInput.addEventListener('change', handlePhotoSelect);
+      removePhotoBtn.addEventListener('click', removePhoto);
+      
+      // QR Code
+      scanQrBtn.addEventListener('click', startQrScanner);
+      stopQrBtn.addEventListener('click', stopQrScanner);
+      removeQrBtn.addEventListener('click', removeQrCode);
+      
+      // Form
+      document.getElementById('infraction-form').addEventListener('submit', handleSubmit);
+      modifyBtn.addEventListener('click', handleModify);
+      resetBtn.addEventListener('click', resetForm);
+    }
+
+    function setDefaultValues() {
+      patrolName.value = currentUserData.name || currentUser.email;
+      
+      const now = new Date();
+      offenceDate.value = now.toISOString().split('T')[0];
+      offenceTime.value = now.toTimeString().slice(0, 5);
+    }
+
+    function populateTrails() {
+      const sectorId = sectorSelect.value;
+      trailSelect.innerHTML = '<option value="">-- Sélectionner une piste --</option>';
+      
+      if (sectorId && TRAILS_DATA[sectorId]) {
+        TRAILS_DATA[sectorId].trails.forEach(trail => {
+          const opt = document.createElement('option');
+          opt.value = trail;
+          opt.textContent = trail;
+          trailSelect.appendChild(opt);
+        });
+      }
+    }
+
+    // Load user's past infractions
+    async function loadUserInfractions() {
+      try {
+        const snap = await db.collection('infractions')
+          .where('createdBy', '==', currentUser.uid)
+          .orderBy('createdAt', 'desc')
+          .limit(50)
+          .get();
+        
+        userInfractions = [];
+        reportSelector.innerHTML = '<option value="new">+ Nouveau rapport</option>';
+        
+        snap.forEach(doc => {
+          const data = doc.data();
+          userInfractions.push({ id: doc.id, ...data });
+          
+          const date = data.offenceTimestamp?.toDate?.() || data.createdAt?.toDate?.();
+          const dateStr = date ? date.toLocaleDateString('fr-CA') : 'Date inconnue';
+          const label = `${dateStr} - ${data.offenderName || 'Sans nom'} - ${FAULT_LABELS[data.fault] || data.fault || 'N/A'}`;
+          
+          const opt = document.createElement('option');
+          opt.value = doc.id;
+          opt.textContent = label;
+          reportSelector.appendChild(opt);
+        });
+      } catch (e) {
+        console.error('Error loading infractions:', e);
+      }
+    }
+
+    function handleReportChange() {
+      const selectedId = reportSelector.value;
+      
+      if (selectedId === 'new') {
+        resetForm();
+        return;
+      }
+      
+      const infraction = userInfractions.find(i => i.id === selectedId);
+      if (!infraction) return;
+      
+      currentInfractionId = selectedId;
+      isNewReport = false;
+      
+      // Populate form
+      if (infraction.offenceTimestamp?.toDate) {
+        const d = infraction.offenceTimestamp.toDate();
+        offenceDate.value = d.toISOString().split('T')[0];
+        offenceTime.value = d.toTimeString().slice(0, 5);
+      }
+      
+      offenderName.value = infraction.offenderName || '';
+      faultSelect.value = infraction.fault || '';
+      sectorSelect.value = infraction.sector || '';
+      populateTrails();
+      trailSelect.value = infraction.trail || '';
+      offPiste.checked = infraction.offPiste || false;
+      practiceSelect.value = infraction.practice || '';
+      comments.value = infraction.comments || '';
+      
+      // QR Code
+      if (infraction.qrCodeData) {
+        qrCodeData = infraction.qrCodeData;
+        qrDataDisplay.textContent = qrCodeData;
+        qrPreview.classList.add('show');
+        if (infraction.qrCodeImageUrl) {
+          qrCodeImageUrl = infraction.qrCodeImageUrl;
+          qrImagePreview.src = qrCodeImageUrl;
+          qrImagePreview.style.display = 'block';
+        }
+      } else {
+        removeQrCode();
+      }
+      
+      // Photo
+      if (infraction.photoUrl) {
+        photoUrl = infraction.photoUrl;
+        photoPreview.src = photoUrl;
+        photoPreviewContainer.classList.add('show');
+      } else {
+        removePhoto();
+      }
+      
+      // Toggle buttons
+      saveBtn.style.display = 'none';
+      modifyBtn.style.display = '';
+      duplicateContainer.classList.add('show');
+      
+      clearValidation();
+    }
+
+    function duplicateReport() {
+      currentInfractionId = null;
+      isNewReport = true;
+      
+      // Reset timestamps
+      setDefaultValues();
+      
+      // Toggle buttons
+      saveBtn.style.display = '';
+      modifyBtn.style.display = 'none';
+      duplicateContainer.classList.remove('show');
+      reportSelector.value = 'new';
+      
+      showToast('Rapport dupliqué. Modifiez si nécessaire et enregistrez.', 'info');
+    }
+
+    function resetForm() {
+      currentInfractionId = null;
+      isNewReport = true;
+      reportSelector.value = 'new';
+      
+      setDefaultValues();
+      offenderName.value = '';
+      faultSelect.value = '';
+      sectorSelect.value = '';
+      trailSelect.innerHTML = '<option value="">-- Sélectionner d\'abord un secteur --</option>';
+      offPiste.checked = false;
+      practiceSelect.value = '';
+      comments.value = '';
+      
+      removePhoto();
+      removeQrCode();
+      clearValidation();
+      
+      saveBtn.style.display = '';
+      modifyBtn.style.display = 'none';
+      duplicateContainer.classList.remove('show');
+    }
+
+    // Photo handling
+    function handlePhotoSelect(e) {
+      const file = e.target.files[0];
+      if (!file) return;
+      
+      photoFile = file;
+      const reader = new FileReader();
+      reader.onload = (ev) => {
+        photoPreview.src = ev.target.result;
+        photoPreviewContainer.classList.add('show');
+      };
+      reader.readAsDataURL(file);
+    }
+
+    function removePhoto() {
+      photoFile = null;
+      photoUrl = null;
+      photoInput.value = '';
+      photoPreview.src = '';
+      photoPreviewContainer.classList.remove('show');
+    }
+
+    // QR Code handling
+    function startQrScanner() {
+      qrScannerContainer.classList.add('show');
+      
+      html5QrCode = new Html5Qrcode("qr-reader");
+      html5QrCode.start(
+        { facingMode: "environment" },
+        { fps: 10, qrbox: { width: 250, height: 250 } },
+        onQrCodeSuccess,
+        () => {} // Ignore errors during scan
+      ).catch(err => {
+        console.error('QR Scanner error:', err);
+        showToast('Erreur lors du démarrage du scanner', 'error');
+        stopQrScanner();
+      });
+    }
+
+    function stopQrScanner() {
+      if (html5QrCode) {
+        html5QrCode.stop().then(() => {
+          html5QrCode.clear();
+          html5QrCode = null;
+        }).catch(() => {});
+      }
+      qrScannerContainer.classList.remove('show');
+    }
+
+    function onQrCodeSuccess(decodedText, decodedResult) {
+      qrCodeData = decodedText;
+      qrDataDisplay.textContent = decodedText;
+      qrPreview.classList.add('show');
+      
+      // Capture QR code image
+      const canvas = document.createElement('canvas');
+      const video = document.querySelector('#qr-reader video');
+      if (video) {
+        canvas.width = video.videoWidth;
+        canvas.height = video.videoHeight;
+        canvas.getContext('2d').drawImage(video, 0, 0);
+        qrCodeImageData = canvas.toDataURL('image/jpeg', 0.8);
+        qrImagePreview.src = qrCodeImageData;
+        qrImagePreview.style.display = 'block';
+      }
+      
+      stopQrScanner();
+      showToast('QR Code scanné avec succès', 'success');
+    }
+
+    function removeQrCode() {
+      qrCodeData = null;
+      qrCodeImageData = null;
+      qrCodeImageUrl = null;
+      qrDataDisplay.textContent = '-';
+      qrImagePreview.src = '';
+      qrImagePreview.style.display = 'none';
+      qrPreview.classList.remove('show');
+    }
+
+    // Validation
+    function validateForm() {
+      let isValid = true;
+      const errors = [];
+      clearValidation();
+      
+      if (!offenceDate.value) {
+        isValid = false;
+        errors.push('La date est requise');
+        offenceDate.classList.add('is-invalid');
+      }
+      
+      if (!offenceTime.value) {
+        isValid = false;
+        errors.push('L\'heure est requise');
+        offenceTime.classList.add('is-invalid');
+      }
+      
+      const hasName = offenderName.value.trim() !== '';
+      const hasQr = qrCodeData !== null && qrCodeData !== '';
+      if (!hasName && !hasQr) {
+        isValid = false;
+        errors.push('Le nom du contrevenant OU un QR Code est requis');
+        offenderName.classList.add('is-invalid');
+        scanQrBtn.classList.add('is-invalid');
+      }
+      
+      if (!faultSelect.value) {
+        isValid = false;
+        errors.push('Le type d\'infraction est requis');
+        faultSelect.classList.add('is-invalid');
+      }
+      
+      if (!sectorSelect.value) {
+        isValid = false;
+        errors.push('Le secteur est requis');
+        sectorSelect.classList.add('is-invalid');
+      }
+      
+      if (!isValid) {
+        showToast(errors.join('<br>'), 'error');
+      }
+      
+      return isValid;
+    }
+
+    function clearValidation() {
+      [offenceDate, offenceTime, offenderName, faultSelect, sectorSelect, scanQrBtn].forEach(el => {
+        el.classList.remove('is-invalid');
+      });
+    }
+
+    // Submit
+    async function handleSubmit(e) {
+      e.preventDefault();
+      if (!isNewReport) return;
+      if (!validateForm()) return;
+      
+      saveBtn.disabled = true;
+      saveBtn.textContent = 'Enregistrement...';
+      
+      try {
+        // Upload photo if any
+        let uploadedPhotoUrl = null;
+        if (photoFile) {
+          uploadedPhotoUrl = await uploadPhoto(photoFile);
+        }
+        
+        // Upload QR image if any
+        let uploadedQrUrl = null;
+        if (qrCodeImageData) {
+          uploadedQrUrl = await uploadQrImage();
+        }
+        
+        // Create timestamp from date + time
+        const [year, month, day] = offenceDate.value.split('-');
+        const [hours, minutes] = offenceTime.value.split(':');
+        const offenceTimestamp = new Date(year, month - 1, day, hours, minutes);
+        
+        const infractionData = {
+          offenceTimestamp: firebase.firestore.Timestamp.fromDate(offenceTimestamp),
+          offenderName: offenderName.value.trim(),
+          qrCodeData: qrCodeData || null,
+          qrCodeImageUrl: uploadedQrUrl || null,
+          photoUrl: uploadedPhotoUrl || null,
+          fault: faultSelect.value,
+          sector: sectorSelect.value,
+          sectorName: TRAILS_DATA[sectorSelect.value]?.name || sectorSelect.value,
+          trail: trailSelect.value || null,
+          offPiste: offPiste.checked,
+          practice: practiceSelect.value || null,
+          comments: comments.value.trim() || null,
+          patrolName: patrolName.value,
+          createdBy: currentUser.uid,
+          createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+          archived: false
+        };
+        
+        await db.collection('infractions').add(infractionData);
+        
+        showToast('Infraction enregistrée avec succès', 'success');
+        resetForm();
+        loadUserInfractions();
+        
+      } catch (e) {
+        console.error('Error saving infraction:', e);
+        showToast('Erreur lors de l\'enregistrement: ' + e.message, 'error');
+      } finally {
+        saveBtn.disabled = false;
+        saveBtn.textContent = 'Enregistrer';
+      }
+    }
+
+    async function handleModify() {
+      if (!currentInfractionId) return;
+      if (!validateForm()) return;
+      
+      modifyBtn.disabled = true;
+      modifyBtn.textContent = 'Modification...';
+      
+      try {
+        // Upload new photo if changed
+        let uploadedPhotoUrl = photoUrl;
+        if (photoFile) {
+          uploadedPhotoUrl = await uploadPhoto(photoFile);
+        }
+        
+        // Upload new QR image if changed
+        let uploadedQrUrl = qrCodeImageUrl;
+        if (qrCodeImageData && !qrCodeImageUrl) {
+          uploadedQrUrl = await uploadQrImage();
+        }
+        
+        const [year, month, day] = offenceDate.value.split('-');
+        const [hours, minutes] = offenceTime.value.split(':');
+        const offenceTimestamp = new Date(year, month - 1, day, hours, minutes);
+        
+        const updateData = {
+          offenceTimestamp: firebase.firestore.Timestamp.fromDate(offenceTimestamp),
+          offenderName: offenderName.value.trim(),
+          qrCodeData: qrCodeData || null,
+          qrCodeImageUrl: uploadedQrUrl || null,
+          photoUrl: uploadedPhotoUrl || null,
+          fault: faultSelect.value,
+          sector: sectorSelect.value,
+          sectorName: TRAILS_DATA[sectorSelect.value]?.name || sectorSelect.value,
+          trail: trailSelect.value || null,
+          offPiste: offPiste.checked,
+          practice: practiceSelect.value || null,
+          comments: comments.value.trim() || null,
+          modifiedAt: firebase.firestore.FieldValue.serverTimestamp()
+        };
+        
+        await db.collection('infractions').doc(currentInfractionId).update(updateData);
+        
+        showToast('Infraction modifiée avec succès', 'success');
+        loadUserInfractions();
+        
+      } catch (e) {
+        console.error('Error updating infraction:', e);
+        showToast('Erreur lors de la modification: ' + e.message, 'error');
+      } finally {
+        modifyBtn.disabled = false;
+        modifyBtn.textContent = 'Modifier';
+      }
+    }
+
+    async function uploadPhoto(file) {
+      const timestamp = Date.now();
+      const fileName = `infractions/${currentUser.uid}/${timestamp}_photo.jpg`;
+      const ref = storage.ref(fileName);
+      
+      // Compress if needed
+      let uploadFile = file;
+      if (file.size > 1024 * 1024) {
+        uploadFile = await compressImage(file, 0.7, 1200);
+      }
+      
+      const snap = await ref.put(uploadFile);
+      return await snap.ref.getDownloadURL();
+    }
+
+    async function uploadQrImage() {
+      if (!qrCodeImageData) return null;
+      
+      const response = await fetch(qrCodeImageData);
+      const blob = await response.blob();
+      
+      const timestamp = Date.now();
+      const fileName = `infractions/${currentUser.uid}/${timestamp}_qrcode.jpg`;
+      const ref = storage.ref(fileName);
+      
+      const snap = await ref.put(blob);
+      return await snap.ref.getDownloadURL();
+    }
+
+    async function compressImage(file, quality, maxWidth) {
+      return new Promise((resolve) => {
+        const img = new Image();
+        img.onload = () => {
+          const canvas = document.createElement('canvas');
+          let width = img.width;
+          let height = img.height;
+          
+          if (width > maxWidth) {
+            height = (height * maxWidth) / width;
+            width = maxWidth;
+          }
+          
+          canvas.width = width;
+          canvas.height = height;
+          canvas.getContext('2d').drawImage(img, 0, 0, width, height);
+          
+          canvas.toBlob(resolve, 'image/jpeg', quality);
+        };
+        img.src = URL.createObjectURL(file);
+      });
+    }
+
+    function showToast(message, type = 'info') {
+      // Simple toast - you could enhance this
+      const toast = document.createElement('div');
+      toast.className = `toast toast--${type}`;
+      toast.innerHTML = message;
+      toast.style.cssText = 'position:fixed;bottom:20px;left:50%;transform:translateX(-50%);padding:12px 24px;border-radius:8px;color:#fff;z-index:9999;max-width:90%;text-align:center;';
+      toast.style.backgroundColor = type === 'error' ? '#dc2626' : type === 'success' ? '#16a34a' : '#2563eb';
+      document.body.appendChild(toast);
+      setTimeout(() => toast.remove(), 4000);
+    }
+
+    document.addEventListener('DOMContentLoaded', initInfractionReport);
+  </script>
+</body>
+</html>

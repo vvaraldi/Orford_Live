@@ -1,0 +1,470 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Gestion des infractions - Orford Live">
+  <meta name="theme-color" content="#dc2626">
+  <title>Gestion des infractions - Orford Live</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🚨</text></svg>">
+  <link rel="stylesheet" href="../css/main.css">
+  <style>
+    /* Filters row */
+    .filters-row { display: flex; flex-wrap: wrap; gap: 1rem; align-items: center; margin-bottom: 1rem; }
+    .filters-row .form-group { margin-bottom: 0; min-width: 140px; }
+    .filters-row .form-check { display: flex; align-items: center; gap: 0.5rem; }
+
+    /* Table */
+    .table-container { overflow-x: auto; }
+    .data-table { width: 100%; border-collapse: collapse; font-size: 0.875rem; }
+    .data-table th, .data-table td { padding: 0.75rem; text-align: left; border-bottom: 1px solid var(--theme-border); }
+    .data-table th { background: var(--theme-surface-alt); font-weight: 600; color: var(--theme-text-secondary); white-space: nowrap; }
+    .data-table tbody tr { cursor: pointer; transition: background 0.15s; }
+    .data-table tbody tr:hover { background: var(--theme-surface-alt); }
+    .data-table .badge { font-size: 0.75rem; }
+
+    /* Status badges */
+    .status-active { background: #dcfce7; color: #166534; padding: 0.25rem 0.5rem; border-radius: 4px; font-size: 0.75rem; }
+    .status-archived { background: #f3f4f6; color: #6b7280; padding: 0.25rem 0.5rem; border-radius: 4px; font-size: 0.75rem; }
+
+    /* Modal detail sections */
+    .detail-section { margin-bottom: 1.5rem; }
+    .detail-section:last-child { margin-bottom: 0; }
+    .detail-section h4 { font-size: 0.8rem; font-weight: 600; color: var(--theme-text-secondary); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 0.5rem; }
+    .detail-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 0.75rem; }
+    .detail-item { font-size: 0.875rem; }
+    .detail-item strong { color: var(--theme-text-secondary); font-weight: 500; }
+    .detail-description { background: var(--theme-surface-alt); padding: 1rem; border-radius: var(--radius-md); white-space: pre-wrap; font-size: 0.875rem; }
+    .detail-photo { max-width: 100%; max-height: 300px; border-radius: var(--radius-md); border: 1px solid var(--theme-border); cursor: pointer; }
+    .detail-qr { max-width: 150px; border-radius: var(--radius-md); border: 1px solid var(--theme-border); }
+
+    /* Admin editable field */
+    .admin-field { margin-top: 1rem; }
+    .admin-field label { display: block; font-size: 0.8rem; font-weight: 600; color: var(--theme-text-secondary); margin-bottom: 0.5rem; }
+    .admin-field textarea, .admin-field input { width: 100%; }
+    .admin-note { font-size: 0.75rem; color: var(--theme-text-secondary); margin-top: 0.25rem; }
+    
+    @media (max-width: 768px) {
+      .filters-row { flex-direction: column; align-items: stretch; }
+      .data-table { font-size: 0.8rem; }
+      .data-table th, .data-table td { padding: 0.5rem; }
+    }
+  </style>
+</head>
+<body data-theme="light" data-module="infraction">
+  <a href="#main-content" class="skip-link">Aller au contenu principal</a>
+
+  <!-- Header -->
+  <header class="header">
+    <a href="../index.html" class="logo"><span class="logo__icon">🚨</span><span class="logo__text">Infractions</span></a>
+    <nav class="nav">
+      <a href="../index.html" class="nav__link"><span>🏠</span><span>Portail</span></a>
+      <a href="infraction-report.html" class="nav__link"><span>📝</span><span>Rapport</span></a>
+      <a href="infraction-admin.html" class="nav__link is-active"><span>📋</span><span>Gestion</span></a>
+      <div class="nav__divider"></div>
+      <button class="theme-toggle" onclick="window.themeManager.toggle()" aria-label="Changer le thème">
+        <svg class="theme-toggle__icon theme-toggle__icon--moon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg>
+        <svg class="theme-toggle__icon theme-toggle__icon--sun" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display:none;"><circle cx="12" cy="12" r="5"></circle><line x1="12" y1="1" x2="12" y2="3"></line><line x1="12" y1="21" x2="12" y2="23"></line><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line><line x1="1" y1="12" x2="3" y2="12"></line><line x1="21" y1="12" x2="23" y2="12"></line><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line></svg>
+      </button>
+      <div class="user-menu">
+        <button class="user-menu__trigger"><span class="user-menu__avatar" data-user-initials>--</span><span class="user-menu__name" data-user-name>Chargement...</span></button>
+        <div class="user-menu__dropdown">
+          <div class="user-menu__header"><div class="user-menu__header-name" data-user-name>-</div><div class="user-menu__header-email" data-user-email>-</div></div>
+          <a href="user-profile.html" class="user-menu__item"><span>👤</span><span>Mon profil</span></a>
+          <div class="user-menu__divider"></div>
+          <button class="user-menu__item user-menu__item--danger" onclick="handleLogout()"><span>🚪</span><span>Déconnexion</span></button>
+        </div>
+      </div>
+    </nav>
+    <button class="mobile-menu-btn" id="mobile-menu-btn" aria-label="Menu"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="12" x2="21" y2="12"></line><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="18" x2="21" y2="18"></line></svg></button>
+  </header>
+
+  <!-- Mobile Navigation -->
+  <div class="mobile-nav__backdrop" id="mobile-nav-backdrop"></div>
+  <nav class="mobile-nav" id="mobile-nav">
+    <div class="mobile-nav__header"><a href="../index.html" class="mobile-nav__logo"><span>🚨</span><span>Infractions</span></a><button class="mobile-nav__close" id="mobile-nav-close" aria-label="Fermer"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg></button></div>
+    <div class="mobile-nav__user"><div class="mobile-nav__user-name" data-user-name>-</div><div class="mobile-nav__user-role" data-user-role>-</div></div>
+    <div class="mobile-nav__section">
+      <a href="../index.html" class="mobile-nav__link"><span class="mobile-nav__link-icon">🏠</span><span>Portail</span></a>
+      <a href="infraction-report.html" class="mobile-nav__link"><span class="mobile-nav__link-icon">📝</span><span>Rapport</span></a>
+      <a href="infraction-admin.html" class="mobile-nav__link is-active"><span class="mobile-nav__link-icon">📋</span><span>Gestion</span></a>
+    </div>
+    <div class="mobile-nav__divider"></div>
+    <div class="mobile-nav__section"><a href="#" class="mobile-nav__link" onclick="handleLogout(); return false;"><span class="mobile-nav__link-icon">🚪</span><span>Déconnexion</span></a></div>
+  </nav>
+
+  <!-- Loading -->
+  <div id="loading" class="page-loading"><div class="loading-spinner"></div><p class="loading-text">Chargement...</p></div>
+
+  <!-- Main Content -->
+  <main id="main-content" class="main" style="display: none;">
+    <div class="page-header"><div class="page-header__content"><h1 class="page-title">Gestion des infractions</h1><p class="page-subtitle">Consulter et gérer les infractions signalées</p></div></div>
+
+    <section class="content-section">
+      <div class="section-card">
+        <div class="section-card__header">
+          <h2 class="section-card__title">📋 Liste des infractions</h2>
+        </div>
+        <div class="section-card__body">
+          <!-- Filters -->
+          <div class="filters-row">
+            <div class="form-group">
+              <label class="form-label" for="sort-by">Trier par</label>
+              <select class="form-select" id="sort-by">
+                <option value="date">Date</option>
+                <option value="offender">Contrevenant</option>
+              </select>
+            </div>
+            <div class="form-check">
+              <input type="checkbox" id="show-archived">
+              <label for="show-archived">Afficher les archivées</label>
+            </div>
+            <button class="btn btn-secondary btn-sm" id="refresh-btn">🔄 Actualiser</button>
+          </div>
+
+          <!-- Table -->
+          <div class="table-container">
+            <table class="data-table" id="infractions-table">
+              <thead>
+                <tr>
+                  <th>Date</th>
+                  <th>Contrevenant</th>
+                  <th>Infraction</th>
+                  <th>Localisation</th>
+                  <th>Patrouilleur</th>
+                  <th>Statut</th>
+                </tr>
+              </thead>
+              <tbody id="infractions-tbody">
+                <tr><td colspan="6" style="text-align:center;">Chargement...</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <!-- Detail Modal -->
+  <div class="modal" id="detail-modal">
+    <div class="modal__container" style="max-width: 700px;">
+      <div class="modal__header">
+        <h3 class="modal__title">Détails de l'infraction</h3>
+        <button class="modal__close" id="modal-close">&times;</button>
+      </div>
+      <div class="modal__body" id="modal-body">
+        <!-- Loaded dynamically -->
+      </div>
+      <div class="modal__footer">
+        <button class="btn btn-warning" id="archive-btn">Archiver</button>
+        <button class="btn btn-primary" id="save-btn">Enregistrer les modifications</button>
+        <button class="btn btn-secondary" id="close-btn">Fermer</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Footer -->
+  <footer class="footer footer--simple"><div class="footer__content"><p class="footer__copyright">© 2025 Patrouille Mont Orford</p></div></footer>
+
+  <!-- Scripts -->
+  <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-storage-compat.js"></script>
+  <script src="../js/core/config.js"></script>
+  <script src="../js/core/utils.js"></script>
+  <script src="../js/core/theme.js"></script>
+  <script src="../js/core/ui.js"></script>
+  <script src="../js/core/auth.js"></script>
+  <script>
+    const FAULT_LABELS = {
+      'downhill': 'Downhill',
+      'saut-dangereux': 'Saut dangereux',
+      'ski-hors-piste': 'Ski hors piste',
+      'ski-piste-fermee': 'Ski piste fermée',
+      'saut-des-chaises': 'Saut des chaises',
+      'manoeuvre-dangereuse': 'Manoeuvre dangereuse',
+      'autres': 'Autres'
+    };
+
+    const PRACTICE_LABELS = {
+      'ski': 'Ski',
+      'snowboard': 'Snowboard',
+      'raquette': 'Raquette',
+      'autres': 'Autres'
+    };
+
+    let infractionsData = [];
+    let showArchived = false;
+    let sortBy = 'date';
+    let currentInfractionId = null;
+
+    function initInfractionAdmin() {
+      checkAuthStatus({
+        requireAuth: true,
+        requireAdmin: true,
+        onAuthenticated: () => {
+          bindEvents();
+          loadInfractions();
+        }
+      });
+    }
+
+    function bindEvents() {
+      document.getElementById('sort-by').addEventListener('change', (e) => {
+        sortBy = e.target.value;
+        renderInfractions();
+      });
+      
+      document.getElementById('show-archived').addEventListener('change', (e) => {
+        showArchived = e.target.checked;
+        loadInfractions();
+      });
+      
+      document.getElementById('refresh-btn').addEventListener('click', loadInfractions);
+      
+      // Modal
+      document.getElementById('modal-close').addEventListener('click', closeModal);
+      document.getElementById('close-btn').addEventListener('click', closeModal);
+      document.getElementById('archive-btn').addEventListener('click', toggleArchive);
+      document.getElementById('save-btn').addEventListener('click', saveChanges);
+      document.getElementById('detail-modal').addEventListener('click', (e) => {
+        if (e.target.id === 'detail-modal') closeModal();
+      });
+      document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeModal(); });
+    }
+
+    async function loadInfractions() {
+      const tbody = document.getElementById('infractions-tbody');
+      tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;">Chargement...</td></tr>';
+      
+      try {
+        let query = db.collection('infractions').orderBy('createdAt', 'desc');
+        
+        if (!showArchived) {
+          query = query.where('archived', '==', false);
+        }
+        
+        const snap = await query.get();
+        infractionsData = [];
+        snap.forEach(doc => {
+          infractionsData.push({ id: doc.id, ...doc.data() });
+        });
+        
+        renderInfractions();
+      } catch (e) {
+        console.error('Error loading infractions:', e);
+        tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:var(--color-danger);">Erreur de chargement</td></tr>';
+      }
+    }
+
+    function renderInfractions() {
+      const tbody = document.getElementById('infractions-tbody');
+      
+      if (infractionsData.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;">Aucune infraction trouvée</td></tr>';
+        return;
+      }
+      
+      // Sort
+      let sorted = [...infractionsData];
+      if (sortBy === 'date') {
+        sorted.sort((a, b) => {
+          const dateA = a.offenceTimestamp?.toDate?.() || a.createdAt?.toDate?.() || new Date(0);
+          const dateB = b.offenceTimestamp?.toDate?.() || b.createdAt?.toDate?.() || new Date(0);
+          return dateB - dateA;
+        });
+      } else if (sortBy === 'offender') {
+        sorted.sort((a, b) => (a.offenderName || '').localeCompare(b.offenderName || '', 'fr'));
+      }
+      
+      tbody.innerHTML = sorted.map(inf => {
+        const date = inf.offenceTimestamp?.toDate?.() || inf.createdAt?.toDate?.();
+        const dateStr = date ? date.toLocaleDateString('fr-CA') : '-';
+        const location = inf.trail ? `${inf.trail}${inf.offPiste ? ' (HP)' : ''}` : (inf.sectorName || inf.sector || '-');
+        const status = inf.archived ? '<span class="status-archived">Archivée</span>' : '<span class="status-active">Active</span>';
+        
+        return `
+          <tr data-id="${inf.id}">
+            <td>${dateStr}</td>
+            <td>${escapeHtml(inf.offenderName || '-')}</td>
+            <td>${FAULT_LABELS[inf.fault] || inf.fault || '-'}</td>
+            <td>${escapeHtml(location)}</td>
+            <td>${escapeHtml(inf.patrolName || '-')}</td>
+            <td>${status}</td>
+          </tr>
+        `;
+      }).join('');
+      
+      // Bind row clicks
+      tbody.querySelectorAll('tr[data-id]').forEach(row => {
+        row.addEventListener('click', () => openDetail(row.dataset.id));
+      });
+    }
+
+    async function openDetail(id) {
+      currentInfractionId = id;
+      const inf = infractionsData.find(i => i.id === id);
+      if (!inf) return;
+      
+      const date = inf.offenceTimestamp?.toDate?.();
+      const dateStr = date ? date.toLocaleDateString('fr-CA', { year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '-';
+      const createdStr = inf.createdAt?.toDate?.()?.toLocaleDateString('fr-CA', { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) || '-';
+      const modifiedStr = inf.modifiedAt?.toDate?.()?.toLocaleDateString('fr-CA', { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) || '';
+      
+      const location = inf.trail 
+        ? `${inf.sectorName || inf.sector} - ${inf.trail}${inf.offPiste ? ' (Hors-piste)' : ''}`
+        : (inf.sectorName || inf.sector || '-') + (inf.offPiste ? ' (Hors-piste)' : '');
+      
+      let photoHtml = '<p style="color:var(--theme-text-secondary);">Aucune photo</p>';
+      if (inf.photoUrl) {
+        photoHtml = `<img src="${inf.photoUrl}" class="detail-photo" alt="Photo" onclick="window.open('${inf.photoUrl}', '_blank')">`;
+      }
+      
+      let qrHtml = '<p style="color:var(--theme-text-secondary);">Aucun QR code</p>';
+      if (inf.qrCodeData) {
+        qrHtml = `<div class="qr-data-display"><span class="qr-data-label">Données</span><span class="qr-data-value">${escapeHtml(inf.qrCodeData)}</span></div>`;
+        if (inf.qrCodeImageUrl) {
+          qrHtml += `<img src="${inf.qrCodeImageUrl}" class="detail-qr" alt="QR Code" style="margin-top:0.5rem;">`;
+        }
+      }
+      
+      const modalBody = document.getElementById('modal-body');
+      modalBody.innerHTML = `
+        <div class="detail-section">
+          <h4>Informations générales</h4>
+          <div class="detail-grid">
+            <div class="detail-item"><strong>Date/Heure:</strong> ${dateStr}</div>
+            <div class="detail-item"><strong>Patrouilleur:</strong> ${escapeHtml(inf.patrolName || '-')}</div>
+            <div class="detail-item"><strong>Infraction:</strong> ${FAULT_LABELS[inf.fault] || inf.fault || '-'}</div>
+            <div class="detail-item"><strong>Pratique:</strong> ${PRACTICE_LABELS[inf.practice] || inf.practice || 'Non spécifié'}</div>
+            <div class="detail-item"><strong>Localisation:</strong> ${escapeHtml(location)}</div>
+            <div class="detail-item"><strong>Statut:</strong> ${inf.archived ? 'Archivée' : 'Active'}</div>
+          </div>
+          <p style="font-size:0.75rem;color:var(--theme-text-secondary);margin-top:0.5rem;">
+            Créé le: ${createdStr}${modifiedStr ? ` • Modifié le: ${modifiedStr}` : ''}
+          </p>
+        </div>
+        
+        <div class="detail-section">
+          <h4>Contrevenant</h4>
+          <div class="admin-field">
+            <label for="admin-offender-name">Nom du contrevenant</label>
+            <input type="text" class="form-input" id="admin-offender-name" value="${escapeHtml(inf.offenderName || '')}">
+          </div>
+        </div>
+        
+        <div class="detail-section">
+          <h4>QR Code du pass</h4>
+          ${qrHtml}
+        </div>
+        
+        ${inf.comments ? `
+        <div class="detail-section">
+          <h4>Commentaires du patrouilleur</h4>
+          <div class="detail-description">${escapeHtml(inf.comments)}</div>
+        </div>
+        ` : ''}
+        
+        <div class="detail-section">
+          <h4>Photo</h4>
+          ${photoHtml}
+        </div>
+        
+        <div class="detail-section">
+          <h4>Sanction et commentaires administratifs</h4>
+          <div class="admin-field">
+            <textarea class="form-input" id="admin-comments" rows="4" placeholder="Entrez les commentaires et sanctions...">${escapeHtml(inf.commentsAndSanctionAdmin || '')}</textarea>
+            ${inf.timestampModificationAdmin ? `<p class="admin-note">Dernière modification admin: ${inf.timestampModificationAdmin.toDate?.()?.toLocaleDateString('fr-CA', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) || ''}</p>` : ''}
+          </div>
+        </div>
+      `;
+      
+      // Update archive button
+      const archiveBtn = document.getElementById('archive-btn');
+      if (inf.archived) {
+        archiveBtn.textContent = 'Désarchiver';
+        archiveBtn.classList.remove('btn-warning');
+        archiveBtn.classList.add('btn-secondary');
+      } else {
+        archiveBtn.textContent = 'Archiver';
+        archiveBtn.classList.remove('btn-secondary');
+        archiveBtn.classList.add('btn-warning');
+      }
+      
+      document.getElementById('detail-modal').classList.add('is-active');
+      document.body.style.overflow = 'hidden';
+    }
+
+    function closeModal() {
+      document.getElementById('detail-modal').classList.remove('is-active');
+      document.body.style.overflow = '';
+      currentInfractionId = null;
+    }
+
+    async function saveChanges() {
+      if (!currentInfractionId) return;
+      
+      const offenderName = document.getElementById('admin-offender-name').value.trim();
+      const comments = document.getElementById('admin-comments').value.trim();
+      
+      try {
+        await db.collection('infractions').doc(currentInfractionId).update({
+          offenderName: offenderName,
+          commentsAndSanctionAdmin: comments,
+          timestampModificationAdmin: firebase.firestore.FieldValue.serverTimestamp()
+        });
+        
+        showToast('Modifications enregistrées', 'success');
+        loadInfractions();
+      } catch (e) {
+        console.error('Error saving:', e);
+        showToast('Erreur lors de l\'enregistrement', 'error');
+      }
+    }
+
+    async function toggleArchive() {
+      if (!currentInfractionId) return;
+      
+      const inf = infractionsData.find(i => i.id === currentInfractionId);
+      if (!inf) return;
+      
+      const newStatus = !inf.archived;
+      
+      try {
+        const updateData = { archived: newStatus };
+        if (newStatus) {
+          updateData.timestampArchivedAdmin = firebase.firestore.FieldValue.serverTimestamp();
+        }
+        
+        await db.collection('infractions').doc(currentInfractionId).update(updateData);
+        
+        showToast(newStatus ? 'Infraction archivée' : 'Infraction désarchivée', 'success');
+        closeModal();
+        loadInfractions();
+      } catch (e) {
+        console.error('Error archiving:', e);
+        showToast('Erreur lors de l\'archivage', 'error');
+      }
+    }
+
+    function escapeHtml(text) {
+      if (!text) return '';
+      const div = document.createElement('div');
+      div.textContent = text;
+      return div.innerHTML;
+    }
+
+    function showToast(message, type = 'info') {
+      const toast = document.createElement('div');
+      toast.innerHTML = message;
+      toast.style.cssText = 'position:fixed;bottom:20px;left:50%;transform:translateX(-50%);padding:12px 24px;border-radius:8px;color:#fff;z-index:9999;max-width:90%;text-align:center;';
+      toast.style.backgroundColor = type === 'error' ? '#dc2626' : type === 'success' ? '#16a34a' : '#2563eb';
+      document.body.appendChild(toast);
+      setTimeout(() => toast.remove(), 4000);
+    }
+
+    document.addEventListener('DOMContentLoaded', initInfractionAdmin);
+  </script>
+</body>
+</html>
