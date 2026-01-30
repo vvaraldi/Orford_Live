@@ -220,6 +220,11 @@
 }
 
 /* ===== ROLE BADGES ===== */
+.badge-system-admin {
+  background-color: #7c3aed;
+  color: var(--color-white);
+}
+
 .badge-admin {
   background-color: var(--color-admin);
   color: var(--color-gray-900);

@@ -567,7 +567,7 @@
       try {
         // Get system admins
         const adminsSnap = await db.collection('inspectors')
-          .where('isSystemAdmin', '==', true)
+          .where('role', '==', 'system_admin')
           .where('status', '==', 'active')
           .get();
 
@@ -650,7 +650,7 @@
 
     function setupAdminControls(request) {
       const isAdmin = currentUserData.role === 'admin' || currentUserData.role === 'system_admin';
-      const isSystemAdmin = currentUserData.isSystemAdmin === true;
+      const isSystemAdmin = currentUserData.role === 'system_admin';
 
       const adminControls = document.getElementById('admin-controls');
       const statusControlGroup = document.getElementById('status-control-group');
@@ -673,7 +673,7 @@
     async function saveAdminChanges() {
       if (!currentRequestId) return;
 
-      const isSystemAdmin = currentUserData.isSystemAdmin === true;
+      const isSystemAdmin = currentUserData.role === 'system_admin';
       const updates = {
         priority: document.getElementById('admin-priority').value,
         updatedAt: firebase.firestore.FieldValue.serverTimestamp()
@@ -729,7 +729,7 @@
           const date = c.createdAt?.toDate ? c.createdAt.toDate().toLocaleDateString('fr-CA', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '';
           
           let roleHtml = '';
-          if (c.isSystemAdmin) {
+          if (c.role === 'system_admin') {
             roleHtml = '<span class="comment__role comment__role--system">System Admin</span>';
           } else if (c.role === 'admin') {
             roleHtml = '<span class="comment__role comment__role--admin">Admin</span>';
@@ -771,7 +771,6 @@
           authorId: currentUser.uid,
           authorName: currentUserData.name || currentUser.email,
           role: currentUserData.role,
-          isSystemAdmin: currentUserData.isSystemAdmin === true,
           createdAt: firebase.firestore.FieldValue.serverTimestamp()
         };
 
