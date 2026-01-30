@@ -33,9 +33,12 @@ function checkAuthStatus(options = {}) {
   const {
     requireAuth = true,
     requireAdmin = false,
-    requiredPermission = null,
+    requiredRoles = null,        // Array of allowed roles, e.g., ['admin', 'system_admin']
+    requiredPermission = null,   // Permission field name, e.g., 'allowInspection'
+    permissionDefault = false,   // Default value if permission field is undefined (false = must be explicitly granted)
     onAuthenticated = null,
-    onUnauthenticated = null
+    onUnauthenticated = null,
+    onAccessDenied = null        // Callback when access is denied
   } = options;
 
   const loading = document.getElementById('loading');
@@ -62,16 +65,49 @@ function checkAuthStatus(options = {}) {
             return;
           }
 
-          // Check admin requirement
-          if (requireAdmin && currentUserData.role !== 'admin') {
-            showAccessDenied('Accès réservé aux administrateurs.');
+          // Check required roles (replaces requireAdmin for more flexibility)
+          if (requiredRoles && requiredRoles.length > 0) {
+            if (!requiredRoles.includes(currentUserData.role)) {
+              if (onAccessDenied) {
+                onAccessDenied();
+              } else {
+                showAccessDenied('Accès réservé aux administrateurs.');
+              }
+              return;
+            }
+          }
+
+          // Legacy: Check admin requirement (for backward compatibility)
+          if (requireAdmin && currentUserData.role !== 'admin' && currentUserData.role !== 'system_admin') {
+            if (onAccessDenied) {
+              onAccessDenied();
+            } else {
+              showAccessDenied('Accès réservé aux administrateurs.');
+            }
             return;
           }
 
-          // Check specific permission
-          if (requiredPermission && !currentUserData[requiredPermission]) {
-            showAccessDenied('Vous n\'avez pas accès à cette fonctionnalité.');
-            return;
+          // Check specific permission with default handling
+          if (requiredPermission) {
+            const permissionValue = currentUserData[requiredPermission];
+            let hasPermission;
+            
+            if (permissionDefault) {
+              // Default true: allow unless explicitly false
+              hasPermission = permissionValue !== false;
+            } else {
+              // Default false: deny unless explicitly true
+              hasPermission = permissionValue === true;
+            }
+            
+            if (!hasPermission) {
+              if (onAccessDenied) {
+                onAccessDenied();
+              } else {
+                showAccessDenied('Vous n\'avez pas accès à cette fonctionnalité.');
+              }
+              return;
+            }
           }
 
           // Show content

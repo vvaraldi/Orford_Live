@@ -130,7 +130,7 @@
     <!-- Tabs -->
     <div class="tabs">
       <button class="tab-btn active" data-tab="statistics">📊 Statistiques</button>
-      <button class="tab-btn" data-tab="management">🗄️ Gestion des données</button>
+      <button class="tab-btn" data-tab="management" id="tab-btn-management" style="display: none;">🗄️ Gestion des données</button>
     </div>
 
     <!-- Statistics Tab -->
@@ -355,6 +355,11 @@
         requireAuth: true,
         requiredRoles: ['admin', 'system_admin'],
         onAuthenticated: async (userData) => {
+          // Show data management tab only for system_admin
+          if (userData.role === 'system_admin') {
+            document.getElementById('tab-btn-management').style.display = '';
+          }
+          
           await loadAllData();
           renderStatistics();
           renderCharts();
