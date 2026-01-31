@@ -1,0 +1,501 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Gestion Signalisation - Orford Live</title>
+  <link rel="stylesheet" href="../css/main.css">
+  <style>
+    .filters-row { display: flex; flex-wrap: wrap; gap: 1rem; align-items: center; margin-bottom: 1rem; }
+    .filters-row .form-select { width: auto; min-width: 150px; }
+    .filters-row label { display: flex; align-items: center; gap: 0.5rem; font-size: 0.875rem; cursor: pointer; }
+    
+    .data-table { width: 100%; border-collapse: collapse; font-size: 0.875rem; }
+    .data-table th, .data-table td { padding: 0.75rem; text-align: left; border-bottom: 1px solid var(--theme-border); }
+    .data-table th { background: var(--theme-surface-alt); font-weight: 600; white-space: nowrap; }
+    .data-table tr:hover { background: var(--theme-surface-alt); cursor: pointer; }
+    
+    .badge { display: inline-block; padding: 0.25rem 0.5rem; border-radius: var(--radius-sm); font-size: 0.75rem; font-weight: 500; }
+    .badge--open { background: #d1fae5; color: #065f46; }
+    .badge--warning { background: #fef3c7; color: #92400e; }
+    .badge--closed { background: #fee2e2; color: #991b1b; }
+    .badge--resolved { background: #dbeafe; color: #1e40af; }
+    .badge--archived { background: #e5e7eb; color: #374151; }
+    
+    .status-badges { display: flex; gap: 0.25rem; flex-wrap: wrap; }
+    
+    .empty-state { text-align: center; padding: 2rem; color: var(--theme-text-secondary); }
+    
+    /* Modal */
+    .modal { display: none; position: fixed; inset: 0; z-index: 500; align-items: center; justify-content: center; padding: 1rem; background: rgba(0,0,0,0.5); }
+    .modal.is-active { display: flex; }
+    .modal__container { background: var(--theme-surface); border-radius: var(--radius-lg); width: 100%; max-width: 600px; max-height: 90vh; overflow: hidden; display: flex; flex-direction: column; }
+    .modal__header { display: flex; align-items: center; justify-content: space-between; padding: 1rem 1.5rem; border-bottom: 1px solid var(--theme-border); }
+    .modal__title { font-size: 1.125rem; font-weight: 600; }
+    .modal__close { background: none; border: none; font-size: 1.5rem; cursor: pointer; color: var(--theme-text-secondary); }
+    .modal__body { padding: 1.5rem; overflow-y: auto; flex: 1; }
+    .modal__footer { display: flex; gap: 1rem; justify-content: space-between; padding: 1rem 1.5rem; border-top: 1px solid var(--theme-border); }
+    .modal__footer-left { display: flex; gap: 1rem; align-items: center; }
+    .modal__footer-right { display: flex; gap: 0.5rem; }
+    
+    .detail-section { margin-bottom: 1.5rem; }
+    .detail-section h4 { font-size: 0.875rem; font-weight: 600; color: var(--theme-accent); margin-bottom: 0.5rem; }
+    .detail-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 0.5rem; }
+    .detail-item { font-size: 0.875rem; }
+    .detail-item strong { color: var(--theme-text-secondary); font-weight: 500; }
+    .detail-description { background: var(--theme-surface-alt); padding: 1rem; border-radius: var(--radius-md); white-space: pre-wrap; font-size: 0.875rem; }
+    .detail-photo { max-width: 100%; max-height: 300px; border-radius: var(--radius-md); border: 1px solid var(--theme-border); cursor: pointer; }
+    
+    .admin-field { margin-top: 1rem; }
+    .admin-field label { display: block; font-size: 0.8rem; font-weight: 600; color: var(--theme-text-secondary); margin-bottom: 0.5rem; }
+    .admin-note { font-size: 0.75rem; color: var(--theme-text-secondary); margin-top: 0.25rem; }
+    
+    .checkbox-label { display: flex; align-items: center; gap: 0.5rem; cursor: pointer; font-size: 0.875rem; }
+    
+    .toast { position: fixed; bottom: 2rem; left: 50%; transform: translateX(-50%); padding: 0.75rem 1.5rem; border-radius: var(--radius-md); color: white; font-weight: 500; z-index: 1000; opacity: 0; transition: opacity 0.3s; }
+    .toast.show { opacity: 1; }
+    .toast--success { background: #10b981; }
+    .toast--error { background: #ef4444; }
+    .toast--info { background: #3b82f6; }
+    
+    @media (max-width: 768px) {
+      .filters-row { flex-direction: column; align-items: stretch; }
+      .data-table { font-size: 0.8rem; }
+      .data-table th, .data-table td { padding: 0.5rem; }
+      .detail-grid { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body data-theme="light" data-module="signalisation">
+  <a href="#main-content" class="skip-link">Aller au contenu principal</a>
+
+  <!-- Header -->
+  <header class="header">
+    <div class="logo"><span class="logo__icon">🚧</span><span class="logo__text">Signalisation</span></div>
+    <nav class="nav">
+      <a href="../index.html" class="nav__link"><span>🏠</span><span>Portail</span></a>
+      <div class="nav__divider"></div>
+      <a href="signalisation-report.html" class="nav__link"><span>📝</span><span>Rapport</span></a>
+      <a href="signalisation-admin.html" class="nav__link is-active"><span>📋</span><span>Gestion</span></a>
+      <div class="nav__divider"></div>
+      <button class="theme-toggle" onclick="window.themeManager.toggle()" aria-label="Changer le thème">
+        <svg class="theme-toggle__icon theme-toggle__icon--moon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg>
+        <svg class="theme-toggle__icon theme-toggle__icon--sun" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display:none;"><circle cx="12" cy="12" r="5"></circle><line x1="12" y1="1" x2="12" y2="3"></line><line x1="12" y1="21" x2="12" y2="23"></line><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line><line x1="1" y1="12" x2="3" y2="12"></line><line x1="21" y1="12" x2="23" y2="12"></line><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line></svg>
+      </button>
+      <div class="user-menu">
+        <button class="user-menu__trigger"><span class="user-menu__avatar" data-user-initials>--</span><span class="user-menu__name" data-user-name>Chargement...</span></button>
+        <div class="user-menu__dropdown">
+          <div class="user-menu__header"><div class="user-menu__header-name" data-user-name>-</div><div class="user-menu__header-email" data-user-email>-</div></div>
+          <a href="user-profile.html" class="user-menu__item"><span>👤</span><span>Mon profil</span></a>
+          <div class="user-menu__divider"></div>
+          <button class="user-menu__item user-menu__item--danger" onclick="handleLogout()"><span>🚪</span><span>Déconnexion</span></button>
+        </div>
+      </div>
+    </nav>
+    <button class="mobile-menu-btn" id="mobile-menu-btn" aria-label="Menu"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="12" x2="21" y2="12"></line><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="18" x2="21" y2="18"></line></svg></button>
+  </header>
+
+  <!-- Mobile Navigation -->
+  <div class="mobile-nav__backdrop" id="mobile-nav-backdrop"></div>
+  <nav class="mobile-nav" id="mobile-nav">
+    <div class="mobile-nav__header"><div class="mobile-nav__logo"><span>🚧</span><span>Signalisation</span></div><button class="mobile-nav__close" id="mobile-nav-close" aria-label="Fermer"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg></button></div>
+    <div class="mobile-nav__user"><div class="mobile-nav__user-name" data-user-name>-</div><div class="mobile-nav__user-role" data-user-role>-</div></div>
+    <div class="mobile-nav__section">
+      <a href="../index.html" class="mobile-nav__link"><span class="mobile-nav__link-icon">🏠</span><span>Portail</span></a>
+    </div>
+    <div class="mobile-nav__divider"></div>
+    <div class="mobile-nav__section">
+      <a href="signalisation-report.html" class="mobile-nav__link"><span class="mobile-nav__link-icon">📝</span><span>Rapport</span></a>
+      <a href="signalisation-admin.html" class="mobile-nav__link is-active"><span class="mobile-nav__link-icon">📋</span><span>Gestion</span></a>
+    </div>
+    <div class="mobile-nav__divider"></div>
+    <div class="mobile-nav__section"><a href="#" class="mobile-nav__link" onclick="handleLogout(); return false;"><span class="mobile-nav__link-icon">🚪</span><span>Déconnexion</span></a></div>
+  </nav>
+
+  <!-- Loading -->
+  <div id="loading" class="page-loading"><div class="loading-spinner"></div><p class="loading-text">Chargement...</p></div>
+
+  <!-- Main Content -->
+  <main class="main-content" id="main-content" style="display:none;">
+    <div class="container">
+      <div class="page-header">
+        <h1 class="page-title">📋 Gestion des Signalisations</h1>
+      </div>
+
+      <div class="card">
+        <div class="card__header">
+          <div class="filters-row">
+            <select class="form-select" id="filter-sector">
+              <option value="">Tous les secteurs</option>
+            </select>
+            <select class="form-select" id="sort-by">
+              <option value="date">Trier par date</option>
+              <option value="sector">Trier par secteur</option>
+            </select>
+            <label><input type="checkbox" id="show-resolved"> Afficher résolus</label>
+            <label><input type="checkbox" id="show-archived"> Afficher archivés</label>
+            <button class="btn btn-secondary btn-sm" id="refresh-btn">🔄 Actualiser</button>
+          </div>
+        </div>
+        <div class="card__body">
+          <div class="table-responsive">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Date</th>
+                  <th>Secteur</th>
+                  <th>Piste</th>
+                  <th>Statut</th>
+                  <th>Inspecteur</th>
+                  <th>État</th>
+                </tr>
+              </thead>
+              <tbody id="reports-tbody">
+                <tr><td colspan="6" class="empty-state">Chargement...</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <!-- Detail Modal -->
+  <div class="modal" id="detail-modal">
+    <div class="modal__container">
+      <div class="modal__header">
+        <h3 class="modal__title">Détails du rapport</h3>
+        <button class="modal__close" onclick="closeModal()">&times;</button>
+      </div>
+      <div class="modal__body" id="modal-body">
+        <!-- Content loaded dynamically -->
+      </div>
+      <div class="modal__footer">
+        <div class="modal__footer-left">
+          <label class="checkbox-label"><input type="checkbox" id="modal-resolved"> Résolu</label>
+          <label class="checkbox-label"><input type="checkbox" id="modal-archived"> Archivé</label>
+        </div>
+        <div class="modal__footer-right">
+          <button class="btn btn-primary" onclick="saveChanges()">💾 Enregistrer</button>
+          <button class="btn btn-secondary" onclick="closeModal()">Fermer</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast -->
+  <div id="toast" class="toast"></div>
+
+  <!-- Footer -->
+  <footer class="footer footer--simple"><div class="footer__content"><p class="footer__copyright">© 2025 Patrouille Mont Orford</p></div></footer>
+
+  <!-- Scripts -->
+  <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-storage-compat.js"></script>
+  <script src="../js/core/config.js"></script>
+  <script src="../js/core/auth.js"></script>
+  <script src="../js/core/theme.js"></script>
+  <script src="../js/core/mobile-nav.js"></script>
+
+  <script>
+    const TRAILS_DATA = {
+      'mont-orford': { name: 'Mont-Orford' },
+      'mont-giroux-nord': { name: 'Mont Giroux Nord' },
+      'mont-giroux-est': { name: 'Mont Giroux Est' },
+      'alfred-desrochers': { name: 'Mont Alfred-DesRochers' },
+      'remontees': { name: 'Remontées mécaniques' },
+      'randonnee-alpine': { name: 'Randonnée alpine' }
+    };
+
+    const STATUS_LABELS = {
+      'ouverte': '🟢 Ouverte',
+      'attention-requise': '🟡 Attention requise',
+      'fermee': '🔴 Fermée'
+    };
+
+    const STATUS_BADGE_CLASS = {
+      'ouverte': 'badge--open',
+      'attention-requise': 'badge--warning',
+      'fermee': 'badge--closed'
+    };
+
+    // State
+    let currentUser = null;
+    let currentUserData = null;
+    let db;
+    let reportsData = [];
+    let currentReportId = null;
+    let showResolved = false;
+    let showArchived = false;
+    let filterSector = '';
+    let sortBy = 'date';
+
+    function escapeHtml(str) {
+      if (!str) return '';
+      return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    }
+
+    function showToast(message, type = 'info') {
+      const toast = document.getElementById('toast');
+      toast.textContent = message;
+      toast.className = `toast toast--${type} show`;
+      setTimeout(() => toast.classList.remove('show'), 4000);
+    }
+
+    function initApp() {
+      db = firebase.firestore();
+
+      checkAuthStatus({
+        requireAuth: true,
+        requireAdmin: true,
+        onAuthenticated: (userData) => {
+          currentUser = firebase.auth().currentUser;
+          currentUserData = userData;
+          
+          document.getElementById('loading').style.display = 'none';
+          document.getElementById('main-content').style.display = '';
+          
+          populateSectorFilter();
+          bindEvents();
+          loadReports();
+        }
+      });
+    }
+
+    function populateSectorFilter() {
+      const select = document.getElementById('filter-sector');
+      select.innerHTML = '<option value="">Tous les secteurs</option>';
+      Object.keys(TRAILS_DATA).forEach(key => {
+        const opt = document.createElement('option');
+        opt.value = key;
+        opt.textContent = TRAILS_DATA[key].name;
+        select.appendChild(opt);
+      });
+    }
+
+    function bindEvents() {
+      document.getElementById('filter-sector').addEventListener('change', (e) => {
+        filterSector = e.target.value;
+        renderReports();
+      });
+      document.getElementById('sort-by').addEventListener('change', (e) => {
+        sortBy = e.target.value;
+        renderReports();
+      });
+      document.getElementById('show-resolved').addEventListener('change', (e) => {
+        showResolved = e.target.checked;
+        loadReports();
+      });
+      document.getElementById('show-archived').addEventListener('change', (e) => {
+        showArchived = e.target.checked;
+        loadReports();
+      });
+      document.getElementById('refresh-btn').addEventListener('click', loadReports);
+    }
+
+    async function loadReports() {
+      try {
+        const snap = await db.collection('signalisations')
+          .orderBy('createdAt', 'desc')
+          .get();
+        
+        reportsData = [];
+        snap.forEach(doc => {
+          const data = { id: doc.id, ...doc.data() };
+          
+          // Apply resolved/archived filters
+          if (!showResolved && data.resolved === true) return;
+          if (!showArchived && data.archived === true) return;
+          
+          reportsData.push(data);
+        });
+        
+        renderReports();
+      } catch (e) {
+        console.error('Error loading reports:', e);
+        document.getElementById('reports-tbody').innerHTML = '<tr><td colspan="6" class="empty-state" style="color:#ef4444;">Erreur de chargement</td></tr>';
+      }
+    }
+
+    function renderReports() {
+      const tbody = document.getElementById('reports-tbody');
+      
+      // Filter by sector
+      let filtered = [...reportsData];
+      if (filterSector) {
+        filtered = filtered.filter(r => r.sector === filterSector);
+      }
+      
+      // Sort
+      if (sortBy === 'date') {
+        filtered.sort((a, b) => {
+          const dateA = a.createdAt?.toDate?.() || new Date(0);
+          const dateB = b.createdAt?.toDate?.() || new Date(0);
+          return dateB - dateA;
+        });
+      } else if (sortBy === 'sector') {
+        filtered.sort((a, b) => (a.sector || '').localeCompare(b.sector || ''));
+      }
+      
+      if (filtered.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="6" class="empty-state">Aucun rapport trouvé</td></tr>';
+        return;
+      }
+      
+      tbody.innerHTML = filtered.map(r => {
+        const date = r.createdAt?.toDate?.();
+        const dateStr = date ? date.toLocaleDateString('fr-CA', { year: 'numeric', month: 'short', day: 'numeric' }) : '-';
+        
+        const sectorName = r.sectorDisplayName || TRAILS_DATA[r.sector]?.name || r.sector || '-';
+        
+        let statusHtml = '<span style="color:var(--theme-text-secondary);">-</span>';
+        if (r.status) {
+          const badgeClass = STATUS_BADGE_CLASS[r.status] || '';
+          statusHtml = `<span class="badge ${badgeClass}">${STATUS_LABELS[r.status] || r.status}</span>`;
+        }
+        
+        // État badges
+        let etatBadges = [];
+        if (r.resolved) etatBadges.push('<span class="badge badge--resolved">Résolu</span>');
+        if (r.archived) etatBadges.push('<span class="badge badge--archived">Archivé</span>');
+        const etatHtml = etatBadges.length ? `<div class="status-badges">${etatBadges.join('')}</div>` : '<span style="color:var(--theme-text-secondary);">Actif</span>';
+        
+        return `
+          <tr data-id="${r.id}">
+            <td>${dateStr}</td>
+            <td>${escapeHtml(sectorName)}</td>
+            <td>${escapeHtml(r.trail || '-')}</td>
+            <td>${statusHtml}</td>
+            <td>${escapeHtml(r.inspectorName || '-')}</td>
+            <td>${etatHtml}</td>
+          </tr>
+        `;
+      }).join('');
+      
+      // Bind row clicks
+      tbody.querySelectorAll('tr[data-id]').forEach(row => {
+        row.addEventListener('click', () => openDetail(row.dataset.id));
+      });
+    }
+
+    async function openDetail(id) {
+      currentReportId = id;
+      const r = reportsData.find(rep => rep.id === id);
+      if (!r) return;
+      
+      const date = r.createdAt?.toDate?.();
+      const dateStr = date ? date.toLocaleDateString('fr-CA', { year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '-';
+      const modifiedStr = r.modifiedAt?.toDate?.()?.toLocaleDateString('fr-CA', { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) || '';
+      
+      const sectorName = r.sectorDisplayName || TRAILS_DATA[r.sector]?.name || r.sector || '-';
+      
+      let statusHtml = '<span style="color:var(--theme-text-secondary);">Non spécifié</span>';
+      if (r.status) {
+        const badgeClass = STATUS_BADGE_CLASS[r.status] || '';
+        statusHtml = `<span class="badge ${badgeClass}">${STATUS_LABELS[r.status] || r.status}</span>`;
+      }
+      
+      let photoHtml = '<p style="color:var(--theme-text-secondary);">Aucune photo</p>';
+      if (r.photoUrl) {
+        photoHtml = `<img src="${r.photoUrl}" class="detail-photo" alt="Photo" onclick="window.open('${r.photoUrl}', '_blank')">`;
+      }
+      
+      const modalBody = document.getElementById('modal-body');
+      modalBody.innerHTML = `
+        <div class="detail-section">
+          <h4>📍 Localisation</h4>
+          <div class="detail-grid">
+            <div class="detail-item"><strong>Secteur:</strong> ${escapeHtml(sectorName)}</div>
+            <div class="detail-item"><strong>Piste:</strong> ${escapeHtml(r.trail || '-')}</div>
+          </div>
+        </div>
+        
+        <div class="detail-section">
+          <h4>📊 Statut de la signalisation</h4>
+          ${statusHtml}
+        </div>
+        
+        <div class="detail-section">
+          <h4>📷 Photo</h4>
+          ${photoHtml}
+        </div>
+        
+        ${r.comments ? `
+        <div class="detail-section">
+          <h4>💬 Commentaires de l'inspecteur</h4>
+          <div class="detail-description">${escapeHtml(r.comments)}</div>
+        </div>
+        ` : ''}
+        
+        <div class="detail-section">
+          <h4>👤 Informations</h4>
+          <div class="detail-grid">
+            <div class="detail-item"><strong>Inspecteur:</strong> ${escapeHtml(r.inspectorName || '-')}</div>
+            <div class="detail-item"><strong>Créé le:</strong> ${dateStr}</div>
+          </div>
+          ${modifiedStr ? `<p style="font-size:0.75rem;color:var(--theme-text-secondary);margin-top:0.5rem;">Modifié le: ${modifiedStr}</p>` : ''}
+        </div>
+        
+        <div class="detail-section">
+          <h4>📝 Commentaires administratifs</h4>
+          <div class="admin-field">
+            <textarea class="form-input" id="admin-comments" rows="4" placeholder="Entrez les commentaires administratifs...">${escapeHtml(r.adminComments || '')}</textarea>
+            ${r.adminModifiedAt ? `<p class="admin-note">Dernière modification admin: ${r.adminModifiedAt.toDate?.()?.toLocaleDateString('fr-CA', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) || ''}</p>` : ''}
+          </div>
+        </div>
+      `;
+      
+      // Set checkboxes
+      document.getElementById('modal-resolved').checked = r.resolved || false;
+      document.getElementById('modal-archived').checked = r.archived || false;
+      
+      document.getElementById('detail-modal').classList.add('is-active');
+      document.body.style.overflow = 'hidden';
+    }
+
+    function closeModal() {
+      document.getElementById('detail-modal').classList.remove('is-active');
+      document.body.style.overflow = '';
+      currentReportId = null;
+    }
+
+    async function saveChanges() {
+      if (!currentReportId) return;
+      
+      const adminComments = document.getElementById('admin-comments').value.trim();
+      const resolved = document.getElementById('modal-resolved').checked;
+      const archived = document.getElementById('modal-archived').checked;
+      
+      try {
+        const updateData = {
+          adminComments: adminComments || null,
+          resolved: resolved,
+          archived: archived,
+          adminModifiedAt: firebase.firestore.FieldValue.serverTimestamp()
+        };
+        
+        // Add timestamps if being set to true
+        if (resolved) {
+          updateData.resolvedAt = firebase.firestore.FieldValue.serverTimestamp();
+        }
+        if (archived) {
+          updateData.archivedAt = firebase.firestore.FieldValue.serverTimestamp();
+        }
+        
+        await db.collection('signalisations').doc(currentReportId).update(updateData);
+        
+        showToast('Modifications enregistrées', 'success');
+        closeModal();
+        loadReports();
+      } catch (e) {
+        console.error('Error saving:', e);
+        showToast('Erreur lors de l\'enregistrement', 'error');
+      }
+    }
+
+    document.addEventListener('DOMContentLoaded', initApp);
+  </script>
+</body>
+</html>

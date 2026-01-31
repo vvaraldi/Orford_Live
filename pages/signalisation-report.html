@@ -1,0 +1,629 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Rapport de Signalisation - Orford Live</title>
+  <link rel="stylesheet" href="../css/main.css">
+  <style>
+    .form-card { max-width: 600px; margin: 0 auto; }
+    .form-section { margin-bottom: 1.5rem; }
+    .form-section-title { font-weight: 600; margin-bottom: 1rem; color: var(--theme-accent); }
+    .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+    @media (max-width: 480px) { .form-row { grid-template-columns: 1fr; } }
+    
+    .photo-preview-container { margin-top: 1rem; display: none; }
+    .photo-preview-container.show { display: block; }
+    .photo-preview { max-width: 100%; max-height: 200px; border-radius: var(--radius-md); border: 1px solid var(--theme-border); }
+    .photo-actions { margin-top: 0.5rem; }
+    
+    .form-actions { display: flex; gap: 1rem; margin-top: 1.5rem; }
+    .form-actions .btn { flex: 1; }
+    
+    .status-option { display: flex; align-items: center; gap: 0.5rem; }
+    .status-dot { width: 12px; height: 12px; border-radius: 50%; }
+    .status-dot--open { background: #10b981; }
+    .status-dot--warning { background: #f59e0b; }
+    .status-dot--closed { background: #ef4444; }
+    
+    .validation-note { font-size: 0.8rem; color: var(--theme-text-secondary); margin-top: 0.5rem; padding: 0.75rem; background: var(--theme-surface-alt); border-radius: var(--radius-md); }
+    
+    .toast { position: fixed; bottom: 2rem; left: 50%; transform: translateX(-50%); padding: 0.75rem 1.5rem; border-radius: var(--radius-md); color: white; font-weight: 500; z-index: 1000; opacity: 0; transition: opacity 0.3s; }
+    .toast.show { opacity: 1; }
+    .toast--success { background: #10b981; }
+    .toast--error { background: #ef4444; }
+    .toast--info { background: #3b82f6; }
+  </style>
+</head>
+<body data-theme="light" data-module="signalisation">
+  <a href="#main-content" class="skip-link">Aller au contenu principal</a>
+
+  <!-- Header -->
+  <header class="header">
+    <div class="logo"><span class="logo__icon">🚧</span><span class="logo__text">Signalisation</span></div>
+    <nav class="nav">
+      <a href="../index.html" class="nav__link"><span>🏠</span><span>Portail</span></a>
+      <div class="nav__divider"></div>
+      <a href="signalisation-report.html" class="nav__link is-active"><span>📝</span><span>Rapport</span></a>
+      <a href="signalisation-admin.html" class="nav__link nav__link--admin" style="display:none;"><span>📋</span><span>Gestion</span></a>
+      <div class="nav__divider"></div>
+      <button class="theme-toggle" onclick="window.themeManager.toggle()" aria-label="Changer le thème">
+        <svg class="theme-toggle__icon theme-toggle__icon--moon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg>
+        <svg class="theme-toggle__icon theme-toggle__icon--sun" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display:none;"><circle cx="12" cy="12" r="5"></circle><line x1="12" y1="1" x2="12" y2="3"></line><line x1="12" y1="21" x2="12" y2="23"></line><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line><line x1="1" y1="12" x2="3" y2="12"></line><line x1="21" y1="12" x2="23" y2="12"></line><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line></svg>
+      </button>
+      <div class="user-menu">
+        <button class="user-menu__trigger"><span class="user-menu__avatar" data-user-initials>--</span><span class="user-menu__name" data-user-name>Chargement...</span></button>
+        <div class="user-menu__dropdown">
+          <div class="user-menu__header"><div class="user-menu__header-name" data-user-name>-</div><div class="user-menu__header-email" data-user-email>-</div></div>
+          <a href="user-profile.html" class="user-menu__item"><span>👤</span><span>Mon profil</span></a>
+          <div class="user-menu__divider"></div>
+          <button class="user-menu__item user-menu__item--danger" onclick="handleLogout()"><span>🚪</span><span>Déconnexion</span></button>
+        </div>
+      </div>
+    </nav>
+    <button class="mobile-menu-btn" id="mobile-menu-btn" aria-label="Menu"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="12" x2="21" y2="12"></line><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="18" x2="21" y2="18"></line></svg></button>
+  </header>
+
+  <!-- Mobile Navigation -->
+  <div class="mobile-nav__backdrop" id="mobile-nav-backdrop"></div>
+  <nav class="mobile-nav" id="mobile-nav">
+    <div class="mobile-nav__header"><div class="mobile-nav__logo"><span>🚧</span><span>Signalisation</span></div><button class="mobile-nav__close" id="mobile-nav-close" aria-label="Fermer"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg></button></div>
+    <div class="mobile-nav__user"><div class="mobile-nav__user-name" data-user-name>-</div><div class="mobile-nav__user-role" data-user-role>-</div></div>
+    <div class="mobile-nav__section">
+      <a href="../index.html" class="mobile-nav__link"><span class="mobile-nav__link-icon">🏠</span><span>Portail</span></a>
+    </div>
+    <div class="mobile-nav__divider"></div>
+    <div class="mobile-nav__section">
+      <a href="signalisation-report.html" class="mobile-nav__link is-active"><span class="mobile-nav__link-icon">📝</span><span>Rapport</span></a>
+      <a href="signalisation-admin.html" class="mobile-nav__link mobile-nav__link--admin" style="display:none;"><span class="mobile-nav__link-icon">📋</span><span>Gestion</span></a>
+    </div>
+    <div class="mobile-nav__divider"></div>
+    <div class="mobile-nav__section"><a href="#" class="mobile-nav__link" onclick="handleLogout(); return false;"><span class="mobile-nav__link-icon">🚪</span><span>Déconnexion</span></a></div>
+  </nav>
+
+  <!-- Loading -->
+  <div id="loading" class="page-loading"><div class="loading-spinner"></div><p class="loading-text">Chargement...</p></div>
+
+  <!-- Main Content -->
+  <main class="main-content" id="main-content" style="display:none;">
+    <div class="container">
+      <div class="page-header">
+        <h1 class="page-title">📝 Rapport de Signalisation</h1>
+      </div>
+
+      <div class="card form-card">
+        <div class="card__header">
+          <select class="form-select" id="report-selector">
+            <option value="new">+ Nouveau rapport</option>
+          </select>
+        </div>
+        
+        <form class="card__body" id="signalisation-form">
+          <!-- Inspector & DateTime -->
+          <div class="form-section">
+            <div class="form-section-title">👤 Informations</div>
+            <div class="form-group">
+              <label class="form-label">Inspecteur</label>
+              <input type="text" class="form-input" id="inspector-name" readonly>
+            </div>
+            <div class="form-row">
+              <div class="form-group">
+                <label class="form-label" for="report-date">Date *</label>
+                <input type="date" class="form-input" id="report-date" required>
+              </div>
+              <div class="form-group">
+                <label class="form-label" for="report-time">Heure *</label>
+                <input type="time" class="form-input" id="report-time" required>
+              </div>
+            </div>
+          </div>
+
+          <!-- Status & Photo -->
+          <div class="form-section">
+            <div class="form-section-title">📊 Statut de la signalisation</div>
+            <div class="form-group">
+              <label class="form-label" for="status-select">Statut</label>
+              <select class="form-select" id="status-select">
+                <option value="">-- Sélectionner un statut --</option>
+                <option value="ouverte">🟢 Ouverte</option>
+                <option value="attention-requise">🟡 Attention requise</option>
+                <option value="fermee">🔴 Fermée</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Photo</label>
+              <input type="file" id="photo-input" accept="image/*" capture="environment" style="display:none;">
+              <button type="button" class="btn btn-secondary" id="photo-btn">📷 Prendre une photo</button>
+              <div class="photo-preview-container" id="photo-preview-container">
+                <img id="photo-preview" class="photo-preview" alt="Aperçu">
+                <div class="photo-actions">
+                  <button type="button" class="btn btn-sm btn-danger" id="remove-photo-btn">✕ Supprimer</button>
+                </div>
+              </div>
+            </div>
+            <div class="validation-note">
+              <strong>Note:</strong> Au moins un statut OU une photo est requis. Les deux peuvent être fournis.
+            </div>
+          </div>
+
+          <!-- Location -->
+          <div class="form-section">
+            <div class="form-section-title">📍 Localisation</div>
+            <div class="form-group">
+              <label class="form-label" for="sector-select">Secteur *</label>
+              <select class="form-select" id="sector-select" required>
+                <option value="">-- Sélectionner un secteur --</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label class="form-label" for="trail-select">Piste *</label>
+              <select class="form-select" id="trail-select" required>
+                <option value="">-- Sélectionner d'abord un secteur --</option>
+              </select>
+            </div>
+          </div>
+
+          <!-- Comments -->
+          <div class="form-section">
+            <div class="form-section-title">💬 Commentaires</div>
+            <div class="form-group">
+              <textarea class="form-input" id="comments" rows="3" placeholder="Commentaires optionnels..."></textarea>
+            </div>
+          </div>
+
+          <!-- Actions -->
+          <div class="form-actions">
+            <button type="button" class="btn btn-secondary" id="reset-btn">Réinitialiser</button>
+            <button type="submit" class="btn btn-primary" id="save-btn">Enregistrer</button>
+            <button type="button" class="btn btn-primary" id="modify-btn" style="display:none;">Modifier</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </main>
+
+  <!-- Toast -->
+  <div id="toast" class="toast"></div>
+
+  <!-- Footer -->
+  <footer class="footer footer--simple"><div class="footer__content"><p class="footer__copyright">© 2025 Patrouille Mont Orford</p></div></footer>
+
+  <!-- Scripts -->
+  <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-storage-compat.js"></script>
+  <script src="../js/core/config.js"></script>
+  <script src="../js/core/auth.js"></script>
+  <script src="../js/core/theme.js"></script>
+  <script src="../js/core/mobile-nav.js"></script>
+
+  <script>
+    // Trails data (same as Infraction)
+    const TRAILS_DATA = {
+      'mont-orford': {
+        name: 'Mont-Orford',
+        trails: ['Trois Ruisseaux', 'Grande Coulée', 'Inter', 'Maxi', '4 KM', 'Giroux', 'Alpage', 'Bois-rond', 'Calumet', 'Camping', 'Centrale', 'Chouette', 'Contour', 'Coustrois', 'Des Crêtes', 'Des Scouts', 'Gagnon', 'Lièvre', 'Louis', 'Mailhot', 'Martre', 'Mésange', 'Perdrix', 'Pic-Bois', 'Pionniers', 'Pond', 'Slalom', 'Sous-bois 1000m', 'Sun', 'Tournevent']
+      },
+      'mont-giroux-nord': {
+        name: 'Mont Giroux Nord',
+        trails: ['Magog', 'Familiale', 'Jean-d\'Avignon', 'Des Sapins', 'Bromont', 'De L\'Écluse', 'Du Lac', 'Edelweiss', 'Évasion', 'Memphrémagog', 'Moraine', 'Petite Ours', 'Plein-sud', 'Ruisseau', 'Slalom', 'Soleil', 'Sous-bois', 'Vallée']
+      },
+      'mont-giroux-est': {
+        name: 'Mont Giroux Est',
+        trails: ['Sherbrooke', 'Slalom', 'Passe Montagne', 'Bellevue', 'De L\'Est', 'De la Mine', 'Du Vallon', 'La Crete', 'Sous-bois', 'Tunnel']
+      },
+      'alfred-desrochers': {
+        name: 'Mont Alfred-DesRochers',
+        trails: ['Petite Ours', 'Descente', 'Le Lien', 'Le Plein-sud', 'Moraine', 'Slalom', 'Soleil']
+      },
+      'remontees': {
+        name: 'Remontées mécaniques',
+        trails: ['Rapido', 'Hybride', 'Alfred-Desrochers', 'Giroux Express', 'Magog', 'Soleil', 'Tapis Familial']
+      },
+      'randonnee-alpine': {
+        name: 'Randonnée alpine',
+        trails: ['La tortue', 'Le Renard', 'Le tracé du Lynx', 'Le tracé du Pic Bois', 'Les Cerfs', 'Les Crêtes', 'Les sous-bois du Chat Sauvage', 'Mont Chauve - section sud', 'Panorama', 'Sentier des Légendes', 'Table Ronde']
+      }
+    };
+
+    const STATUS_LABELS = {
+      'ouverte': '🟢 Ouverte',
+      'attention-requise': '🟡 Attention requise',
+      'fermee': '🔴 Fermée'
+    };
+
+    // State
+    let currentUser = null;
+    let currentUserData = null;
+    let db, storage;
+    let userReports = [];
+    let currentReportId = null;
+    let isNewReport = true;
+    let photoFile = null;
+    let photoUrl = null;
+
+    // Elements
+    const reportSelector = document.getElementById('report-selector');
+    const inspectorName = document.getElementById('inspector-name');
+    const reportDate = document.getElementById('report-date');
+    const reportTime = document.getElementById('report-time');
+    const statusSelect = document.getElementById('status-select');
+    const photoInput = document.getElementById('photo-input');
+    const photoBtn = document.getElementById('photo-btn');
+    const photoPreviewContainer = document.getElementById('photo-preview-container');
+    const photoPreview = document.getElementById('photo-preview');
+    const removePhotoBtn = document.getElementById('remove-photo-btn');
+    const sectorSelect = document.getElementById('sector-select');
+    const trailSelect = document.getElementById('trail-select');
+    const comments = document.getElementById('comments');
+    const saveBtn = document.getElementById('save-btn');
+    const modifyBtn = document.getElementById('modify-btn');
+    const resetBtn = document.getElementById('reset-btn');
+    const form = document.getElementById('signalisation-form');
+
+    // Toast
+    function showToast(message, type = 'info') {
+      const toast = document.getElementById('toast');
+      toast.textContent = message;
+      toast.className = `toast toast--${type} show`;
+      setTimeout(() => toast.classList.remove('show'), 4000);
+    }
+
+    // Initialize
+    function initApp() {
+      db = firebase.firestore();
+      storage = firebase.storage();
+
+      checkAuthStatus({
+        requiredPermission: 'allowSignalisation',
+        permissionDefault: false,
+        onAuthenticated: (userData) => {
+          currentUser = firebase.auth().currentUser;
+          currentUserData = userData;
+          
+          document.getElementById('loading').style.display = 'none';
+          document.getElementById('main-content').style.display = '';
+          
+          // Show admin link if admin
+          if (userData.role === 'admin' || userData.role === 'system_admin') {
+            document.querySelectorAll('.nav__link--admin, .mobile-nav__link--admin').forEach(el => el.style.display = '');
+          }
+          
+          populateSectors();
+          setDefaultValues();
+          loadUserReports();
+          bindEvents();
+        }
+      });
+    }
+
+    function populateSectors() {
+      sectorSelect.innerHTML = '<option value="">-- Sélectionner un secteur --</option>';
+      Object.keys(TRAILS_DATA).forEach(key => {
+        const opt = document.createElement('option');
+        opt.value = key;
+        opt.textContent = TRAILS_DATA[key].name;
+        sectorSelect.appendChild(opt);
+      });
+    }
+
+    function populateTrails() {
+      const sectorId = sectorSelect.value;
+      trailSelect.innerHTML = '<option value="">-- Sélectionner une piste --</option>';
+      
+      if (sectorId && TRAILS_DATA[sectorId]) {
+        TRAILS_DATA[sectorId].trails.forEach(trail => {
+          const opt = document.createElement('option');
+          opt.value = trail;
+          opt.textContent = trail;
+          trailSelect.appendChild(opt);
+        });
+      }
+    }
+
+    function setDefaultValues() {
+      inspectorName.value = currentUserData.name || currentUser.email;
+      
+      const now = new Date();
+      reportDate.value = now.toISOString().split('T')[0];
+      reportTime.value = now.toTimeString().slice(0, 5);
+    }
+
+    function bindEvents() {
+      sectorSelect.addEventListener('change', populateTrails);
+      reportSelector.addEventListener('change', handleReportChange);
+      photoBtn.addEventListener('click', () => photoInput.click());
+      photoInput.addEventListener('change', handlePhotoSelect);
+      removePhotoBtn.addEventListener('click', removePhoto);
+      form.addEventListener('submit', handleSubmit);
+      modifyBtn.addEventListener('click', handleModify);
+      resetBtn.addEventListener('click', resetForm);
+    }
+
+    // Load user's past reports
+    async function loadUserReports() {
+      try {
+        const snap = await db.collection('signalisations')
+          .where('inspectorId', '==', currentUser.uid)
+          .orderBy('createdAt', 'desc')
+          .limit(50)
+          .get();
+        
+        userReports = [];
+        reportSelector.innerHTML = '<option value="new">+ Nouveau rapport</option>';
+        
+        snap.forEach(doc => {
+          const data = doc.data();
+          userReports.push({ id: doc.id, ...data });
+          
+          const date = data.createdAt?.toDate?.();
+          const dateStr = date ? date.toLocaleDateString('fr-CA') : 'Date inconnue';
+          const trail = data.trail || 'N/A';
+          const status = STATUS_LABELS[data.status] || data.status || 'Sans statut';
+          const label = `${dateStr} - ${trail} - ${status}`;
+          
+          const opt = document.createElement('option');
+          opt.value = doc.id;
+          opt.textContent = label;
+          reportSelector.appendChild(opt);
+        });
+      } catch (e) {
+        console.error('Error loading reports:', e);
+      }
+    }
+
+    function handleReportChange() {
+      const selectedId = reportSelector.value;
+      
+      if (selectedId === 'new') {
+        resetForm();
+        return;
+      }
+      
+      const report = userReports.find(r => r.id === selectedId);
+      if (!report) return;
+      
+      currentReportId = selectedId;
+      isNewReport = false;
+      
+      // Populate form
+      if (report.createdAt?.toDate) {
+        const d = report.createdAt.toDate();
+        reportDate.value = d.toISOString().split('T')[0];
+        reportTime.value = d.toTimeString().slice(0, 5);
+      }
+      
+      statusSelect.value = report.status || '';
+      sectorSelect.value = report.sector || '';
+      populateTrails();
+      trailSelect.value = report.trail || '';
+      comments.value = report.comments || '';
+      
+      // Photo
+      if (report.photoUrl) {
+        photoUrl = report.photoUrl;
+        photoPreview.src = photoUrl;
+        photoPreviewContainer.classList.add('show');
+      } else {
+        removePhoto();
+      }
+      
+      // Toggle buttons
+      saveBtn.style.display = 'none';
+      modifyBtn.style.display = '';
+      
+      clearValidation();
+    }
+
+    function resetForm() {
+      currentReportId = null;
+      isNewReport = true;
+      reportSelector.value = 'new';
+      
+      setDefaultValues();
+      statusSelect.value = '';
+      sectorSelect.value = '';
+      trailSelect.innerHTML = '<option value="">-- Sélectionner d\'abord un secteur --</option>';
+      comments.value = '';
+      
+      removePhoto();
+      clearValidation();
+      
+      saveBtn.style.display = '';
+      modifyBtn.style.display = 'none';
+    }
+
+    // Photo handling
+    function handlePhotoSelect(e) {
+      const file = e.target.files[0];
+      if (!file) return;
+      
+      photoFile = file;
+      const reader = new FileReader();
+      reader.onload = (ev) => {
+        photoPreview.src = ev.target.result;
+        photoPreviewContainer.classList.add('show');
+      };
+      reader.readAsDataURL(file);
+    }
+
+    function removePhoto() {
+      photoFile = null;
+      photoUrl = null;
+      photoInput.value = '';
+      photoPreview.src = '';
+      photoPreviewContainer.classList.remove('show');
+    }
+
+    async function uploadPhoto(file) {
+      const timestamp = Date.now();
+      const fileName = `signalisations/${currentUser.uid}/${timestamp}_photo.jpg`;
+      const ref = storage.ref(fileName);
+      
+      // Compress if needed
+      let uploadFile = file;
+      if (file.size > 1024 * 1024) {
+        uploadFile = await compressImage(file, 0.7, 1200);
+      }
+      
+      await ref.put(uploadFile);
+      return await ref.getDownloadURL();
+    }
+
+    function compressImage(file, quality, maxWidth) {
+      return new Promise((resolve) => {
+        const canvas = document.createElement('canvas');
+        const ctx = canvas.getContext('2d');
+        const img = new Image();
+        
+        img.onload = () => {
+          let w = img.width, h = img.height;
+          if (w > maxWidth) {
+            h = h * maxWidth / w;
+            w = maxWidth;
+          }
+          canvas.width = w;
+          canvas.height = h;
+          ctx.drawImage(img, 0, 0, w, h);
+          canvas.toBlob(resolve, 'image/jpeg', quality);
+        };
+        img.src = URL.createObjectURL(file);
+      });
+    }
+
+    // Validation
+    function validateForm() {
+      let isValid = true;
+      clearValidation();
+      
+      // Date & Time
+      if (!reportDate.value) {
+        reportDate.classList.add('is-invalid');
+        isValid = false;
+      }
+      if (!reportTime.value) {
+        reportTime.classList.add('is-invalid');
+        isValid = false;
+      }
+      
+      // Status OR Photo required
+      const hasStatus = statusSelect.value !== '';
+      const hasPhoto = photoFile || photoUrl;
+      if (!hasStatus && !hasPhoto) {
+        statusSelect.classList.add('is-invalid');
+        photoBtn.classList.add('is-invalid');
+        showToast('Un statut OU une photo est requis', 'error');
+        isValid = false;
+      }
+      
+      // Sector & Trail
+      if (!sectorSelect.value) {
+        sectorSelect.classList.add('is-invalid');
+        isValid = false;
+      }
+      if (!trailSelect.value) {
+        trailSelect.classList.add('is-invalid');
+        isValid = false;
+      }
+      
+      return isValid;
+    }
+
+    function clearValidation() {
+      [reportDate, reportTime, statusSelect, photoBtn, sectorSelect, trailSelect].forEach(el => {
+        el.classList.remove('is-invalid');
+      });
+    }
+
+    // Submit
+    async function handleSubmit(e) {
+      e.preventDefault();
+      if (!isNewReport) return;
+      if (!validateForm()) return;
+      
+      saveBtn.disabled = true;
+      saveBtn.textContent = 'Enregistrement...';
+      
+      try {
+        // Upload photo if any
+        let uploadedPhotoUrl = null;
+        if (photoFile) {
+          uploadedPhotoUrl = await uploadPhoto(photoFile);
+        }
+        
+        const reportData = {
+          inspectorId: currentUser.uid,
+          inspectorName: inspectorName.value,
+          status: statusSelect.value || null,
+          statusDisplayName: statusSelect.value ? STATUS_LABELS[statusSelect.value] : null,
+          photoUrl: uploadedPhotoUrl || null,
+          sector: sectorSelect.value,
+          sectorDisplayName: TRAILS_DATA[sectorSelect.value]?.name || sectorSelect.value,
+          trail: trailSelect.value,
+          comments: comments.value.trim() || null,
+          resolved: false,
+          archived: false,
+          adminComments: null,
+          createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+          modifiedAt: firebase.firestore.FieldValue.serverTimestamp()
+        };
+        
+        await db.collection('signalisations').add(reportData);
+        
+        showToast('Rapport enregistré avec succès', 'success');
+        resetForm();
+        loadUserReports();
+        
+      } catch (e) {
+        console.error('Error saving report:', e);
+        showToast('Erreur lors de l\'enregistrement: ' + e.message, 'error');
+      } finally {
+        saveBtn.disabled = false;
+        saveBtn.textContent = 'Enregistrer';
+      }
+    }
+
+    async function handleModify() {
+      if (!currentReportId) return;
+      if (!validateForm()) return;
+      
+      modifyBtn.disabled = true;
+      modifyBtn.textContent = 'Modification...';
+      
+      try {
+        // Upload new photo if changed
+        let uploadedPhotoUrl = photoUrl;
+        if (photoFile) {
+          uploadedPhotoUrl = await uploadPhoto(photoFile);
+        }
+        
+        const updateData = {
+          status: statusSelect.value || null,
+          statusDisplayName: statusSelect.value ? STATUS_LABELS[statusSelect.value] : null,
+          photoUrl: uploadedPhotoUrl || null,
+          sector: sectorSelect.value,
+          sectorDisplayName: TRAILS_DATA[sectorSelect.value]?.name || sectorSelect.value,
+          trail: trailSelect.value,
+          comments: comments.value.trim() || null,
+          modifiedAt: firebase.firestore.FieldValue.serverTimestamp()
+        };
+        
+        await db.collection('signalisations').doc(currentReportId).update(updateData);
+        
+        showToast('Rapport modifié avec succès', 'success');
+        loadUserReports();
+        
+      } catch (e) {
+        console.error('Error updating report:', e);
+        showToast('Erreur lors de la modification: ' + e.message, 'error');
+      } finally {
+        modifyBtn.disabled = false;
+        modifyBtn.textContent = 'Modifier';
+      }
+    }
+
+    document.addEventListener('DOMContentLoaded', initApp);
+  </script>
+</body>
+</html>
