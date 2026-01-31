@@ -2,14 +2,6 @@
 All in one app for inspection, signalisation, infraction, ...
 
 
-
-
-
-I did a hard refresch. THere is seems to be a divider  (there is the proper spacing) but divider is not visible like it is in the "gestion " page... Strange.
-link top left of the pages should not exist (like Inspection). Could you remove it in Infraction app pages ?
-
-
-
 Phase 4: Signalisation Module
 4.1 Signalisation reportStatus/photo capture form
 4.2 Signalisation adminList, resolve, archive
