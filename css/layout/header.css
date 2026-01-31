@@ -80,7 +80,7 @@
 }
 
 .nav__divider {
-  width: 1px;
+  width: 2px;
   height: 24px;
   margin: 0 var(--space-2);
   background-color: rgba(255, 255, 255, 0.3);
