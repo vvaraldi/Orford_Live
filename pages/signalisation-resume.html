@@ -60,6 +60,16 @@
     .detail-description { background: var(--theme-surface-alt); padding: 0.75rem; border-radius: var(--radius-md); white-space: pre-wrap; font-size: 0.875rem; }
     .photo-location { margin-top: 0.5rem; font-size: 0.8rem; }
     .photo-location a { color: var(--theme-accent); margin-right: 1rem; }
+
+    /* Modal */
+    .detail-modal { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 1000; align-items: center; justify-content: center; padding: 1rem; }
+    .detail-modal.show { display: flex; }
+    .detail-modal__content { background: var(--theme-surface); border-radius: var(--radius-lg); max-width: 600px; width: 100%; max-height: 90vh; overflow: hidden; display: flex; flex-direction: column; }
+    .detail-modal__header { display: flex; align-items: center; justify-content: space-between; padding: 1rem; border-bottom: 1px solid var(--theme-border); }
+    .detail-modal__title { font-size: 1.125rem; font-weight: 600; }
+    .detail-modal__close { background: none; border: none; font-size: 1.5rem; cursor: pointer; color: var(--theme-text-secondary); }
+    .detail-modal__body { padding: 1rem; overflow-y: auto; flex: 1; }
+    .detail-modal__footer { display: flex; gap: 1rem; justify-content: flex-end; padding: 1rem; border-top: 1px solid var(--theme-border); }
   </style>
 </head>
 <body data-theme="light" data-module="signalisation">
