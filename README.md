@@ -17,6 +17,11 @@ Inspection Randonnée - Pink
 
 Phase 4: Signalisation Module
 4.1 debug !
+In the signalisation-admin.html, at the bottom left there is allways the same boxes as in the modal view :  "Details du rapport
+x
+Résolu   Archivé
+Enregistrer Ferner"
+It shouldn't be there !
 
 Phase 5: Public Status + Polish
 5.1 Public status pageTrail status (no auth required)

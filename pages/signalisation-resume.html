@@ -3,16 +3,40 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="description" content="Gestion Signalisation - Orford Live">
+  <meta name="description" content="Résumé Signalisation - Orford Live">
   <meta name="theme-color" content="#f59e0b">
-  <title>Gestion Signalisation - Orford Live</title>
+  <title>Résumé Signalisation - Orford Live</title>
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🚧</text></svg>">
   <link rel="stylesheet" href="../css/main.css">
   <style>
-    .filters-bar { display: flex; flex-wrap: wrap; gap: 1rem; align-items: center; }
-    .filters-bar .form-select { width: auto; min-width: 150px; }
-    .filters-bar label { display: flex; align-items: center; gap: 0.5rem; font-size: 0.875rem; cursor: pointer; }
-    
+    /* Map section */
+    .map-section { background: var(--theme-surface); border: 1px solid var(--theme-border); border-radius: var(--radius-lg); overflow: hidden; margin-bottom: 1.5rem; }
+    .map-header { display: flex; align-items: center; justify-content: space-between; padding: 1rem; border-bottom: 1px solid var(--theme-border); }
+    .map-header__title { font-size: 1.125rem; font-weight: 600; display: flex; align-items: center; gap: 0.5rem; }
+    .map-header__count { font-size: 0.875rem; color: var(--theme-text-secondary); }
+
+    /* Map container */
+    .map-container { position: relative; width: 100%; overflow: auto; background: var(--theme-surface-alt); max-height: 500px; }
+    .map-wrapper { position: relative; display: inline-block; }
+    .map-image { display: block; width: auto; height: auto; max-width: none; }
+
+    /* Map markers */
+    .map-marker { position: absolute; width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 14px; color: white; cursor: pointer; transform: translate(-50%, -50%); transition: transform 0.2s ease; z-index: 10; border: 2px solid white; box-shadow: 0 2px 6px rgba(0,0,0,0.3); }
+    .map-marker:hover { transform: translate(-50%, -50%) scale(1.15); z-index: 20; }
+    .map-marker--open { background: #10b981; }
+    .map-marker--warning { background: #f59e0b; }
+    .map-marker--closed { background: #ef4444; }
+    .map-marker--unknown { background: #6b7280; }
+
+    /* Legend */
+    .map-legend { display: flex; gap: 1.5rem; padding: 0.75rem 1rem; background: var(--theme-surface-alt); border-top: 1px solid var(--theme-border); font-size: 0.75rem; flex-wrap: wrap; }
+    .legend-item { display: flex; align-items: center; gap: 0.5rem; }
+    .legend-dot { width: 12px; height: 12px; border-radius: 50%; }
+    .legend-dot--open { background: #10b981; }
+    .legend-dot--warning { background: #f59e0b; }
+    .legend-dot--closed { background: #ef4444; }
+
+    /* Reports table */
     .data-table { width: 100%; border-collapse: collapse; }
     .data-table th, .data-table td { padding: 0.75rem; text-align: left; border-bottom: 1px solid var(--theme-border); }
     .data-table th { background: var(--theme-surface-alt); font-weight: 600; font-size: 0.75rem; text-transform: uppercase; }
@@ -22,12 +46,10 @@
     .badge--open { background: #d1fae5; color: #065f46; }
     .badge--warning { background: #fef3c7; color: #92400e; }
     .badge--closed { background: #fee2e2; color: #991b1b; }
-    .badge--resolved { background: #dbeafe; color: #1e40af; }
-    .badge--archived { background: #e5e7eb; color: #374151; }
-    .status-badges { display: flex; gap: 0.25rem; flex-wrap: wrap; }
     
     .empty-row td { text-align: center; padding: 2rem; color: var(--theme-text-secondary); }
-    
+
+    /* Detail sections in modal */
     .detail-section { margin-bottom: 1.5rem; }
     .detail-section h4 { font-size: 0.875rem; font-weight: 600; color: var(--theme-accent); margin-bottom: 0.75rem; display: flex; align-items: center; gap: 0.5rem; }
     .detail-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 0.75rem; }
@@ -36,13 +58,8 @@
     .detail-item strong { color: var(--theme-text-secondary); font-weight: 500; display: block; margin-bottom: 0.25rem; }
     .detail-photo { max-width: 100%; max-height: 300px; border-radius: var(--radius-md); border: 1px solid var(--theme-border); cursor: pointer; }
     .detail-description { background: var(--theme-surface-alt); padding: 0.75rem; border-radius: var(--radius-md); white-space: pre-wrap; font-size: 0.875rem; }
-    
     .photo-location { margin-top: 0.5rem; font-size: 0.8rem; }
     .photo-location a { color: var(--theme-accent); margin-right: 1rem; }
-    
-    .modal-checkboxes { display: flex; gap: 1.5rem; }
-    .modal-checkboxes label { display: flex; align-items: center; gap: 0.5rem; cursor: pointer; font-size: 0.875rem; }
-    .modal-checkboxes input[type="checkbox"] { width: 18px; height: 18px; }
   </style>
 </head>
 <body data-theme="light" data-module="signalisation">
@@ -54,8 +71,8 @@
       <a href="../index.html" class="nav__link"><span>🏠</span><span>Portail</span></a>
       <div class="nav__divider"></div>
       <a href="signalisation-report.html" class="nav__link"><span>📝</span><span>Rapport</span></a>
-      <a href="signalisation-resume.html" class="nav__link"><span>🗺️</span><span>Résumé</span></a>
-      <a href="signalisation-admin.html" class="nav__link is-active"><span>📋</span><span>Gestion</span></a>
+      <a href="signalisation-resume.html" class="nav__link is-active"><span>🗺️</span><span>Résumé</span></a>
+      <a href="signalisation-admin.html" class="nav__link nav__link--admin" style="display:none;"><span>📋</span><span>Gestion</span></a>
       <div class="nav__divider"></div>
       <button class="theme-toggle" onclick="window.themeManager.toggle()" aria-label="Changer le thème">
         <svg class="theme-toggle__icon theme-toggle__icon--moon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg>
@@ -82,8 +99,8 @@
     <div class="mobile-nav__divider"></div>
     <div class="mobile-nav__section">
       <a href="signalisation-report.html" class="mobile-nav__link"><span class="mobile-nav__link-icon">📝</span><span>Rapport</span></a>
-      <a href="signalisation-resume.html" class="mobile-nav__link"><span class="mobile-nav__link-icon">🗺️</span><span>Résumé</span></a>
-      <a href="signalisation-admin.html" class="mobile-nav__link is-active"><span class="mobile-nav__link-icon">📋</span><span>Gestion</span></a>
+      <a href="signalisation-resume.html" class="mobile-nav__link is-active"><span class="mobile-nav__link-icon">🗺️</span><span>Résumé</span></a>
+      <a href="signalisation-admin.html" class="mobile-nav__link mobile-nav__link--admin" style="display:none;"><span class="mobile-nav__link-icon">📋</span><span>Gestion</span></a>
     </div>
     <div class="mobile-nav__divider"></div>
     <div class="mobile-nav__section"><a href="#" class="mobile-nav__link" onclick="handleLogout(); return false;"><span class="mobile-nav__link-icon">🚪</span><span>Déconnexion</span></a></div>
@@ -92,30 +109,32 @@
   <div id="loading" class="page-loading"><div class="loading-spinner"></div><p class="loading-text">Chargement...</p></div>
 
   <main id="main-content" class="main" style="display:none;">
-    <div class="page-header"><div class="page-header__content"><h1 class="page-title">Gestion des signalisations</h1><p class="page-subtitle">Consulter et gérer tous les rapports</p></div></div>
+    <div class="page-header"><div class="page-header__content"><h1 class="page-title">Résumé des signalisations</h1><p class="page-subtitle">Vue d'ensemble des rapports actifs</p></div></div>
 
+    <!-- Map Section -->
+    <section class="map-section">
+      <div class="map-header">
+        <h2 class="map-header__title">🗺️ Carte des signalisations</h2>
+        <span class="map-header__count" id="map-count">0 rapport(s) avec localisation</span>
+      </div>
+      <div class="map-container" id="map-container">
+        <div class="map-wrapper" id="map-wrapper">
+          <img src="../assets/map/map3.png" alt="Carte Mont Orford" class="map-image" id="map-image">
+        </div>
+      </div>
+      <div class="map-legend">
+        <div class="legend-item"><span class="legend-dot legend-dot--open"></span><span>Ouverte</span></div>
+        <div class="legend-item"><span class="legend-dot legend-dot--warning"></span><span>Attention requise</span></div>
+        <div class="legend-item"><span class="legend-dot legend-dot--closed"></span><span>Fermée</span></div>
+      </div>
+    </section>
+
+    <!-- Reports List -->
     <section class="content-section">
       <div class="section-card">
         <div class="section-card__header">
-          <h2 class="section-card__title">📋 Liste des rapports</h2>
-          <div class="filters-bar">
-            <select class="form-select" id="filter-sector">
-              <option value="">Tous les secteurs</option>
-              <option value="mont-orford">Mont-Orford</option>
-              <option value="mont-giroux-nord">Mont Giroux Nord</option>
-              <option value="mont-giroux-est">Mont Giroux Est</option>
-              <option value="alfred-desrochers">Mont Alfred-DesRochers</option>
-              <option value="remontees">Remontées mécaniques</option>
-              <option value="randonnee-alpine">Randonnée alpine</option>
-            </select>
-            <select class="form-select" id="sort-by">
-              <option value="date">Trier par date</option>
-              <option value="sector">Trier par secteur</option>
-            </select>
-            <label><input type="checkbox" id="show-resolved"> Résolus</label>
-            <label><input type="checkbox" id="show-archived"> Archivés</label>
-            <button class="btn btn-secondary btn-sm" id="refresh-btn">🔄</button>
-          </div>
+          <h2 class="section-card__title">📋 Rapports actifs</h2>
+          <span id="reports-count" style="font-size:0.875rem;color:var(--theme-text-secondary);">0 rapport(s)</span>
         </div>
         <div class="section-card__body" style="padding:0;">
           <div class="table-responsive">
@@ -127,11 +146,10 @@
                   <th>Piste</th>
                   <th>Statut</th>
                   <th>Inspecteur</th>
-                  <th>État</th>
                 </tr>
               </thead>
               <tbody id="reports-tbody">
-                <tr class="empty-row"><td colspan="6">Chargement...</td></tr>
+                <tr class="empty-row"><td colspan="5">Chargement...</td></tr>
               </tbody>
             </table>
           </div>
@@ -149,14 +167,7 @@
       </div>
       <div class="detail-modal__body" id="modal-body"></div>
       <div class="detail-modal__footer">
-        <div class="modal-checkboxes">
-          <label><input type="checkbox" id="modal-resolved"> Résolu</label>
-          <label><input type="checkbox" id="modal-archived"> Archivé</label>
-        </div>
-        <div class="detail-modal__actions">
-          <button class="btn btn-primary" onclick="saveChanges()">💾 Enregistrer</button>
-          <button class="btn btn-secondary" onclick="closeModal()">Fermer</button>
-        </div>
+        <button class="btn btn-secondary" onclick="closeModal()">Fermer</button>
       </div>
     </div>
   </div>
@@ -195,74 +206,146 @@
       'fermee': 'badge--closed'
     };
 
+    const STATUS_MARKER_CLASS = {
+      'ouverte': 'map-marker--open',
+      'attention-requise': 'map-marker--warning',
+      'fermee': 'map-marker--closed'
+    };
+
     let reportsData = [];
     let currentReportId = null;
-    let showResolved = false;
-    let showArchived = false;
-    let filterSector = '';
-    let sortBy = 'date';
+
+    // GPS to pixel conversion (same as inspection-dashboard)
+    const MAP_WIDTH = 800, MAP_HEIGHT = 700;
+    const calibration = {
+      topLeft:    { lat: 45.296611, lon: -72.243361, x: 0, y: 0 },
+      topRight:   { lat: 45.325861, lon: -72.249972, x: MAP_WIDTH, y: 0 },
+      bottomLeft: { lat: 45.299444, lon: -72.205667, x: 0, y: MAP_HEIGHT }
+    };
+
+    function solveSystem(m) {
+      const det = m[0][0] * (m[1][1] * m[2][2] - m[1][2] * m[2][1])
+                - m[0][1] * (m[1][0] * m[2][2] - m[1][2] * m[2][0])
+                + m[0][2] * (m[1][0] * m[2][1] - m[1][1] * m[2][0]);
+      if (Math.abs(det) < 1e-10) return [0, 0, 0];
+      const detX = m[0][3] * (m[1][1] * m[2][2] - m[1][2] * m[2][1])
+                 - m[0][1] * (m[1][3] * m[2][2] - m[1][2] * m[2][3])
+                 + m[0][2] * (m[1][3] * m[2][1] - m[1][1] * m[2][3]);
+      const detY = m[0][0] * (m[1][3] * m[2][2] - m[1][2] * m[2][3])
+                 - m[0][3] * (m[1][0] * m[2][2] - m[1][2] * m[2][0])
+                 + m[0][2] * (m[1][0] * m[2][3] - m[1][3] * m[2][0]);
+      const detZ = m[0][0] * (m[1][1] * m[2][3] - m[1][3] * m[2][1])
+                 - m[0][1] * (m[1][0] * m[2][3] - m[1][3] * m[2][0])
+                 + m[0][3] * (m[1][0] * m[2][1] - m[1][1] * m[2][0]);
+      return [detX / det, detY / det, detZ / det];
+    }
+
+    const p1 = calibration.topLeft, p2 = calibration.topRight, p3 = calibration.bottomLeft;
+    const matrixX = [[p1.lat, p1.lon, 1, p1.x], [p2.lat, p2.lon, 1, p2.x], [p3.lat, p3.lon, 1, p3.x]];
+    const matrixY = [[p1.lat, p1.lon, 1, p1.y], [p2.lat, p2.lon, 1, p2.y], [p3.lat, p3.lon, 1, p3.y]];
+    const coeffsX = solveSystem(matrixX);
+    const coeffsY = solveSystem(matrixY);
+    const transform = { a: coeffsX[0], b: coeffsX[1], c: coeffsX[2], d: coeffsY[0], e: coeffsY[1], f: coeffsY[2] };
+
+    function gpsToPixel(lat, lon) {
+      const x = Math.round(transform.a * lat + transform.b * lon + transform.c);
+      const y = Math.round(transform.d * lat + transform.e * lon + transform.f);
+      return { x: Math.max(0, Math.min(MAP_WIDTH, x)), y: Math.max(0, Math.min(MAP_HEIGHT, y)) };
+    }
 
     function escapeHtml(str) {
       if (!str) return '';
       return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
     }
 
-    function initSignalisationAdmin() {
+    function initSignalisationResume() {
       checkAuthStatus({
         requireAuth: true,
-        requireAdmin: true,
+        requiredPermission: 'allowSignalisation',
+        permissionDefault: false,
         onAuthenticated: (userData) => {
-          bindEvents();
+          // Show admin link if admin
+          if (userData.role === 'admin' || userData.role === 'system_admin') {
+            document.querySelectorAll('.nav__link--admin, .mobile-nav__link--admin').forEach(el => el.style.display = '');
+          }
           loadReports();
         }
       });
     }
 
-    function bindEvents() {
-      document.getElementById('filter-sector').addEventListener('change', (e) => { filterSector = e.target.value; renderReports(); });
-      document.getElementById('sort-by').addEventListener('change', (e) => { sortBy = e.target.value; renderReports(); });
-      document.getElementById('show-resolved').addEventListener('change', (e) => { showResolved = e.target.checked; loadReports(); });
-      document.getElementById('show-archived').addEventListener('change', (e) => { showArchived = e.target.checked; loadReports(); });
-      document.getElementById('refresh-btn').addEventListener('click', loadReports);
-    }
-
     async function loadReports() {
       try {
-        const snap = await db.collection('signalisations').orderBy('createdAt', 'desc').get();
+        // Load only active reports (not resolved, not archived)
+        const snap = await db.collection('signalisations')
+          .where('resolved', '==', false)
+          .where('archived', '==', false)
+          .orderBy('createdAt', 'desc')
+          .get();
         
         reportsData = [];
         snap.forEach(doc => {
-          const data = { id: doc.id, ...doc.data() };
-          if (!showResolved && data.resolved === true) return;
-          if (!showArchived && data.archived === true) return;
-          reportsData.push(data);
+          reportsData.push({ id: doc.id, ...doc.data() });
         });
         
-        renderReports();
+        renderMapMarkers();
+        renderReportsTable();
       } catch (e) {
         console.error('Error loading reports:', e);
-        document.getElementById('reports-tbody').innerHTML = '<tr class="empty-row"><td colspan="6" style="color:#ef4444;">Erreur de chargement</td></tr>';
+        // Fallback: try without compound query (might need index)
+        try {
+          const snap = await db.collection('signalisations').orderBy('createdAt', 'desc').get();
+          reportsData = [];
+          snap.forEach(doc => {
+            const data = doc.data();
+            if (data.resolved !== true && data.archived !== true) {
+              reportsData.push({ id: doc.id, ...data });
+            }
+          });
+          renderMapMarkers();
+          renderReportsTable();
+        } catch (e2) {
+          console.error('Error loading reports (fallback):', e2);
+          document.getElementById('reports-tbody').innerHTML = '<tr class="empty-row"><td colspan="5" style="color:#ef4444;">Erreur de chargement</td></tr>';
+        }
       }
     }
 
-    function renderReports() {
+    function renderMapMarkers() {
+      const wrapper = document.getElementById('map-wrapper');
+      // Remove existing markers
+      wrapper.querySelectorAll('.map-marker').forEach(m => m.remove());
+      
+      // Filter reports with GPS coordinates
+      const reportsWithGps = reportsData.filter(r => r.coordinates && r.coordinates.latitude && r.coordinates.longitude);
+      document.getElementById('map-count').textContent = `${reportsWithGps.length} rapport(s) avec localisation`;
+      
+      // Add markers
+      reportsWithGps.forEach((report, index) => {
+        const pixel = gpsToPixel(report.coordinates.latitude, report.coordinates.longitude);
+        
+        const marker = document.createElement('div');
+        marker.className = 'map-marker';
+        marker.classList.add(STATUS_MARKER_CLASS[report.status] || 'map-marker--unknown');
+        marker.style.left = pixel.x + 'px';
+        marker.style.top = pixel.y + 'px';
+        marker.textContent = index + 1;
+        marker.title = `${report.trail || 'N/A'} - ${STATUS_LABELS[report.status] || 'Inconnu'}`;
+        marker.onclick = () => openDetailModal(report.id);
+        
+        wrapper.appendChild(marker);
+      });
+    }
+
+    function renderReportsTable() {
       const tbody = document.getElementById('reports-tbody');
+      document.getElementById('reports-count').textContent = `${reportsData.length} rapport(s)`;
       
-      let filtered = [...reportsData];
-      if (filterSector) filtered = filtered.filter(r => r.sector === filterSector);
-      
-      if (sortBy === 'date') {
-        filtered.sort((a, b) => (b.createdAt?.toDate?.() || 0) - (a.createdAt?.toDate?.() || 0));
-      } else if (sortBy === 'sector') {
-        filtered.sort((a, b) => (a.sector || '').localeCompare(b.sector || ''));
-      }
-      
-      if (filtered.length === 0) {
-        tbody.innerHTML = '<tr class="empty-row"><td colspan="6">Aucun rapport trouvé</td></tr>';
+      if (reportsData.length === 0) {
+        tbody.innerHTML = '<tr class="empty-row"><td colspan="5">Aucun rapport actif</td></tr>';
         return;
       }
       
-      tbody.innerHTML = filtered.map(r => {
+      tbody.innerHTML = reportsData.map(r => {
         const date = r.createdAt?.toDate?.();
         const dateStr = date ? date.toLocaleDateString('fr-CA', { year: 'numeric', month: 'short', day: 'numeric' }) : '-';
         const sectorName = r.sectorDisplayName || TRAILS_DATA[r.sector]?.name || r.sector || '-';
@@ -273,20 +356,16 @@
           statusHtml = `<span class="badge ${badgeClass}">${STATUS_LABELS[r.status] || r.status}</span>`;
         }
         
-        let etatBadges = [];
-        if (r.resolved) etatBadges.push('<span class="badge badge--resolved">Résolu</span>');
-        if (r.archived) etatBadges.push('<span class="badge badge--archived">Archivé</span>');
-        const etatHtml = etatBadges.length ? `<div class="status-badges">${etatBadges.join('')}</div>` : '<span style="color:var(--theme-text-secondary);">Actif</span>';
-        
-        return `<tr data-id="${r.id}"><td>${dateStr}</td><td>${escapeHtml(sectorName)}</td><td>${escapeHtml(r.trail || '-')}</td><td>${statusHtml}</td><td>${escapeHtml(r.inspectorName || '-')}</td><td>${etatHtml}</td></tr>`;
+        return `<tr data-id="${r.id}"><td>${dateStr}</td><td>${escapeHtml(sectorName)}</td><td>${escapeHtml(r.trail || '-')}</td><td>${statusHtml}</td><td>${escapeHtml(r.inspectorName || '-')}</td></tr>`;
       }).join('');
       
+      // Bind row clicks
       tbody.querySelectorAll('tr[data-id]').forEach(row => {
-        row.addEventListener('click', () => openDetail(row.dataset.id));
+        row.addEventListener('click', () => openDetailModal(row.dataset.id));
       });
     }
 
-    function openDetail(id) {
+    function openDetailModal(id) {
       currentReportId = id;
       const r = reportsData.find(rep => rep.id === id);
       if (!r) return;
@@ -330,7 +409,7 @@
           <h4>📷 Photo</h4>
           ${photoHtml}
         </div>
-        ${r.comments ? `<div class="detail-section"><h4>💬 Commentaires de l'inspecteur</h4><div class="detail-description">${escapeHtml(r.comments)}</div></div>` : ''}
+        ${r.comments ? `<div class="detail-section"><h4>💬 Commentaires</h4><div class="detail-description">${escapeHtml(r.comments)}</div></div>` : ''}
         <div class="detail-section">
           <h4>👤 Informations</h4>
           <div class="detail-grid">
@@ -339,15 +418,7 @@
           </div>
           ${modifiedStr ? `<p style="font-size:0.75rem;color:var(--theme-text-secondary);margin-top:0.5rem;">Modifié le: ${modifiedStr}</p>` : ''}
         </div>
-        <div class="detail-section">
-          <h4>📝 Commentaires administratifs</h4>
-          <textarea class="form-textarea" id="admin-comments" rows="3" placeholder="Ajouter un commentaire...">${escapeHtml(r.adminComments || '')}</textarea>
-          ${r.adminModifiedAt ? `<p style="font-size:0.75rem;color:var(--theme-text-secondary);margin-top:0.25rem;">Dernière modification: ${r.adminModifiedAt.toDate?.()?.toLocaleDateString('fr-CA', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) || ''}</p>` : ''}
-        </div>
       `;
-      
-      document.getElementById('modal-resolved').checked = r.resolved || false;
-      document.getElementById('modal-archived').checked = r.archived || false;
       
       document.getElementById('detail-modal').classList.add('show');
       document.body.style.overflow = 'hidden';
@@ -359,74 +430,8 @@
       currentReportId = null;
     }
 
-    async function saveChanges() {
-      if (!currentReportId) return;
-      
-      const adminComments = document.getElementById('admin-comments').value.trim();
-      const resolved = document.getElementById('modal-resolved').checked;
-      const archived = document.getElementById('modal-archived').checked;
-      
-      try {
-        const updateData = {
-          adminComments: adminComments || null,
-          resolved: resolved,
-          archived: archived,
-          adminModifiedAt: firebase.firestore.FieldValue.serverTimestamp()
-        };
-        
-        if (resolved) updateData.resolvedAt = firebase.firestore.FieldValue.serverTimestamp();
-        if (archived) updateData.archivedAt = firebase.firestore.FieldValue.serverTimestamp();
-        
-        await db.collection('signalisations').doc(currentReportId).update(updateData);
-        
-        showToast('Modifications enregistrées', 'success');
-        closeModal();
-        loadReports();
-      } catch (e) {
-        console.error('Error saving:', e);
-        showToast('Erreur lors de l\'enregistrement', 'error');
-      }
-    }
-
-    // PhotoMapModal for GPS location display (same as inspection-history)
+    // PhotoMapModal for GPS location display
     const PhotoMapModal = (function() {
-      const MAP_WIDTH = 800, MAP_HEIGHT = 700;
-      const calibration = {
-        topLeft:    { lat: 45.296611, lon: -72.243361, x: 0, y: 0 },
-        topRight:   { lat: 45.325861, lon: -72.249972, x: MAP_WIDTH, y: 0 },
-        bottomLeft: { lat: 45.299444, lon: -72.205667, x: 0, y: MAP_HEIGHT }
-      };
-      
-      function solveSystem(m) {
-        const det = m[0][0] * (m[1][1] * m[2][2] - m[1][2] * m[2][1])
-                  - m[0][1] * (m[1][0] * m[2][2] - m[1][2] * m[2][0])
-                  + m[0][2] * (m[1][0] * m[2][1] - m[1][1] * m[2][0]);
-        if (Math.abs(det) < 1e-10) return [0, 0, 0];
-        const detX = m[0][3] * (m[1][1] * m[2][2] - m[1][2] * m[2][1])
-                   - m[0][1] * (m[1][3] * m[2][2] - m[1][2] * m[2][3])
-                   + m[0][2] * (m[1][3] * m[2][1] - m[1][1] * m[2][3]);
-        const detY = m[0][0] * (m[1][3] * m[2][2] - m[1][2] * m[2][3])
-                   - m[0][3] * (m[1][0] * m[2][2] - m[1][2] * m[2][0])
-                   + m[0][2] * (m[1][0] * m[2][3] - m[1][3] * m[2][0]);
-        const detZ = m[0][0] * (m[1][1] * m[2][3] - m[1][3] * m[2][1])
-                   - m[0][1] * (m[1][0] * m[2][3] - m[1][3] * m[2][0])
-                   + m[0][3] * (m[1][0] * m[2][1] - m[1][1] * m[2][0]);
-        return [detX / det, detY / det, detZ / det];
-      }
-      
-      const p1 = calibration.topLeft, p2 = calibration.topRight, p3 = calibration.bottomLeft;
-      const matrixX = [[p1.lat, p1.lon, 1, p1.x], [p2.lat, p2.lon, 1, p2.x], [p3.lat, p3.lon, 1, p3.x]];
-      const matrixY = [[p1.lat, p1.lon, 1, p1.y], [p2.lat, p2.lon, 1, p2.y], [p3.lat, p3.lon, 1, p3.y]];
-      const coeffsX = solveSystem(matrixX);
-      const coeffsY = solveSystem(matrixY);
-      const transform = { a: coeffsX[0], b: coeffsX[1], c: coeffsX[2], d: coeffsY[0], e: coeffsY[1], f: coeffsY[2] };
-      
-      function gpsToPixel(lat, lon) {
-        const x = Math.round(transform.a * lat + transform.b * lon + transform.c);
-        const y = Math.round(transform.d * lat + transform.e * lon + transform.f);
-        return { x: Math.max(0, Math.min(MAP_WIDTH, x)), y: Math.max(0, Math.min(MAP_HEIGHT, y)) };
-      }
-      
       function open(lat, lon) {
         let modal = document.getElementById('photo-map-modal');
         if (!modal) {
@@ -467,7 +472,7 @@
     window.openPhotoLocationModal = PhotoMapModal.open;
     window.PhotoMapModal = PhotoMapModal;
 
-    document.addEventListener('DOMContentLoaded', initSignalisationAdmin);
+    document.addEventListener('DOMContentLoaded', initSignalisationResume);
   </script>
 </body>
 </html>
