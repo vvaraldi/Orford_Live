@@ -234,9 +234,9 @@
     };
 
     // State
-    let currentUser = null;
-    let currentUserData = null;
-    let db, storage;
+    let signCurrentUser = null;
+    let signCurrentUserData = null;
+    let signDb, signStorage;
     let userReports = [];
     let currentReportId = null;
     let isNewReport = true;
@@ -272,15 +272,15 @@
 
     // Initialize
     function initApp() {
-      db = firebase.firestore();
-      storage = firebase.storage();
+      signDb = firebase.firestore();
+      signStorage = firebase.storage();
 
       checkAuthStatus({
         requiredPermission: 'allowSignalisation',
         permissionDefault: false,
         onAuthenticated: (userData) => {
-          currentUser = firebase.auth().currentUser;
-          currentUserData = userData;
+          signCurrentUser = firebase.auth().currentUser;
+          signCurrentUserData = userData;
           
           document.getElementById('loading').style.display = 'none';
           document.getElementById('main-content').style.display = '';
@@ -323,7 +323,7 @@
     }
 
     function setDefaultValues() {
-      inspectorName.value = currentUserData.name || currentUser.email;
+      inspectorName.value = signCurrentUserData.name || signCurrentUser.email;
       
       const now = new Date();
       reportDate.value = now.toISOString().split('T')[0];
@@ -344,8 +344,8 @@
     // Load user's past reports
     async function loadUserReports() {
       try {
-        const snap = await db.collection('signalisations')
-          .where('inspectorId', '==', currentUser.uid)
+        const snap = await signDb.collection('signalisations')
+          .where('inspectorId', '==', signCurrentUser.uid)
           .orderBy('createdAt', 'desc')
           .limit(50)
           .get();
@@ -458,8 +458,8 @@
 
     async function uploadPhoto(file) {
       const timestamp = Date.now();
-      const fileName = `signalisations/${currentUser.uid}/${timestamp}_photo.jpg`;
-      const ref = storage.ref(fileName);
+      const fileName = `signalisations/${signCurrentUser.uid}/${timestamp}_photo.jpg`;
+      const ref = signStorage.ref(fileName);
       
       // Compress if needed
       let uploadFile = file;
@@ -553,7 +553,7 @@
         }
         
         const reportData = {
-          inspectorId: currentUser.uid,
+          inspectorId: signCurrentUser.uid,
           inspectorName: inspectorName.value,
           status: statusSelect.value || null,
           statusDisplayName: statusSelect.value ? STATUS_LABELS[statusSelect.value] : null,
@@ -569,7 +569,7 @@
           modifiedAt: firebase.firestore.FieldValue.serverTimestamp()
         };
         
-        await db.collection('signalisations').add(reportData);
+        await signDb.collection('signalisations').add(reportData);
         
         showToast('Rapport enregistré avec succès', 'success');
         resetForm();
@@ -609,7 +609,7 @@
           modifiedAt: firebase.firestore.FieldValue.serverTimestamp()
         };
         
-        await db.collection('signalisations').doc(currentReportId).update(updateData);
+        await signDb.collection('signalisations').doc(currentReportId).update(updateData);
         
         showToast('Rapport modifié avec succès', 'success');
         loadUserReports();

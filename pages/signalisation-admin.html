@@ -222,9 +222,9 @@
     };
 
     // State
-    let currentUser = null;
-    let currentUserData = null;
-    let db;
+    let signAdminCurrentUser = null;
+    let signAdminCurrentUserData = null;
+    let signAdminDb;
     let reportsData = [];
     let currentReportId = null;
     let showResolved = false;
@@ -245,14 +245,14 @@
     }
 
     function initApp() {
-      db = firebase.firestore();
+      signAdminDb = firebase.firestore();
 
       checkAuthStatus({
         requireAuth: true,
         requireAdmin: true,
         onAuthenticated: (userData) => {
-          currentUser = firebase.auth().currentUser;
-          currentUserData = userData;
+          signAdminCurrentUser = firebase.auth().currentUser;
+          signAdminCurrentUserData = userData;
           
           document.getElementById('loading').style.display = 'none';
           document.getElementById('main-content').style.display = '';
@@ -297,7 +297,7 @@
 
     async function loadReports() {
       try {
-        const snap = await db.collection('signalisations')
+        const snap = await signAdminDb.collection('signalisations')
           .orderBy('createdAt', 'desc')
           .get();
         
@@ -484,7 +484,7 @@
           updateData.archivedAt = firebase.firestore.FieldValue.serverTimestamp();
         }
         
-        await db.collection('signalisations').doc(currentReportId).update(updateData);
+        await signAdminDb.collection('signalisations').doc(currentReportId).update(updateData);
         
         showToast('Modifications enregistrées', 'success');
         closeModal();
