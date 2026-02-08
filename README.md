@@ -4,9 +4,7 @@ All in one app for inspection, signalisation, infraction, ...
 Inspection , Orford_Patrouille , Signlisation , Infraction
 In the old app... System_Admin is not recognized... should add it to the code so that all admin access are also given to system admin.
 
-signalisation :
-Uncaught SyntaxError: redeclaration of let currentUser
-    <anonymous> https://vvaraldi.github.io/Orford_Live/pages/signalisation-report.html:201
+
 
 Adjust theme colours accordiginly :
 Status Randonnée - light green
@@ -28,5 +26,4 @@ Phase 5: Public Status + Polish
 
 Phase 6: Migration Support
 6.1 Firebase rules updateIf needed for new structure
-6.2 User communicationGuide for switching apps
-6.3 Gradual rolloutRun parallel, deprecate old apps
+6.2 Gradual rolloutRun parallel, deprecate old apps

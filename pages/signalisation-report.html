@@ -20,12 +20,6 @@
     .form-actions { display: flex; gap: 1rem; margin-top: 1.5rem; }
     .form-actions .btn { flex: 1; }
     
-    .status-option { display: flex; align-items: center; gap: 0.5rem; }
-    .status-dot { width: 12px; height: 12px; border-radius: 50%; }
-    .status-dot--open { background: #10b981; }
-    .status-dot--warning { background: #f59e0b; }
-    .status-dot--closed { background: #ef4444; }
-    
     .validation-note { font-size: 0.8rem; color: var(--theme-text-secondary); margin-top: 0.5rem; padding: 0.75rem; background: var(--theme-surface-alt); border-radius: var(--radius-md); }
     
     .toast { position: fixed; bottom: 2rem; left: 50%; transform: translateX(-50%); padding: 0.75rem 1.5rem; border-radius: var(--radius-md); color: white; font-weight: 500; z-index: 1000; opacity: 0; transition: opacity 0.3s; }
@@ -153,6 +147,12 @@
               <label class="form-label" for="sector-select">Secteur *</label>
               <select class="form-select" id="sector-select" required>
                 <option value="">-- Sélectionner un secteur --</option>
+                <option value="mont-orford">Mont-Orford</option>
+                <option value="mont-giroux-nord">Mont Giroux Nord</option>
+                <option value="mont-giroux-est">Mont Giroux Est</option>
+                <option value="alfred-desrochers">Mont Alfred-DesRochers</option>
+                <option value="remontees">Remontées mécaniques</option>
+                <option value="randonnee-alpine">Randonnée alpine</option>
               </select>
             </div>
             <div class="form-group">
@@ -199,7 +199,7 @@
   <script src="../js/core/mobile-nav.js"></script>
 
   <script>
-    // Trails data (same as Infraction)
+    // Trails data
     const TRAILS_DATA = {
       'mont-orford': {
         name: 'Mont-Orford',
@@ -234,9 +234,6 @@
     };
 
     // State
-    let signCurrentUser = null;
-    let signCurrentUserData = null;
-    let signDb, signStorage;
     let userReports = [];
     let currentReportId = null;
     let isNewReport = true;
@@ -244,23 +241,10 @@
     let photoUrl = null;
 
     // Elements
-    const reportSelector = document.getElementById('report-selector');
-    const inspectorName = document.getElementById('inspector-name');
-    const reportDate = document.getElementById('report-date');
-    const reportTime = document.getElementById('report-time');
-    const statusSelect = document.getElementById('status-select');
-    const photoInput = document.getElementById('photo-input');
-    const photoBtn = document.getElementById('photo-btn');
-    const photoPreviewContainer = document.getElementById('photo-preview-container');
-    const photoPreview = document.getElementById('photo-preview');
-    const removePhotoBtn = document.getElementById('remove-photo-btn');
-    const sectorSelect = document.getElementById('sector-select');
-    const trailSelect = document.getElementById('trail-select');
-    const comments = document.getElementById('comments');
-    const saveBtn = document.getElementById('save-btn');
-    const modifyBtn = document.getElementById('modify-btn');
-    const resetBtn = document.getElementById('reset-btn');
-    const form = document.getElementById('signalisation-form');
+    let reportSelector, inspectorNameInput, reportDate, reportTime;
+    let statusSelect, photoInput, photoBtn, photoPreviewContainer, photoPreview, removePhotoBtn;
+    let sectorSelect, trailSelect, commentsInput;
+    let saveBtn, modifyBtn, resetBtn;
 
     // Toast
     function showToast(message, type = 'info') {
@@ -270,42 +254,61 @@
       setTimeout(() => toast.classList.remove('show'), 4000);
     }
 
-    // Initialize
-    function initApp() {
-      signDb = firebase.firestore();
-      signStorage = firebase.storage();
-
+    function initSignalisationReport() {
+      bindElements();
+      bindEvents();
+      
       checkAuthStatus({
+        requireAuth: true,
         requiredPermission: 'allowSignalisation',
         permissionDefault: false,
         onAuthenticated: (userData) => {
-          signCurrentUser = firebase.auth().currentUser;
-          signCurrentUserData = userData;
-          
-          document.getElementById('loading').style.display = 'none';
-          document.getElementById('main-content').style.display = '';
-          
-          // Show admin link if admin
+          // Show admin links if admin
           if (userData.role === 'admin' || userData.role === 'system_admin') {
             document.querySelectorAll('.nav__link--admin, .mobile-nav__link--admin').forEach(el => el.style.display = '');
           }
-          
-          populateSectors();
           setDefaultValues();
           loadUserReports();
-          bindEvents();
         }
       });
     }
 
-    function populateSectors() {
-      sectorSelect.innerHTML = '<option value="">-- Sélectionner un secteur --</option>';
-      Object.keys(TRAILS_DATA).forEach(key => {
-        const opt = document.createElement('option');
-        opt.value = key;
-        opt.textContent = TRAILS_DATA[key].name;
-        sectorSelect.appendChild(opt);
-      });
+    function bindElements() {
+      reportSelector = document.getElementById('report-selector');
+      inspectorNameInput = document.getElementById('inspector-name');
+      reportDate = document.getElementById('report-date');
+      reportTime = document.getElementById('report-time');
+      statusSelect = document.getElementById('status-select');
+      photoInput = document.getElementById('photo-input');
+      photoBtn = document.getElementById('photo-btn');
+      photoPreviewContainer = document.getElementById('photo-preview-container');
+      photoPreview = document.getElementById('photo-preview');
+      removePhotoBtn = document.getElementById('remove-photo-btn');
+      sectorSelect = document.getElementById('sector-select');
+      trailSelect = document.getElementById('trail-select');
+      commentsInput = document.getElementById('comments');
+      saveBtn = document.getElementById('save-btn');
+      modifyBtn = document.getElementById('modify-btn');
+      resetBtn = document.getElementById('reset-btn');
+    }
+
+    function bindEvents() {
+      reportSelector.addEventListener('change', handleReportChange);
+      sectorSelect.addEventListener('change', populateTrails);
+      photoBtn.addEventListener('click', () => photoInput.click());
+      photoInput.addEventListener('change', handlePhotoSelect);
+      removePhotoBtn.addEventListener('click', removePhoto);
+      document.getElementById('signalisation-form').addEventListener('submit', handleSubmit);
+      modifyBtn.addEventListener('click', handleModify);
+      resetBtn.addEventListener('click', resetForm);
+    }
+
+    function setDefaultValues() {
+      inspectorNameInput.value = currentUserData.name || currentUser.email;
+      
+      const now = new Date();
+      reportDate.value = now.toISOString().split('T')[0];
+      reportTime.value = now.toTimeString().slice(0, 5);
     }
 
     function populateTrails() {
@@ -322,30 +325,11 @@
       }
     }
 
-    function setDefaultValues() {
-      inspectorName.value = signCurrentUserData.name || signCurrentUser.email;
-      
-      const now = new Date();
-      reportDate.value = now.toISOString().split('T')[0];
-      reportTime.value = now.toTimeString().slice(0, 5);
-    }
-
-    function bindEvents() {
-      sectorSelect.addEventListener('change', populateTrails);
-      reportSelector.addEventListener('change', handleReportChange);
-      photoBtn.addEventListener('click', () => photoInput.click());
-      photoInput.addEventListener('change', handlePhotoSelect);
-      removePhotoBtn.addEventListener('click', removePhoto);
-      form.addEventListener('submit', handleSubmit);
-      modifyBtn.addEventListener('click', handleModify);
-      resetBtn.addEventListener('click', resetForm);
-    }
-
     // Load user's past reports
     async function loadUserReports() {
       try {
-        const snap = await signDb.collection('signalisations')
-          .where('inspectorId', '==', signCurrentUser.uid)
+        const snap = await db.collection('signalisations')
+          .where('inspectorId', '==', currentUser.uid)
           .orderBy('createdAt', 'desc')
           .limit(50)
           .get();
@@ -398,7 +382,7 @@
       sectorSelect.value = report.sector || '';
       populateTrails();
       trailSelect.value = report.trail || '';
-      comments.value = report.comments || '';
+      commentsInput.value = report.comments || '';
       
       // Photo
       if (report.photoUrl) {
@@ -425,7 +409,7 @@
       statusSelect.value = '';
       sectorSelect.value = '';
       trailSelect.innerHTML = '<option value="">-- Sélectionner d\'abord un secteur --</option>';
-      comments.value = '';
+      commentsInput.value = '';
       
       removePhoto();
       clearValidation();
@@ -458,8 +442,8 @@
 
     async function uploadPhoto(file) {
       const timestamp = Date.now();
-      const fileName = `signalisations/${signCurrentUser.uid}/${timestamp}_photo.jpg`;
-      const ref = signStorage.ref(fileName);
+      const fileName = `signalisations/${currentUser.uid}/${timestamp}_photo.jpg`;
+      const ref = storage.ref(fileName);
       
       // Compress if needed
       let uploadFile = file;
@@ -553,15 +537,15 @@
         }
         
         const reportData = {
-          inspectorId: signCurrentUser.uid,
-          inspectorName: inspectorName.value,
+          inspectorId: currentUser.uid,
+          inspectorName: inspectorNameInput.value,
           status: statusSelect.value || null,
           statusDisplayName: statusSelect.value ? STATUS_LABELS[statusSelect.value] : null,
           photoUrl: uploadedPhotoUrl || null,
           sector: sectorSelect.value,
           sectorDisplayName: TRAILS_DATA[sectorSelect.value]?.name || sectorSelect.value,
           trail: trailSelect.value,
-          comments: comments.value.trim() || null,
+          comments: commentsInput.value.trim() || null,
           resolved: false,
           archived: false,
           adminComments: null,
@@ -569,7 +553,7 @@
           modifiedAt: firebase.firestore.FieldValue.serverTimestamp()
         };
         
-        await signDb.collection('signalisations').add(reportData);
+        await db.collection('signalisations').add(reportData);
         
         showToast('Rapport enregistré avec succès', 'success');
         resetForm();
@@ -605,11 +589,11 @@
           sector: sectorSelect.value,
           sectorDisplayName: TRAILS_DATA[sectorSelect.value]?.name || sectorSelect.value,
           trail: trailSelect.value,
-          comments: comments.value.trim() || null,
+          comments: commentsInput.value.trim() || null,
           modifiedAt: firebase.firestore.FieldValue.serverTimestamp()
         };
         
-        await signDb.collection('signalisations').doc(currentReportId).update(updateData);
+        await db.collection('signalisations').doc(currentReportId).update(updateData);
         
         showToast('Rapport modifié avec succès', 'success');
         loadUserReports();
@@ -623,7 +607,7 @@
       }
     }
 
-    document.addEventListener('DOMContentLoaded', initApp);
+    document.addEventListener('DOMContentLoaded', initSignalisationReport);
   </script>
 </body>
 </html>
