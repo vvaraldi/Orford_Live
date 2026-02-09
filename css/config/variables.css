@@ -69,6 +69,30 @@
   --color-request-dark: #6d28d9;
   --color-request-rgb: 139, 92, 246;
 
+  /* Status Randonnée - Light Green */
+  --color-status: #22c55e;
+  --color-status-light: #bbf7d0;
+  --color-status-dark: #15803d;
+  --color-status-rgb: 34, 197, 94;
+
+  /* Support - Light Blue */
+  --color-support: #0ea5e9;
+  --color-support-light: #bae6fd;
+  --color-support-dark: #0369a1;
+  --color-support-rgb: 14, 165, 233;
+
+  /* Administration - Purple */
+  --color-admin-module: #a855f7;
+  --color-admin-module-light: #e9d5ff;
+  --color-admin-module-dark: #7e22ce;
+  --color-admin-module-rgb: 168, 85, 247;
+
+  /* Inspection Randonnée - Pink */
+  --color-inspection-rando: #ec4899;
+  --color-inspection-rando-light: #fbcfe8;
+  --color-inspection-rando-dark: #be185d;
+  --color-inspection-rando-rgb: 236, 72, 153;
+
   /* ===== TRAIL DIFFICULTY COLORS ===== */
   --color-difficulty-easy: #22c55e;
   --color-difficulty-medium: #3b82f6;
