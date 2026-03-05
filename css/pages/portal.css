@@ -74,7 +74,7 @@
 
 /* Module-specific gradients */
 .app-card--inspection .app-card__header {
-  background: linear-gradient(135deg, var(--color-inspection) 0%, var(--color-inspection-dark) 100%);
+  background: linear-gradient(135deg, var(--color-inspection-rando) 0%, var(--color-inspection-rando-dark) 100%);
 }
 
 .app-card--infraction .app-card__header {
@@ -83,6 +83,18 @@
 
 .app-card--signalisation .app-card__header {
   background: linear-gradient(135deg, var(--color-signalisation) 0%, var(--color-signalisation-dark) 100%);
+}
+
+.app-card--support .app-card__header {
+  background: linear-gradient(135deg, var(--color-support) 0%, var(--color-support-dark) 100%);
+}
+
+.app-card--admin .app-card__header {
+  background: linear-gradient(135deg, var(--color-admin-module) 0%, var(--color-admin-module-dark) 100%);
+}
+
+.app-card--status .app-card__header {
+  background: linear-gradient(135deg, var(--color-status) 0%, var(--color-status-dark) 100%);
 }
 
 .app-card--request .app-card__header {
