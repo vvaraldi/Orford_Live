@@ -179,12 +179,12 @@
 }
 
 [data-theme="dark"][data-module="inspection-rando"] {
-  --theme-accent: #f472b6;
-  --theme-accent-light: #f9a8d4;
-  --theme-accent-dark: #ec4899;
-  --theme-accent-rgb: 244, 114, 182;
+  --theme-accent: #4ade80;
+  --theme-accent-light: #86efac;
+  --theme-accent-dark: #22c55e;
+  --theme-accent-rgb: 74, 222, 128;
   
-  --theme-gradient: linear-gradient(135deg, #ec4899 0%, #be185d 100%);
+  --theme-gradient: linear-gradient(135deg, #22c55e 0%, #166534 100%);
 }
 
 /* ========================================

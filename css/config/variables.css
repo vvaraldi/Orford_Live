@@ -87,11 +87,11 @@
   --color-admin-module-dark: #7e22ce;
   --color-admin-module-rgb: 168, 85, 247;
 
-  /* Inspection Randonnée - Pink */
-  --color-inspection-rando: #ec4899;
-  --color-inspection-rando-light: #fbcfe8;
-  --color-inspection-rando-dark: #be185d;
-  --color-inspection-rando-rgb: 236, 72, 153;
+  /* Inspection Randonnée - Dark Green */
+  --color-inspection-rando: #166534;
+  --color-inspection-rando-light: #86efac;
+  --color-inspection-rando-dark: #14532d;
+  --color-inspection-rando-rgb: 22, 101, 52;
 
   /* ===== TRAIL DIFFICULTY COLORS ===== */
   --color-difficulty-easy: #22c55e;
