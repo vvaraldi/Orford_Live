@@ -417,7 +417,8 @@
             type: 'trail',
             ...d,
             date: d.date?.toDate ? d.date.toDate() : new Date(d.date),
-            inspector: d.inspector_name || inspectors.get(d.inspector_id) || 'Inconnu',
+            inspector_id: d.inspector_id || null,
+            inspector: inspectors.get(d.inspector_id) || d.inspector_name || 'Inconnu',
             location: trails.get(d.trail_id)?.name || 'Inconnu'
           };
         });
@@ -433,7 +434,8 @@
             type: 'shelter',
             ...d,
             date: d.date?.toDate ? d.date.toDate() : new Date(d.date),
-            inspector: d.inspector_name || inspectors.get(d.inspector_id) || 'Inconnu',
+            inspector_id: d.inspector_id || null,
+            inspector: inspectors.get(d.inspector_id) || d.inspector_name || 'Inconnu',
             location: shelters.get(d.shelter_id)?.name || 'Inconnu'
           };
         });
@@ -502,16 +504,18 @@
     function renderInspectorRanking(allInspections) {
       const stats = {};
       allInspections.forEach(i => {
-        if (!stats[i.inspector]) {
-          stats[i.inspector] = { inspections: 0, photos: 0, issues: 0 };
+        // Group by inspector_id, fallback to inspector name for old records without ID
+        const key = i.inspector_id || i.inspector;
+        if (!stats[key]) {
+          stats[key] = { name: i.inspector, inspections: 0, photos: 0, issues: 0 };
         }
-        stats[i.inspector].inspections++;
-        stats[i.inspector].photos += i.photos?.length || 0;
-        stats[i.inspector].issues += i.issues?.length || 0;
+        stats[key].inspections++;
+        stats[key].photos += i.photos?.length || 0;
+        stats[key].issues += i.issues?.length || 0;
       });
       
       const sorted = Object.entries(stats)
-        .map(([name, data]) => ({ name, ...data }))
+        .map(([id, data]) => ({ id, ...data }))
         .sort((a, b) => b.inspections - a.inspections);
       
       const tbody = document.querySelector('#inspector-ranking tbody');
@@ -535,23 +539,27 @@
     function renderWordCountRanking(allInspections) {
       const stats = {};
       allInspections.forEach(i => {
-        if (!stats[i.inspector]) {
-          stats[i.inspector] = { totalWords: 0, inspections: 0 };
+        // Group by inspector_id, fallback to inspector name for old records without ID
+        const key = i.inspector_id || i.inspector;
+        if (!stats[key]) {
+          stats[key] = { name: i.inspector, totalWords: 0, inspections: 0 };
         }
-        stats[i.inspector].inspections++;
+        stats[key].inspections++;
         // Count words in notes
-        stats[i.inspector].totalWords += countWords(i.notes);
+        stats[key].totalWords += countWords(i.notes);
         // Also count words in detail fields for shelters
         if (i.type === 'shelter') {
-          stats[i.inspector].totalWords += countWords(i.cleanliness_details);
-          stats[i.inspector].totalWords += countWords(i.accessibility_details);
+          stats[key].totalWords += countWords(i.cleanliness_details);
+          stats[key].totalWords += countWords(i.accessibility_details);
         }
       });
       
       const sorted = Object.entries(stats)
-        .map(([name, data]) => ({ 
-          name, 
-          ...data, 
+        .map(([id, data]) => ({ 
+          id,
+          name: data.name, 
+          totalWords: data.totalWords,
+          inspections: data.inspections,
           avgWords: data.inspections > 0 ? (data.totalWords / data.inspections).toFixed(1) : 0 
         }))
         .sort((a, b) => b.totalWords - a.totalWords);
