@@ -37,6 +37,10 @@
     .detail-description { background: var(--theme-surface-alt); padding: 1rem; border-radius: var(--radius-md); white-space: pre-wrap; font-size: 0.875rem; }
     .detail-photo { max-width: 100%; max-height: 300px; border-radius: var(--radius-md); border: 1px solid var(--theme-border); cursor: pointer; }
     .detail-qr { max-width: 150px; border-radius: var(--radius-md); border: 1px solid var(--theme-border); }
+    
+    /* Photo location links */
+    .photo-location { margin-top: 0.5rem; font-size: 0.8rem; }
+    .photo-location a { color: var(--theme-accent); margin-right: 1rem; }
 
     /* Admin editable field */
     .admin-field { margin-top: 1rem; }
@@ -317,10 +321,16 @@
         ? `${inf.sector} - ${inf.trail}${inf.offPiste ? ' (Hors-piste)' : ''}`
         : (inf.sector || '-') + (inf.offPiste ? ' (Hors-piste)' : '');
       
-      // Photo
+      // Photo with GPS coordinates (retrocompatible: old records may not have coordinates)
       let photoHtml = '<p style="color:var(--theme-text-secondary);">Aucune photo</p>';
       if (inf.offenderImageUrl) {
         photoHtml = `<img src="${inf.offenderImageUrl}" class="detail-photo" alt="Photo" onclick="window.open('${inf.offenderImageUrl}', '_blank')">`;
+        // Add GPS links if coordinates exist
+        if (inf.offenderImageCoordinates && inf.offenderImageCoordinates.latitude && inf.offenderImageCoordinates.longitude) {
+          const lat = inf.offenderImageCoordinates.latitude;
+          const lon = inf.offenderImageCoordinates.longitude;
+          photoHtml += `<div class="photo-location"><a href="#" onclick="window.openPhotoLocationModal(${lat}, ${lon}); return false;">📍 Carte locale</a><a href="https://www.google.com/maps?q=${lat},${lon}" target="_blank">🗺️ Google Maps</a></div>`;
+        }
       }
       
       // QR Code
@@ -466,6 +476,59 @@
       document.body.appendChild(toast);
       setTimeout(() => toast.remove(), 4000);
     }
+
+    // PhotoMapModal - display photo location on local map
+    const PhotoMapModal = (() => {
+      // Map calibration points (same as inspection)
+      const topLeft = { lat: 45.296611, lon: -72.243361, x: 0, y: 0 };
+      const topRight = { lat: 45.325861, lon: -72.249972, x: 1758, y: 0 };
+      const bottomLeft = { lat: 45.299444, lon: -72.205667, x: 0, y: 2285 };
+      
+      function solveSystem(a1,b1,c1,a2,b2,c2) { const det=a1*b2-a2*b1; return det===0?null:[(c1*b2-c2*b1)/det,(a1*c2-a2*c1)/det]; }
+      
+      function gpsToPixel(lat, lon) {
+        const [A,B] = solveSystem(topRight.lat-topLeft.lat,bottomLeft.lat-topLeft.lat,lat-topLeft.lat,topRight.lon-topLeft.lon,bottomLeft.lon-topLeft.lon,lon-topLeft.lon) || [0,0];
+        return { x: topLeft.x+A*(topRight.x-topLeft.x)+B*(bottomLeft.x-topLeft.x), y: topLeft.y+A*(topRight.y-topLeft.y)+B*(bottomLeft.y-topLeft.y) };
+      }
+      
+      function open(lat, lon) {
+        const pos = gpsToPixel(lat, lon);
+        let modal = document.getElementById('photo-map-modal');
+        if (!modal) {
+          modal = document.createElement('div');
+          modal.id = 'photo-map-modal';
+          modal.className = 'detail-modal';
+          modal.innerHTML = `
+            <div class="detail-modal__content" style="max-width:900px;">
+              <div class="detail-modal__header"><h3 class="detail-modal__title">📍 Localisation de la photo</h3><button class="detail-modal__close" onclick="PhotoMapModal.close()">×</button></div>
+              <div class="detail-modal__body" style="padding:0;">
+                <div style="overflow:auto;max-height:60vh;"><div id="photo-map-wrap" style="position:relative;display:inline-block;"><img src="../assets/map/map3.png" style="display:block;width:auto;height:auto;max-width:none;"><div id="photo-marker" style="position:absolute;width:20px;height:20px;background:red;border:3px solid white;border-radius:50%;transform:translate(-50%,-50%);box-shadow:0 2px 8px rgba(0,0,0,0.4);"></div></div></div>
+              </div>
+            </div>`;
+          document.body.appendChild(modal);
+          modal.addEventListener('click', e => { if (e.target === modal) PhotoMapModal.close(); });
+        }
+        const marker = document.getElementById('photo-marker');
+        marker.style.left = pos.x + 'px';
+        marker.style.top = pos.y + 'px';
+        modal.classList.add('show');
+        setTimeout(() => {
+          const wrap = document.getElementById('photo-map-wrap');
+          if (wrap && wrap.parentElement) {
+            wrap.parentElement.scrollLeft = Math.max(0, pos.x - wrap.parentElement.clientWidth/2);
+            wrap.parentElement.scrollTop = Math.max(0, pos.y - wrap.parentElement.clientHeight/2);
+          }
+        }, 100);
+      }
+      
+      function close() {
+        const modal = document.getElementById('photo-map-modal');
+        if (modal) modal.classList.remove('show');
+      }
+      
+      return { open, close };
+    })();
+    window.openPhotoLocationModal = PhotoMapModal.open;
 
     document.addEventListener('DOMContentLoaded', initInfractionAdmin);
   </script>

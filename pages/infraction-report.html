@@ -10,6 +10,8 @@
   <link rel="stylesheet" href="../css/main.css">
   <!-- QR Code Scanner Library -->
   <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+  <!-- EXIF Library for GPS extraction -->
+  <script src="https://cdn.jsdelivr.net/npm/exif-js@2.3.0/exif.min.js"></script>
   <style>
     /* Form Row */
     .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
@@ -167,7 +169,7 @@
           <div class="form-group">
             <label class="form-label">Photo <span class="form-hint">(optionnel)</span></label>
             <div class="capture-container">
-              <input type="file" id="photo-input" accept="image/*" capture="environment" style="display:none;">
+              <input type="file" id="photo-input" accept="image/*" style="display:none;">
               <button type="button" class="btn btn-secondary" id="capture-photo-btn">📷 Prendre une photo</button>
               <div class="capture-preview" id="photo-preview-container">
                 <img id="photo-preview" alt="Aperçu">
@@ -301,6 +303,7 @@
     let isNewReport = true;
     let photoFile = null;
     let photoUrl = null;
+    let photoCoordinates = null;
     let qrCodeData = null;
     let qrCodeImageData = null;
     let qrCodeImageUrl = null;
@@ -489,9 +492,10 @@
         removeQrCode();
       }
       
-      // Photo
+      // Photo (with coordinates - retrocompatible: old records may not have coordinates)
       if (infraction.offenderImageUrl) {
         photoUrl = infraction.offenderImageUrl;
+        photoCoordinates = infraction.offenderImageCoordinates || null;
         photoPreview.src = photoUrl;
         photoPreviewContainer.classList.add('show');
       } else {
@@ -545,12 +549,24 @@
       duplicateContainer.classList.remove('show');
     }
 
-    // Photo handling
-    function handlePhotoSelect(e) {
+    // Photo handling with EXIF extraction
+    async function handlePhotoSelect(e) {
       const file = e.target.files[0];
       if (!file) return;
       
       photoFile = file;
+      photoCoordinates = null;
+      
+      // Extract GPS coordinates from EXIF
+      try {
+        const exifData = await extractExifData(file);
+        if (exifData) {
+          photoCoordinates = extractGpsFromExif(exifData);
+        }
+      } catch (err) {
+        console.warn('EXIF extraction failed:', err);
+      }
+      
       const reader = new FileReader();
       reader.onload = (ev) => {
         photoPreview.src = ev.target.result;
@@ -562,6 +578,7 @@
     function removePhoto() {
       photoFile = null;
       photoUrl = null;
+      photoCoordinates = null;
       photoInput.value = '';
       photoPreview.src = '';
       photoPreviewContainer.classList.remove('show');
@@ -712,6 +729,7 @@
           offenderQRCode: qrCodeData || null,
           offenderQRImageUrl: uploadedQrUrl || null,
           offenderImageUrl: uploadedPhotoUrl || null,
+          offenderImageCoordinates: photoCoordinates || null,
           fault: faultSelect.value,
           faultDisplayName: FAULT_LABELS[faultSelect.value] || faultSelect.value,
           sector: sectorSelect.value,
@@ -764,12 +782,21 @@
         const [hours, minutes] = offenceTime.value.split(':');
         const offenceTimestamp = new Date(year, month - 1, day, hours, minutes);
         
+        // Keep existing coordinates if no new photo, otherwise use new coordinates
+        let newCoordinates = photoCoordinates;
+        if (!photoFile && photoUrl) {
+          // Photo wasn't changed, keep existing coordinates from loaded infraction
+          const existingInfraction = userInfractions.find(i => i.id === currentInfractionId);
+          newCoordinates = existingInfraction?.offenderImageCoordinates || null;
+        }
+        
         const updateData = {
           offenceTimestamp: firebase.firestore.Timestamp.fromDate(offenceTimestamp),
           offenderName: offenderName.value.trim(),
           offenderQRCode: qrCodeData || null,
           offenderQRImageUrl: uploadedQrUrl || null,
           offenderImageUrl: uploadedPhotoUrl || null,
+          offenderImageCoordinates: newCoordinates,
           fault: faultSelect.value,
           faultDisplayName: FAULT_LABELS[faultSelect.value] || faultSelect.value,
           sector: sectorSelect.value,
@@ -844,6 +871,35 @@
         };
         img.src = URL.createObjectURL(file);
       });
+    }
+
+    // EXIF extraction helpers
+    function extractExifData(file) {
+      return new Promise((resolve) => {
+        if (typeof EXIF === 'undefined') { resolve(null); return; }
+        EXIF.getData(file, function() {
+          const tags = EXIF.getAllTags(this);
+          resolve(tags && Object.keys(tags).length > 0 ? tags : null);
+        });
+      });
+    }
+    
+    function extractGpsFromExif(exifData) {
+      if (!exifData) return null;
+      const lat = exifData.GPSLatitude, latRef = exifData.GPSLatitudeRef;
+      const lon = exifData.GPSLongitude, lonRef = exifData.GPSLongitudeRef;
+      if (!lat || !lon || !latRef || !lonRef) return null;
+      try {
+        const toDecimal = (dms, ref) => {
+          const d = typeof dms[0] === 'object' ? dms[0].numerator / dms[0].denominator : dms[0];
+          const m = typeof dms[1] === 'object' ? dms[1].numerator / dms[1].denominator : dms[1];
+          const s = typeof dms[2] === 'object' ? dms[2].numerator / dms[2].denominator : dms[2];
+          let dec = d + m/60 + s/3600;
+          if (ref === 'S' || ref === 'W') dec = -dec;
+          return Math.round(dec * 1000000) / 1000000;
+        };
+        return { latitude: toDecimal(lat, latRef), longitude: toDecimal(lon, lonRef) };
+      } catch (e) { return null; }
     }
 
     function showToast(message, type = 'info') {
