@@ -388,8 +388,7 @@ function getAuthErrorMessage(error) {
   return errorMessages[error.code] || error.message || 'Une erreur est survenue.';
 }
 
-// Initialize Firebase when script loads
-initFirebase();
+// Note: initFirebase() is called by firebase-loader.js after Firebase scripts are loaded
 
 // Export for module use
 if (typeof module !== 'undefined' && module.exports) {
