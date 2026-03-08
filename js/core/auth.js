@@ -193,14 +193,23 @@ function updateUIForUser(userData) {
   // Update user role badge
   const userRoleElements = document.querySelectorAll('[data-user-role]');
   userRoleElements.forEach(el => {
-    el.textContent = userData.role === 'admin' ? 'Administrateur' : 'Inspecteur';
-    el.className = `badge ${userData.role === 'admin' ? 'badge-admin' : 'badge-inspector'}`;
+    let roleLabel = 'Inspecteur';
+    let badgeClass = 'badge-inspector';
+    if (userData.role === 'system_admin') {
+      roleLabel = 'System Admin';
+      badgeClass = 'badge-system-admin';
+    } else if (userData.role === 'admin') {
+      roleLabel = 'Administrateur';
+      badgeClass = 'badge-admin';
+    }
+    el.textContent = roleLabel;
+    el.className = `badge ${badgeClass}`;
   });
 
   // Show/hide admin links
   const adminLinks = document.querySelectorAll('[data-require-admin]');
   adminLinks.forEach(el => {
-    el.style.display = userData.role === 'admin' ? '' : 'none';
+    el.style.display = (userData.role === 'admin' || userData.role === 'system_admin') ? '' : 'none';
   });
 
   // Update navigation based on permissions
