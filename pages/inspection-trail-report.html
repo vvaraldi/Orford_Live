@@ -185,8 +185,10 @@
   <script src="../js/core/ui.js"></script>
   <script src="../js/core/firebase-loader.js"></script>
   <script src="../js/core/auth.js"></script>
+  <script src="../js/utils/photo-picker.js"></script>
   <script>
     let selectedFiles = [], currentTrailStatus = null, storage = null;
+    let photoPicker = null;
     const form = document.getElementById('trail-inspection-form');
     const trailSelect = document.getElementById('trail-select');
     const inspectorName = document.getElementById('inspector-name');
@@ -233,7 +235,25 @@
         if (confirm('Êtes-vous sûr de vouloir annuler?')) window.location.href = 'inspection-dashboard.html';
       });
       trailSelect.addEventListener('change', updateStatusOptionsForTrail);
-      photoUpload.addEventListener('click', () => fileInput.click());
+      
+      // Initialize PhotoPicker for smart platform detection (Android bottom sheet, iOS/Desktop direct)
+      photoPicker = new PhotoPicker({
+        dropZone: null, // We handle drag & drop separately
+        previewContainer: null, // We handle previews separately
+        multiple: true,
+        maxPhotos: 10,
+        onPhotosChange: (photos) => {
+          // PhotoPicker selected files - process them
+          const pendingFiles = photoPicker.getPendingFiles();
+          pendingFiles.forEach(p => {
+            if (!selectedFiles.find(f => f.name === p.file.name)) {
+              processFiles([p.file]);
+            }
+          });
+        }
+      });
+      
+      photoUpload.addEventListener('click', () => photoPicker.open());
       photoUpload.addEventListener('dragover', e => { e.preventDefault(); photoUpload.classList.add('drag-over'); });
       photoUpload.addEventListener('dragleave', e => { e.preventDefault(); photoUpload.classList.remove('drag-over'); });
       photoUpload.addEventListener('drop', e => { e.preventDefault(); photoUpload.classList.remove('drag-over'); processFiles(Array.from(e.dataTransfer.files).filter(f => f.type.startsWith('image/'))); });

@@ -2,11 +2,12 @@
  * PhotoPicker - Cross-platform photo picker utility with EXIF extraction
  * 
  * FEATURES:
- * - Bottom sheet UI for mobile (camera vs gallery choice)
+ * - Bottom sheet UI for Android (camera vs gallery choice)
+ * - Direct picker on iOS (iOS shows its own choice sheet)
+ * - Direct file picker on desktop
  * - Drag & drop support for desktop
  * - EXIF extraction (GPS coordinates + timestamp)
  * - Multiple photo support
- * - Consistent behavior across Android/iOS/Desktop
  */
 
 class PhotoPicker {
@@ -28,6 +29,12 @@ class PhotoPicker {
     this._inputGallery = null;
     this._resolve = null;
 
+    // Detect platform
+    this._isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+    this._isAndroid = /Android/.test(navigator.userAgent);
+    this._isMobile = this._isIOS || this._isAndroid;
+    this._isDesktop = !this._isMobile;
+
     this._build();
     this._setupDropZone();
   }
@@ -37,6 +44,15 @@ class PhotoPicker {
   open() {
     this._inputCam.value = '';
     this._inputGallery.value = '';
+    
+    // iOS: Skip bottom sheet, iOS shows its own picker with camera/gallery choice
+    // Desktop: Skip bottom sheet, open file picker directly
+    if (this._isIOS || this._isDesktop) {
+      this._inputGallery.click();
+      return Promise.resolve();
+    }
+    
+    // Android: Show bottom sheet (Android is inconsistent with capture attribute)
     this._showSheet();
     return new Promise(resolve => { this._resolve = resolve; });
   }
@@ -150,6 +166,13 @@ class PhotoPicker {
     document.body.appendChild(this._inputCam);
     document.body.appendChild(this._inputGallery);
 
+    // Only build bottom sheet for Android
+    if (this._isAndroid) {
+      this._buildSheet();
+    }
+  }
+
+  _buildSheet() {
     this._sheet = document.createElement('div');
     this._sheet.className = 'photo-picker-sheet';
     this._sheet.style.cssText = 'display:none;position:fixed;inset:0;z-index:9999;';
@@ -215,6 +238,7 @@ class PhotoPicker {
   }
 
   _showSheet() {
+    if (!this._sheet) return;
     this._sheet.style.display = 'block';
     void this._sheet.offsetWidth;
     this._panel.style.transform = 'translateY(0)';
@@ -222,6 +246,7 @@ class PhotoPicker {
   }
 
   _hideSheet() {
+    if (!this._sheet) return;
     this._panel.style.transform = 'translateY(100%)';
     document.body.style.overflow = '';
     setTimeout(() => { this._sheet.style.display = 'none'; }, 280);
