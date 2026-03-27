@@ -1,0 +1,370 @@
+/**
+ * PhotoPicker - Cross-platform photo picker utility with EXIF extraction
+ * 
+ * FEATURES:
+ * - Bottom sheet UI for mobile (camera vs gallery choice)
+ * - Drag & drop support for desktop
+ * - EXIF extraction (GPS coordinates + timestamp)
+ * - Multiple photo support
+ * - Consistent behavior across Android/iOS/Desktop
+ */
+
+class PhotoPicker {
+  constructor(options = {}) {
+    this.options = {
+      dropZone: null,
+      previewContainer: null,
+      onPhotosChange: null,
+      multiple: true,
+      maxPhotos: 10,
+      maxFileSize: 10 * 1024 * 1024,
+      accept: 'image/*',
+      ...options
+    };
+
+    this._photos = [];
+    this._sheet = null;
+    this._inputCam = null;
+    this._inputGallery = null;
+    this._resolve = null;
+
+    this._build();
+    this._setupDropZone();
+  }
+
+  // ─── Public API ────────────────────────────────────────────────────────────
+
+  open() {
+    this._inputCam.value = '';
+    this._inputGallery.value = '';
+    this._showSheet();
+    return new Promise(resolve => { this._resolve = resolve; });
+  }
+
+  getPhotos() {
+    return this._photos.map(p => ({
+      url: p.url,
+      filename: p.filename,
+      coordinates: p.coordinates,
+      timestamp: p.timestamp
+    }));
+  }
+
+  getUploadedPhotos() {
+    return this._photos
+      .filter(p => p.isUploaded && p.url)
+      .map(p => ({
+        url: p.url,
+        filename: p.filename,
+        coordinates: p.coordinates,
+        timestamp: p.timestamp
+      }));
+  }
+
+  getPendingFiles() {
+    return this._photos
+      .filter(p => !p.isUploaded && p.file)
+      .map(p => ({
+        file: p.file,
+        filename: p.filename,
+        coordinates: p.coordinates,
+        timestamp: p.timestamp
+      }));
+  }
+
+  markAsUploaded(filename, url) {
+    const photo = this._photos.find(p => p.filename === filename);
+    if (photo) {
+      photo.url = url;
+      photo.isUploaded = true;
+    }
+  }
+
+  setPhotos(photos) {
+    this._photos = (photos || []).map(p => ({
+      file: null,
+      url: p.url,
+      previewUrl: p.url,
+      filename: p.filename || 'photo.jpg',
+      coordinates: p.coordinates || null,
+      timestamp: p.timestamp ? (p.timestamp.toDate ? p.timestamp.toDate() : new Date(p.timestamp)) : null,
+      isUploaded: true
+    }));
+    this._renderPreviews();
+    this._notifyChange();
+  }
+
+  clear() {
+    this._photos.forEach(p => {
+      if (p.previewUrl && p.previewUrl.startsWith('blob:')) {
+        URL.revokeObjectURL(p.previewUrl);
+      }
+    });
+    this._photos = [];
+    this._renderPreviews();
+    this._notifyChange();
+  }
+
+  removePhoto(index) {
+    if (index >= 0 && index < this._photos.length) {
+      const photo = this._photos[index];
+      if (photo.previewUrl && photo.previewUrl.startsWith('blob:')) {
+        URL.revokeObjectURL(photo.previewUrl);
+      }
+      this._photos.splice(index, 1);
+      this._renderPreviews();
+      this._notifyChange();
+    }
+  }
+
+  hasPhotos() {
+    return this._photos.length > 0;
+  }
+
+  dismiss() {
+    this._hideSheet();
+    if (this._resolve) {
+      this._resolve();
+      this._resolve = null;
+    }
+  }
+
+  // ─── Internal: Build UI ────────────────────────────────────────────────────
+
+  _build() {
+    this._inputCam = document.createElement('input');
+    this._inputCam.type = 'file';
+    this._inputCam.accept = this.options.accept;
+    this._inputCam.capture = 'environment';
+    this._inputCam.multiple = false;
+    Object.assign(this._inputCam.style, { display: 'none', position: 'fixed' });
+    this._inputCam.addEventListener('change', e => this._onFilesSelected(e.target.files));
+
+    this._inputGallery = document.createElement('input');
+    this._inputGallery.type = 'file';
+    this._inputGallery.accept = this.options.accept;
+    this._inputGallery.multiple = this.options.multiple;
+    Object.assign(this._inputGallery.style, { display: 'none', position: 'fixed' });
+    this._inputGallery.addEventListener('change', e => this._onFilesSelected(e.target.files));
+
+    document.body.appendChild(this._inputCam);
+    document.body.appendChild(this._inputGallery);
+
+    this._sheet = document.createElement('div');
+    this._sheet.className = 'photo-picker-sheet';
+    this._sheet.style.cssText = 'display:none;position:fixed;inset:0;z-index:9999;';
+
+    this._sheet.innerHTML = `
+      <div class="pp-backdrop" style="position:absolute;inset:0;background:rgba(0,0,0,0.45);backdrop-filter:blur(2px);"></div>
+      <div class="pp-panel" style="position:absolute;bottom:0;left:0;right:0;background:var(--theme-surface,#fff);border-radius:16px 16px 0 0;padding:0 0 env(safe-area-inset-bottom,0);box-shadow:0 -4px 24px rgba(0,0,0,0.18);transform:translateY(100%);transition:transform 0.28s cubic-bezier(0.32,0.72,0,1);">
+        <div style="width:40px;height:4px;background:var(--theme-border,#d1d5db);border-radius:2px;margin:12px auto 0;"></div>
+        <p style="text-align:center;font-size:0.8rem;font-weight:600;letter-spacing:0.08em;text-transform:uppercase;color:var(--theme-text-secondary,#6b7280);margin:12px 0 4px;">Ajouter une photo</p>
+        <div style="padding:8px 16px 16px;display:flex;flex-direction:column;gap:10px;">
+          <button type="button" class="pp-btn-camera" style="display:flex;align-items:center;gap:14px;padding:15px 20px;border:none;border-radius:12px;background:var(--theme-accent,#1e40af);color:#fff;font-size:1rem;font-weight:600;cursor:pointer;width:100%;text-align:left;">
+            <span style="font-size:1.6rem;line-height:1;">📷</span><span>Prendre une photo</span>
+          </button>
+          <button type="button" class="pp-btn-gallery" style="display:flex;align-items:center;gap:14px;padding:15px 20px;border:2px solid var(--theme-accent,#1e40af);border-radius:12px;background:transparent;color:var(--theme-accent,#1e40af);font-size:1rem;font-weight:600;cursor:pointer;width:100%;text-align:left;">
+            <span style="font-size:1.6rem;line-height:1;">🖼️</span><span>Choisir depuis la galerie</span>
+          </button>
+          <button type="button" class="pp-btn-cancel" style="padding:13px 20px;border:none;border-radius:12px;background:var(--theme-surface-alt,#f3f4f6);color:var(--theme-text,#374151);font-size:1rem;font-weight:500;cursor:pointer;width:100%;">Annuler</button>
+        </div>
+      </div>
+    `;
+
+    this._panel = this._sheet.querySelector('.pp-panel');
+    this._sheet.querySelector('.pp-backdrop').addEventListener('click', () => this.dismiss());
+    this._sheet.querySelector('.pp-btn-cancel').addEventListener('click', () => this.dismiss());
+    this._sheet.querySelector('.pp-btn-camera').addEventListener('click', () => {
+      this._hideSheet();
+      setTimeout(() => this._inputCam.click(), 120);
+    });
+    this._sheet.querySelector('.pp-btn-gallery').addEventListener('click', () => {
+      this._hideSheet();
+      setTimeout(() => this._inputGallery.click(), 120);
+    });
+
+    document.body.appendChild(this._sheet);
+  }
+
+  _setupDropZone() {
+    const dropZone = this.options.dropZone;
+    if (!dropZone) return;
+
+    dropZone.style.cursor = 'pointer';
+    dropZone.addEventListener('click', (e) => {
+      if (e.target.closest('.photo-preview-item')) return;
+      this.open();
+    });
+
+    dropZone.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      dropZone.classList.add('drag-over');
+    });
+
+    dropZone.addEventListener('dragleave', (e) => {
+      e.preventDefault();
+      dropZone.classList.remove('drag-over');
+    });
+
+    dropZone.addEventListener('drop', (e) => {
+      e.preventDefault();
+      dropZone.classList.remove('drag-over');
+      const files = e.dataTransfer?.files;
+      if (files && files.length > 0) this._onFilesSelected(files);
+    });
+  }
+
+  _showSheet() {
+    this._sheet.style.display = 'block';
+    void this._sheet.offsetWidth;
+    this._panel.style.transform = 'translateY(0)';
+    document.body.style.overflow = 'hidden';
+  }
+
+  _hideSheet() {
+    this._panel.style.transform = 'translateY(100%)';
+    document.body.style.overflow = '';
+    setTimeout(() => { this._sheet.style.display = 'none'; }, 280);
+  }
+
+  // ─── Internal: File Handling ───────────────────────────────────────────────
+
+  async _onFilesSelected(fileList) {
+    const files = Array.from(fileList || []);
+    if (!files.length) {
+      if (this._resolve) { this._resolve(); this._resolve = null; }
+      return;
+    }
+
+    const remaining = this.options.maxPhotos - this._photos.length;
+    const toProcess = files.slice(0, remaining);
+
+    for (const file of toProcess) {
+      if (file.size > this.options.maxFileSize) {
+        console.warn(`File ${file.name} exceeds max size, skipping`);
+        continue;
+      }
+
+      let coordinates = null;
+      let timestamp = null;
+      try {
+        const exifData = await this._extractExifData(file);
+        if (exifData) {
+          coordinates = this._extractGpsFromExif(exifData);
+          timestamp = this._extractTimestampFromExif(exifData);
+        }
+      } catch (err) {
+        console.warn('EXIF extraction failed:', err);
+      }
+
+      const previewUrl = URL.createObjectURL(file);
+
+      this._photos.push({
+        file: file,
+        url: null,
+        previewUrl: previewUrl,
+        filename: file.name,
+        coordinates: coordinates,
+        timestamp: timestamp,
+        isUploaded: false
+      });
+    }
+
+    this._renderPreviews();
+    this._notifyChange();
+
+    if (this._resolve) { this._resolve(); this._resolve = null; }
+  }
+
+  // ─── Internal: EXIF Extraction ─────────────────────────────────────────────
+
+  _extractExifData(file) {
+    return new Promise((resolve) => {
+      if (typeof EXIF === 'undefined') { resolve(null); return; }
+      EXIF.getData(file, function() {
+        const tags = EXIF.getAllTags(this);
+        resolve(tags && Object.keys(tags).length > 0 ? tags : null);
+      });
+    });
+  }
+
+  _extractGpsFromExif(exifData) {
+    if (!exifData) return null;
+    const lat = exifData.GPSLatitude, latRef = exifData.GPSLatitudeRef;
+    const lon = exifData.GPSLongitude, lonRef = exifData.GPSLongitudeRef;
+    if (!lat || !lon || !latRef || !lonRef) return null;
+    try {
+      const toDecimal = (dms, ref) => {
+        const d = typeof dms[0] === 'object' ? dms[0].numerator / dms[0].denominator : dms[0];
+        const m = typeof dms[1] === 'object' ? dms[1].numerator / dms[1].denominator : dms[1];
+        const s = typeof dms[2] === 'object' ? dms[2].numerator / dms[2].denominator : dms[2];
+        let dec = d + m/60 + s/3600;
+        if (ref === 'S' || ref === 'W') dec = -dec;
+        return Math.round(dec * 1000000) / 1000000;
+      };
+      return { latitude: toDecimal(lat, latRef), longitude: toDecimal(lon, lonRef) };
+    } catch (e) { return null; }
+  }
+
+  _extractTimestampFromExif(exifData) {
+    if (!exifData) return null;
+    const dateStr = exifData.DateTimeOriginal || exifData.DateTime;
+    if (!dateStr) return null;
+    try {
+      const [datePart, timePart] = dateStr.split(' ');
+      const [year, month, day] = datePart.split(':');
+      const [hour, min, sec] = timePart.split(':');
+      return new Date(year, month - 1, day, hour, min, sec);
+    } catch (e) { return null; }
+  }
+
+  // ─── Internal: Preview Rendering ───────────────────────────────────────────
+
+  _renderPreviews() {
+    const container = this.options.previewContainer;
+    if (!container) return;
+
+    container.innerHTML = '';
+
+    this._photos.forEach((photo, index) => {
+      const item = document.createElement('div');
+      item.className = 'photo-preview-item';
+      item.style.cssText = 'position:relative;display:inline-block;margin:4px;';
+
+      const img = document.createElement('img');
+      img.src = photo.previewUrl || photo.url;
+      img.alt = photo.filename;
+      img.style.cssText = 'width:100px;height:100px;object-fit:cover;border-radius:8px;border:1px solid var(--theme-border,#e5e7eb);';
+
+      const removeBtn = document.createElement('button');
+      removeBtn.type = 'button';
+      removeBtn.innerHTML = '×';
+      removeBtn.style.cssText = 'position:absolute;top:-6px;right:-6px;width:22px;height:22px;border:none;border-radius:50%;background:#ef4444;color:white;font-size:14px;font-weight:bold;cursor:pointer;display:flex;align-items:center;justify-content:center;line-height:1;';
+      removeBtn.addEventListener('click', (e) => { e.stopPropagation(); this.removePhoto(index); });
+
+      if (photo.coordinates) {
+        const gpsIndicator = document.createElement('span');
+        gpsIndicator.innerHTML = '📍';
+        gpsIndicator.title = `GPS: ${photo.coordinates.latitude}, ${photo.coordinates.longitude}`;
+        gpsIndicator.style.cssText = 'position:absolute;bottom:4px;left:4px;font-size:14px;background:rgba(255,255,255,0.9);border-radius:4px;padding:2px 4px;';
+        item.appendChild(gpsIndicator);
+      }
+
+      item.appendChild(img);
+      item.appendChild(removeBtn);
+      container.appendChild(item);
+    });
+
+    container.style.display = this._photos.length > 0 ? 'block' : 'none';
+  }
+
+  _notifyChange() {
+    if (typeof this.options.onPhotosChange === 'function') {
+      this.options.onPhotosChange(this.getPhotos());
+    }
+  }
+}
+
+if (typeof window !== 'undefined') {
+  window.PhotoPicker = PhotoPicker;
+}

@@ -310,16 +310,25 @@
         statusHtml = `<span class="badge ${badgeClass}">${STATUS_LABELS[r.status] || r.status}</span>`;
       }
       
-      // Photo with GPS location
+      // Photos with GPS location - retrocompat: support both old photoUrl and new photos array
       let photoHtml = '<p style="color:var(--theme-text-secondary);">Aucune photo</p>';
-      if (r.photoUrl) {
-        let locationHtml = '';
-        if (r.coordinates && r.coordinates.latitude && r.coordinates.longitude) {
-          const lat = r.coordinates.latitude;
-          const lon = r.coordinates.longitude;
-          locationHtml = `<div class="photo-location"><a href="#" onclick="openPhotoLocationModal(${lat},${lon});return false;">📍 Carte locale</a><a href="https://www.google.com/maps?q=${lat},${lon}" target="_blank">🗺️ Google Maps</a></div>`;
-        }
-        photoHtml = `<img src="${r.photoUrl}" class="detail-photo" alt="Photo" onclick="window.open('${r.photoUrl}', '_blank')">${locationHtml}`;
+      const photos = r.photos || (r.photoUrl ? [{ url: r.photoUrl, coordinates: r.coordinates }] : []);
+      
+      if (photos.length > 0) {
+        photoHtml = '<div class="photo-gallery" style="display:flex;flex-wrap:wrap;gap:0.5rem;">';
+        photos.forEach((photo, idx) => {
+          let locationHtml = '';
+          if (photo.coordinates && photo.coordinates.latitude && photo.coordinates.longitude) {
+            const lat = photo.coordinates.latitude;
+            const lon = photo.coordinates.longitude;
+            locationHtml = `<div class="photo-location"><a href="#" onclick="openPhotoLocationModal(${lat},${lon});return false;">📍 Carte</a><a href="https://www.google.com/maps?q=${lat},${lon}" target="_blank">🗺️</a></div>`;
+          }
+          photoHtml += `<div class="photo-gallery-item" style="position:relative;">
+            <img src="${photo.url}" class="detail-photo" alt="Photo ${idx + 1}" onclick="window.open('${photo.url}', '_blank')" style="max-width:150px;max-height:150px;">
+            ${locationHtml}
+          </div>`;
+        });
+        photoHtml += '</div>';
       }
       
       document.getElementById('modal-body').innerHTML = `
@@ -335,7 +344,7 @@
           ${statusHtml}
         </div>
         <div class="detail-section">
-          <h4>📷 Photo</h4>
+          <h4>📷 Photos (${photos.length})</h4>
           ${photoHtml}
         </div>
         ${r.comments ? `<div class="detail-section"><h4>💬 Commentaires de l'inspecteur</h4><div class="detail-description">${escapeHtml(r.comments)}</div></div>` : ''}
