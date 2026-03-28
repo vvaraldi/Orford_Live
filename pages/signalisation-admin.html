@@ -318,7 +318,7 @@
           if (photo.coordinates && photo.coordinates.latitude && photo.coordinates.longitude) {
             const lat = photo.coordinates.latitude;
             const lon = photo.coordinates.longitude;
-            locationHtml = `<div class="photo-location"><a href="#" onclick="openPhotoLocationModal(${lat},${lon});return false;">📍 Carte</a><a href="https://www.google.com/maps?q=${lat},${lon}" target="_blank">🗺️</a></div>`;
+            locationHtml = `<div class="photo-location"><a href="#" onclick="openPhotoLocationModal(${lat},${lon});return false;">📍 Carte</a><a href="https://www.google.com/maps?q=${lat},${lon}" target="_blank" rel="noopener noreferrer">🗺️</a></div>`;
           }
           photoHtml += `<div class="photo-gallery-item" style="position:relative;">
             <img src="${photo.url}" class="detail-photo" alt="Photo ${idx + 1}" onclick="window.open('${photo.url}', '_blank')" style="max-width:150px;max-height:150px;">
@@ -452,7 +452,7 @@
                   <div style="overflow:auto;max-height:60vh;"><div id="photo-map-wrap" style="position:relative;display:inline-block;"><img src="../assets/map/map3.png" style="display:block;width:auto;height:auto;max-width:none;"><div id="photo-marker" style="position:absolute;width:20px;height:20px;background:red;border:3px solid white;border-radius:50%;transform:translate(-50%,-50%);box-shadow:0 2px 8px rgba(0,0,0,0.4);"></div></div></div>
                   <div id="photo-coords" style="padding:1rem;background:var(--theme-surface-alt);border-top:1px solid var(--theme-border);"></div>
                 </div>
-                <div class="detail-modal__footer"><a id="photo-google-link" href="#" target="_blank" class="btn btn-primary">🗺️ Google Maps</a><button class="btn btn-secondary" onclick="PhotoMapModal.close()">Fermer</button></div>
+                <div class="detail-modal__footer"><a id="photo-google-link" href="#" target="_blank" rel="noopener noreferrer" class="btn btn-primary">🗺️ Google Maps</a><button class="btn btn-secondary" onclick="PhotoMapModal.close()">Fermer</button></div>
               </div>
             </div>
           `);

@@ -260,6 +260,9 @@
       bindElements();
       bindEvents();
       
+      // Setup offline detection
+      setupOfflineDetection();
+      
       checkAuthStatus({
         requireAuth: true,
         requiredPermission: 'allowSignalisation',
@@ -308,9 +311,10 @@
 
     function setDefaultValues() {
       inspectorNameInput.value = currentUserData.name || currentUser.email;
-      const now = new Date();
-      reportDate.value = now.toISOString().split('T')[0];
-      reportTime.value = now.toTimeString().slice(0, 5);
+      // Use local timezone (getLocalDateTime from utils.js)
+      const { date, time } = getLocalDateTime();
+      reportDate.value = date;
+      reportTime.value = time;
     }
 
     function populateTrails() {
@@ -366,9 +370,13 @@
       currentReportId = selectedId;
       isNewReport = false;
       
+      // Populate form with local timezone
       if (report.createdAt?.toDate) {
         const d = report.createdAt.toDate();
-        reportDate.value = d.toISOString().split('T')[0];
+        const year = d.getFullYear();
+        const month = (d.getMonth() + 1).toString().padStart(2, '0');
+        const day = d.getDate().toString().padStart(2, '0');
+        reportDate.value = `${year}-${month}-${day}`;
         reportTime.value = d.toTimeString().slice(0, 5);
       }
       

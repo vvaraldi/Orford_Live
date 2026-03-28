@@ -332,7 +332,7 @@
           if (photo.coordinates && photo.coordinates.latitude && photo.coordinates.longitude) {
             const lat = photo.coordinates.latitude;
             const lon = photo.coordinates.longitude;
-            locationHtml = `<div class="photo-location"><a href="#" onclick="window.openPhotoLocationModal(${lat},${lon});return false;">📍 Carte</a><a href="https://www.google.com/maps?q=${lat},${lon}" target="_blank">🗺️</a></div>`;
+            locationHtml = `<div class="photo-location"><a href="#" onclick="window.openPhotoLocationModal(${lat},${lon});return false;">📍 Carte</a><a href="https://www.google.com/maps?q=${lat},${lon}" target="_blank" rel="noopener noreferrer">🗺️</a></div>`;
           }
           photoHtml += `<div class="photo-gallery-item" style="position:relative;">
             <img src="${photo.url}" class="detail-photo" alt="Photo ${idx + 1}" onclick="window.open('${photo.url}', '_blank')" style="max-width:150px;max-height:150px;">

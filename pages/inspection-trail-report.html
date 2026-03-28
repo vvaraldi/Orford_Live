@@ -208,6 +208,10 @@
       storage = firebase.storage();
       setCurrentDateTime();
       bindEvents();
+      
+      // Setup offline detection
+      setupOfflineDetection();
+      
       checkAuthStatus({
         requireAuth: true,
         requiredPermission: 'allowInspection',

@@ -610,7 +610,7 @@
             <div class="outlier-card__title">${escapeHtml(outlierPhoto.location)}</div>
             <div class="outlier-card__meta">Inspecteur: ${escapeHtml(outlierPhoto.inspector)}</div>
             <div class="outlier-card__meta">Coordonnées: ${outlierPhoto.coordinates.latitude.toFixed(5)}°, ${outlierPhoto.coordinates.longitude.toFixed(5)}°</div>
-            <div class="outlier-card__meta"><a href="https://www.google.com/maps?q=${outlierPhoto.coordinates.latitude},${outlierPhoto.coordinates.longitude}" target="_blank">Voir sur Google Maps</a></div>
+            <div class="outlier-card__meta"><a href="https://www.google.com/maps?q=${outlierPhoto.coordinates.latitude},${outlierPhoto.coordinates.longitude}" target="_blank" rel="noopener noreferrer">Voir sur Google Maps</a></div>
           </div>
           <div class="outlier-card__distance">${maxDistance.toFixed(2)} km</div>
         </div>

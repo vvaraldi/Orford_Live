@@ -332,6 +332,9 @@
       bindElements();
       bindEvents();
       
+      // Setup offline detection
+      setupOfflineDetection();
+      
       checkAuthStatus({
         requireAuth: true,
         requiredPermission: 'allowInfraction',
@@ -409,9 +412,10 @@
     function setDefaultValues() {
       patrolName.value = currentUserData.name || currentUser.email;
       
-      const now = new Date();
-      offenceDate.value = now.toISOString().split('T')[0];
-      offenceTime.value = now.toTimeString().slice(0, 5);
+      // Use local timezone (getLocalDateTime from utils.js)
+      const { date, time } = getLocalDateTime();
+      offenceDate.value = date;
+      offenceTime.value = time;
     }
 
     function populateTrails() {
@@ -472,10 +476,13 @@
       currentInfractionId = selectedId;
       isNewReport = false;
       
-      // Populate form
+      // Populate form with local timezone
       if (infraction.offenceTimestamp?.toDate) {
         const d = infraction.offenceTimestamp.toDate();
-        offenceDate.value = d.toISOString().split('T')[0];
+        const year = d.getFullYear();
+        const month = (d.getMonth() + 1).toString().padStart(2, '0');
+        const day = d.getDate().toString().padStart(2, '0');
+        offenceDate.value = `${year}-${month}-${day}`;
         offenceTime.value = d.toTimeString().slice(0, 5);
       }
       
