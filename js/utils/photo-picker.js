@@ -16,24 +16,27 @@ class PhotoPicker {
       dropZone: null,
       previewContainer: null,
       onPhotosChange: null,
+      onError: null, // New: error callback for max size, invalid type, etc.
       multiple: true,
       maxPhotos: 10,
       maxFileSize: 10 * 1024 * 1024,
       accept: 'image/*',
+      exifTimeout: 5000, // New: timeout for EXIF extraction (ms)
       ...options
     };
 
     this._photos = [];
     this._sheet = null;
+    this._panel = null;
     this._inputCam = null;
     this._inputGallery = null;
     this._resolve = null;
+    this._destroyed = false;
 
     // Detect platform
     this._isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
     this._isAndroid = /Android/.test(navigator.userAgent);
-    this._isMobile = this._isIOS || this._isAndroid;
-    this._isDesktop = !this._isMobile;
+    this._isDesktop = !this._isIOS && !this._isAndroid;
 
     this._build();
     this._setupDropZone();
@@ -42,6 +45,8 @@ class PhotoPicker {
   // ─── Public API ────────────────────────────────────────────────────────────
 
   open() {
+    if (this._destroyed) return Promise.resolve();
+    
     this._inputCam.value = '';
     this._inputGallery.value = '';
     
@@ -113,7 +118,7 @@ class PhotoPicker {
   clear() {
     this._photos.forEach(p => {
       if (p.previewUrl && p.previewUrl.startsWith('blob:')) {
-        URL.revokeObjectURL(p.previewUrl);
+        try { URL.revokeObjectURL(p.previewUrl); } catch (e) { /* Safari private mode */ }
       }
     });
     this._photos = [];
@@ -125,7 +130,7 @@ class PhotoPicker {
     if (index >= 0 && index < this._photos.length) {
       const photo = this._photos[index];
       if (photo.previewUrl && photo.previewUrl.startsWith('blob:')) {
-        URL.revokeObjectURL(photo.previewUrl);
+        try { URL.revokeObjectURL(photo.previewUrl); } catch (e) { /* Safari private mode */ }
       }
       this._photos.splice(index, 1);
       this._renderPreviews();
@@ -145,6 +150,30 @@ class PhotoPicker {
     }
   }
 
+  /**
+   * Clean up resources - call when done with the picker
+   */
+  destroy() {
+    this._destroyed = true;
+    this.clear();
+    
+    // Remove inputs from DOM
+    if (this._inputCam && this._inputCam.parentNode) {
+      this._inputCam.parentNode.removeChild(this._inputCam);
+    }
+    if (this._inputGallery && this._inputGallery.parentNode) {
+      this._inputGallery.parentNode.removeChild(this._inputGallery);
+    }
+    if (this._sheet && this._sheet.parentNode) {
+      this._sheet.parentNode.removeChild(this._sheet);
+    }
+    
+    this._inputCam = null;
+    this._inputGallery = null;
+    this._sheet = null;
+    this._panel = null;
+  }
+
   // ─── Internal: Build UI ────────────────────────────────────────────────────
 
   _build() {
@@ -153,6 +182,7 @@ class PhotoPicker {
     this._inputCam.accept = this.options.accept;
     this._inputCam.capture = 'environment';
     this._inputCam.multiple = false;
+    this._inputCam.setAttribute('aria-label', 'Prendre une photo');
     Object.assign(this._inputCam.style, { display: 'none', position: 'fixed' });
     this._inputCam.addEventListener('change', e => this._onFilesSelected(e.target.files));
 
@@ -160,6 +190,7 @@ class PhotoPicker {
     this._inputGallery.type = 'file';
     this._inputGallery.accept = this.options.accept;
     this._inputGallery.multiple = this.options.multiple;
+    this._inputGallery.setAttribute('aria-label', 'Choisir des photos');
     Object.assign(this._inputGallery.style, { display: 'none', position: 'fixed' });
     this._inputGallery.addEventListener('change', e => this._onFilesSelected(e.target.files));
 
@@ -175,21 +206,25 @@ class PhotoPicker {
   _buildSheet() {
     this._sheet = document.createElement('div');
     this._sheet.className = 'photo-picker-sheet';
+    this._sheet.setAttribute('role', 'dialog');
+    this._sheet.setAttribute('aria-modal', 'true');
+    this._sheet.setAttribute('aria-label', 'Ajouter une photo');
     this._sheet.style.cssText = 'display:none;position:fixed;inset:0;z-index:9999;';
 
+    // Note: backdrop-filter may not work on older Android WebViews, but degrades gracefully
     this._sheet.innerHTML = `
-      <div class="pp-backdrop" style="position:absolute;inset:0;background:rgba(0,0,0,0.45);backdrop-filter:blur(2px);"></div>
+      <div class="pp-backdrop" style="position:absolute;inset:0;background:rgba(0,0,0,0.5);-webkit-backdrop-filter:blur(2px);backdrop-filter:blur(2px);"></div>
       <div class="pp-panel" style="position:absolute;bottom:0;left:0;right:0;background:var(--theme-surface,#fff);border-radius:16px 16px 0 0;padding:0 0 env(safe-area-inset-bottom,0);box-shadow:0 -4px 24px rgba(0,0,0,0.18);transform:translateY(100%);transition:transform 0.28s cubic-bezier(0.32,0.72,0,1);">
         <div style="width:40px;height:4px;background:var(--theme-border,#d1d5db);border-radius:2px;margin:12px auto 0;"></div>
         <p style="text-align:center;font-size:0.8rem;font-weight:600;letter-spacing:0.08em;text-transform:uppercase;color:var(--theme-text-secondary,#6b7280);margin:12px 0 4px;">Ajouter une photo</p>
         <div style="padding:8px 16px 16px;display:flex;flex-direction:column;gap:10px;">
-          <button type="button" class="pp-btn-camera" style="display:flex;align-items:center;gap:14px;padding:15px 20px;border:none;border-radius:12px;background:var(--theme-accent,#1e40af);color:#fff;font-size:1rem;font-weight:600;cursor:pointer;width:100%;text-align:left;">
+          <button type="button" class="pp-btn-camera" aria-label="Prendre une photo avec la caméra" style="display:flex;align-items:center;gap:14px;padding:15px 20px;border:none;border-radius:12px;background:var(--theme-accent,#1e40af);color:#fff;font-size:1rem;font-weight:600;cursor:pointer;width:100%;text-align:left;">
             <span style="font-size:1.6rem;line-height:1;">📷</span><span>Prendre une photo</span>
           </button>
-          <button type="button" class="pp-btn-gallery" style="display:flex;align-items:center;gap:14px;padding:15px 20px;border:2px solid var(--theme-accent,#1e40af);border-radius:12px;background:transparent;color:var(--theme-accent,#1e40af);font-size:1rem;font-weight:600;cursor:pointer;width:100%;text-align:left;">
+          <button type="button" class="pp-btn-gallery" aria-label="Choisir depuis la galerie" style="display:flex;align-items:center;gap:14px;padding:15px 20px;border:2px solid var(--theme-accent,#1e40af);border-radius:12px;background:transparent;color:var(--theme-accent,#1e40af);font-size:1rem;font-weight:600;cursor:pointer;width:100%;text-align:left;">
             <span style="font-size:1.6rem;line-height:1;">🖼️</span><span>Choisir depuis la galerie</span>
           </button>
-          <button type="button" class="pp-btn-cancel" style="padding:13px 20px;border:none;border-radius:12px;background:var(--theme-surface-alt,#f3f4f6);color:var(--theme-text,#374151);font-size:1rem;font-weight:500;cursor:pointer;width:100%;">Annuler</button>
+          <button type="button" class="pp-btn-cancel" aria-label="Annuler" style="padding:13px 20px;border:none;border-radius:12px;background:var(--theme-surface-alt,#f3f4f6);color:var(--theme-text,#374151);font-size:1rem;font-weight:500;cursor:pointer;width:100%;">Annuler</button>
         </div>
       </div>
     `;
@@ -252,9 +287,29 @@ class PhotoPicker {
     setTimeout(() => { this._sheet.style.display = 'none'; }, 280);
   }
 
+  // ─── Internal: Error Handling ──────────────────────────────────────────────
+
+  _emitError(type, message, file = null) {
+    console.warn(`PhotoPicker: ${message}`);
+    if (typeof this.options.onError === 'function') {
+      this.options.onError({ type, message, file });
+    }
+  }
+
   // ─── Internal: File Handling ───────────────────────────────────────────────
 
+  _isValidImageType(file) {
+    // Accept standard image types + HEIC/HEIF (iOS)
+    const validTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp', 'image/heic', 'image/heif'];
+    if (validTypes.includes(file.type.toLowerCase())) return true;
+    // Fallback: check extension for files with empty/generic type
+    const ext = file.name.split('.').pop().toLowerCase();
+    return ['jpg', 'jpeg', 'png', 'gif', 'webp', 'heic', 'heif'].includes(ext);
+  }
+
   async _onFilesSelected(fileList) {
+    if (this._destroyed) return;
+    
     const files = Array.from(fileList || []);
     if (!files.length) {
       if (this._resolve) { this._resolve(); this._resolve = null; }
@@ -262,11 +317,25 @@ class PhotoPicker {
     }
 
     const remaining = this.options.maxPhotos - this._photos.length;
+    if (remaining <= 0) {
+      this._emitError('max_photos', `Maximum ${this.options.maxPhotos} photos atteint`);
+      if (this._resolve) { this._resolve(); this._resolve = null; }
+      return;
+    }
+    
     const toProcess = files.slice(0, remaining);
 
     for (const file of toProcess) {
+      // Validate image type
+      if (!this._isValidImageType(file)) {
+        this._emitError('invalid_type', `${file.name}: type de fichier non supporté`, file);
+        continue;
+      }
+      
+      // Validate file size
       if (file.size > this.options.maxFileSize) {
-        console.warn(`File ${file.name} exceeds max size, skipping`);
+        const maxMB = Math.round(this.options.maxFileSize / 1024 / 1024);
+        this._emitError('max_size', `${file.name}: fichier trop volumineux (max ${maxMB}MB)`, file);
         continue;
       }
 
@@ -282,7 +351,13 @@ class PhotoPicker {
         console.warn('EXIF extraction failed:', err);
       }
 
-      const previewUrl = URL.createObjectURL(file);
+      // Create preview URL with Safari private mode protection
+      let previewUrl = null;
+      try {
+        previewUrl = URL.createObjectURL(file);
+      } catch (e) {
+        console.warn('Could not create preview URL:', e);
+      }
 
       this._photos.push({
         file: file,
@@ -306,10 +381,23 @@ class PhotoPicker {
   _extractExifData(file) {
     return new Promise((resolve) => {
       if (typeof EXIF === 'undefined') { resolve(null); return; }
-      EXIF.getData(file, function() {
-        const tags = EXIF.getAllTags(this);
-        resolve(tags && Object.keys(tags).length > 0 ? tags : null);
-      });
+      
+      // Timeout protection - EXIF.getData can hang on corrupt files
+      const timeoutId = setTimeout(() => {
+        console.warn('EXIF extraction timed out');
+        resolve(null);
+      }, this.options.exifTimeout);
+      
+      try {
+        EXIF.getData(file, function() {
+          clearTimeout(timeoutId);
+          const tags = EXIF.getAllTags(this);
+          resolve(tags && Object.keys(tags).length > 0 ? tags : null);
+        });
+      } catch (e) {
+        clearTimeout(timeoutId);
+        resolve(null);
+      }
     });
   }
 
@@ -357,19 +445,27 @@ class PhotoPicker {
       item.style.cssText = 'position:relative;display:inline-block;margin:4px;';
 
       const img = document.createElement('img');
-      img.src = photo.previewUrl || photo.url;
+      img.src = photo.previewUrl || photo.url || '';
       img.alt = photo.filename;
       img.style.cssText = 'width:100px;height:100px;object-fit:cover;border-radius:8px;border:1px solid var(--theme-border,#e5e7eb);';
+      
+      // Handle broken images gracefully
+      img.onerror = () => {
+        img.style.background = 'var(--theme-surface-alt, #f3f4f6)';
+        img.alt = 'Image non disponible';
+      };
 
       const removeBtn = document.createElement('button');
       removeBtn.type = 'button';
       removeBtn.innerHTML = '×';
+      removeBtn.setAttribute('aria-label', `Supprimer ${photo.filename}`);
       removeBtn.style.cssText = 'position:absolute;top:-6px;right:-6px;width:22px;height:22px;border:none;border-radius:50%;background:#ef4444;color:white;font-size:14px;font-weight:bold;cursor:pointer;display:flex;align-items:center;justify-content:center;line-height:1;';
       removeBtn.addEventListener('click', (e) => { e.stopPropagation(); this.removePhoto(index); });
 
       if (photo.coordinates) {
         const gpsIndicator = document.createElement('span');
         gpsIndicator.innerHTML = '📍';
+        gpsIndicator.setAttribute('aria-label', 'Photo géolocalisée');
         gpsIndicator.title = `GPS: ${photo.coordinates.latitude}, ${photo.coordinates.longitude}`;
         gpsIndicator.style.cssText = 'position:absolute;bottom:4px;left:4px;font-size:14px;background:rgba(255,255,255,0.9);border-radius:4px;padding:2px 4px;';
         item.appendChild(gpsIndicator);
