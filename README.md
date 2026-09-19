@@ -12,4 +12,3 @@ Phase 5: Public Status + Polish
 
 Phase 6: Migration Support
 6.1 Firebase rules updateIf needed for new structure
-
