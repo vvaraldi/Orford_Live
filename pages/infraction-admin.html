@@ -455,7 +455,7 @@
 
       function open(lat, lon) {
         // This activity's map cannot place GPS positions (no calibration): open Google Maps instead
-        if (!MapService.canLocate()) { window.open(`https://www.google.com/maps?q=${lat},${lon}`, '_blank', 'noopener'); return; }
+        if (!MapService.gpsToPixel(lat, lon)) { window.open(`https://www.google.com/maps?q=${lat},${lon}`, '_blank', 'noopener'); return; }
         let modal = document.getElementById('photo-map-modal');
         if (!modal) {
           document.body.insertAdjacentHTML('beforeend', `

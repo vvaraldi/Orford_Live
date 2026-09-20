@@ -201,6 +201,7 @@
             console.error('Error loading sectors:', e);
           }
           MapService.showImage(document.getElementById('map-image')); // the current activity's map
+          await MapService.load(); // its GPS calibration (markers below need it)
           loadReports();
         }
       });
@@ -251,7 +252,8 @@
       
       // Reports with GPS coordinates, if this activity's map can place them
       const reportsWithGps = MapService.canLocate()
-        ? reportsData.filter(r => r.coordinates && r.coordinates.latitude && r.coordinates.longitude)
+        ? reportsData.filter(r => r.coordinates && r.coordinates.latitude && r.coordinates.longitude &&
+            gpsToPixel(r.coordinates.latitude, r.coordinates.longitude))
         : [];
       document.getElementById('map-count').textContent = `${reportsWithGps.length} rapport(s) avec localisation`;
       
@@ -379,7 +381,7 @@
     const PhotoMapModal = (function() {
       function open(lat, lon) {
         // This activity's map cannot place GPS positions (no calibration): open Google Maps instead
-        if (!MapService.canLocate()) { window.open(`https://www.google.com/maps?q=${lat},${lon}`, '_blank', 'noopener'); return; }
+        if (!MapService.gpsToPixel(lat, lon)) { window.open(`https://www.google.com/maps?q=${lat},${lon}`, '_blank', 'noopener'); return; }
         let modal = document.getElementById('photo-map-modal');
         if (!modal) {
           document.body.insertAdjacentHTML('beforeend', `

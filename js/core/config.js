@@ -152,7 +152,8 @@ const APP_CONFIG = {
       id: 'bike', name: 'Vélo', icon: '🚵',
       seasonMonths: [5, 6, 7, 8, 9, 10], // 1 May to 31 October
       // The illustrated map (Bike_Map.jpg, not to scale) resized to 1600 px wide: trail coordinates are pixels on THIS image.
-      // calibration: null = no GPS conversion yet (photo positions are then not drawn on the map)
+      // calibration: null = no code default; set it in Administration > Cartes (saved in Firestore maps/bike).
+      // Without any calibration, photo positions are not drawn on the map (a Google Maps link is used).
       map: { image: 'assets/map/Bike_Map_web.jpg', width: 1600, height: 919, calibration: null },
       features: { shelters: false, snowCondition: false },
       publicTitle: 'État des sentiers de vélo de montagne',

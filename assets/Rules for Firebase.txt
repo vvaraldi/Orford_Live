@@ -138,6 +138,14 @@ service cloud.firestore {
       allow delete: if isSystemAdmin();
     }
 
+    // MAPS: the GPS calibration of each activity's map (maps/{network}: mode, points, width,
+    // height). Everyone signed in reads it (photo positions on the maps); only a system_admin
+    // writes it (Administration > Cartes).
+    match /maps/{network} {
+      allow read: if request.auth != null;
+      allow write: if isSystemAdmin();
+    }
+
     match /config/{document} {
       allow read: if request.auth != null;
       allow write: if isAdmin();

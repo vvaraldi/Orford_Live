@@ -232,6 +232,31 @@
       background: rgba(59, 130, 246, 0.15);
       color: #1e40af;
     }
+
+    /* Cartes tab: GPS calibration of the maps */
+    .cal-toolbar { display: flex; flex-wrap: wrap; gap: var(--space-md); align-items: flex-end; }
+    .cal-toolbar .form-group { margin-bottom: 0; min-width: 14rem; }
+    .cal-source { color: var(--theme-text-secondary); font-size: 0.875rem; margin: var(--space-md) 0 0; }
+    .cal-status { padding: 0.75rem 1rem; border-radius: var(--radius-md); margin: var(--space-md) 0; border-left: 4px solid; color: var(--theme-text); }
+    .cal-status.ok { background: rgba(16, 185, 129, 0.15); border-color: #10b981; }
+    .cal-status.error { background: rgba(239, 68, 68, 0.15); border-color: #ef4444; }
+    .cal-status.info { background: rgba(59, 130, 246, 0.15); border-color: #3b82f6; }
+    .cal-warning { padding: 0.75rem 1rem; border-radius: var(--radius-md); margin-bottom: var(--space-md); background: rgba(245, 158, 11, 0.18); border-left: 4px solid #f59e0b; color: var(--theme-text); }
+    .cal-row { display: flex; flex-wrap: wrap; gap: 0.5rem 0.75rem; align-items: flex-end; padding: 0.75rem; margin-bottom: 0.5rem; background: var(--theme-surface-alt); border: 2px solid transparent; border-radius: var(--radius-md); }
+    .cal-row.is-placing { border-color: #f59e0b; }
+    .cal-row .form-group { margin-bottom: 0; flex: 1 1 7rem; min-width: 6rem; }
+    .cal-row__num { flex: 0 0 auto; width: 2rem; height: 2rem; display: flex; align-items: center; justify-content: center; border-radius: 50%; background: #dc2626; color: #fff; font-weight: 700; margin-bottom: 0.25rem; }
+    .cal-row__place { flex: 0 0 auto; margin-bottom: 0.25rem; }
+    .cal-actions { display: flex; flex-wrap: wrap; gap: var(--space-md); align-items: center; margin: var(--space-md) 0; }
+    .cal-test { display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: flex-end; margin-bottom: var(--space-sm); }
+    .cal-test .form-group { margin-bottom: 0; flex: 1 1 16rem; }
+    .cal-readout { min-height: 1.5rem; margin: 0.5rem 0; font-weight: 500; }
+    .cal-hint { color: var(--theme-text-secondary); font-size: 0.875rem; margin: 0 0 0.5rem; }
+    .cal-scroll { overflow: auto; max-height: 70vh; border: 1px solid var(--theme-border); border-radius: var(--radius-md); background: var(--theme-surface-alt); }
+    .cal-map { position: relative; display: inline-block; }
+    .cal-map.is-placing { cursor: crosshair; }
+    .cal-map img { display: block; width: auto; height: auto; max-width: none; }
+    .cal-map svg { position: absolute; left: 0; top: 0; pointer-events: none; }
   </style>
 </head>
 <body data-theme="light" data-module="admin" data-nav="admin" data-page="user-management">
@@ -264,6 +289,9 @@
       </button>
       <button class="admin-tabs__btn" data-tab="sectors" onclick="switchTab('sectors')">
         🗺️ Secteurs
+      </button>
+      <button class="admin-tabs__btn" data-tab="maps" id="maps-tab-btn" onclick="switchTab('maps')" style="display: none;">
+        📍 Cartes
       </button>
       <button class="admin-tabs__btn" data-tab="import" onclick="switchTab('import')">
         📥 Import
@@ -413,6 +441,67 @@
             <textarea class="form-textarea" id="new-sector-trails" rows="5"></textarea>
           </div>
           <button class="btn btn-primary" onclick="addSector()">Ajouter le secteur</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- TAB: MAP CALIBRATION (system admin) -->
+    <div class="admin-tab-content" id="maps-tab">
+      <div class="data-export-section">
+        <div class="data-export-section__header">
+          <span>📍</span>
+          <h3>Calibration GPS des cartes</h3>
+        </div>
+        <p class="data-export-section__description">
+          Relie les positions GPS (photos des rapports) aux pixels de la carte de chaque activité.
+          Choisissez <strong>3 points</strong> pour une carte plate et à l'échelle, ou <strong>4 points</strong> pour une carte dessinée en perspective.
+          Prenez des points éloignés les uns des autres, sur des repères précis (croisement de sentiers, bâtiment), et cherchez leur position GPS
+          en appuyant longuement sur ce lieu dans Google Maps. Avec 4 points, faites le tour du secteur sans croiser les lignes.
+        </p>
+
+        <div class="cal-toolbar">
+          <div class="form-group">
+            <label class="form-label" for="cal-network">Activité</label>
+            <select class="form-select" id="cal-network"></select>
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="cal-mode">Méthode</label>
+            <select class="form-select" id="cal-mode">
+              <option value="affine">3 points : carte plate</option>
+              <option value="perspective">4 points : carte en perspective</option>
+            </select>
+          </div>
+        </div>
+        <p class="cal-source" id="cal-source"></p>
+        <div class="cal-status info" id="cal-status"></div>
+        <div class="cal-warning" id="cal-size-warning" hidden></div>
+
+        <div id="cal-points"></div>
+
+        <div class="cal-actions">
+          <button type="button" class="btn btn-primary" id="cal-save" disabled>Enregistrer la calibration</button>
+          <button type="button" class="btn btn-secondary" id="cal-reload">Annuler les modifications</button>
+          <label class="export-option" style="padding: 0.5rem 0.75rem;">
+            <input type="checkbox" id="cal-grid" checked>
+            <span>Afficher la grille GPS</span>
+          </label>
+        </div>
+
+        <div class="cal-test">
+          <div class="form-group">
+            <label class="form-label" for="cal-test">Tester une position GPS</label>
+            <input type="text" class="form-input" id="cal-test" placeholder="45.3116, -72.2408">
+          </div>
+          <button type="button" class="btn btn-secondary" id="cal-test-btn" disabled>Voir sur la carte</button>
+        </div>
+        <div class="cal-readout" id="cal-readout" aria-live="polite"></div>
+        <p class="cal-hint" id="cal-hint"></p>
+
+        <div class="cal-scroll" id="cal-scroll">
+          <div class="cal-map" id="cal-map">
+            <img id="cal-image" alt="Carte à calibrer">
+            <svg id="cal-overlay" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"></svg>
+          </div>
         </div>
       </div>
     </div>
@@ -700,6 +789,8 @@
   <script src="../js/core/firebase-loader.js"></script>
   <script src="../js/core/auth.js"></script>
   <script src="../js/services/sector-service.js"></script>
+  <script src="../js/services/map-service.js"></script>
+  <script src="../js/admin/map-calibration.js"></script>
 
   <!-- Page JS -->
   <script>
@@ -1782,6 +1873,11 @@ Marie Tremblay,marie.tremblay@example.com,MotDePasse456,admin,,true,true,true,sk
             (isCurrentUserSystemAdmin ? '<option value="">Toutes les activités</option>' : '') +
             myNetworks().map(id => `<option value="${id}">${APP_CONFIG.networks[id].icon} ${APP_CONFIG.networks[id].name}</option>`).join('');
           loadSectorsAdmin();
+          // GPS calibration of the maps: system admin only (the Firestore rules enforce it too)
+          if (isCurrentUserSystemAdmin) {
+            document.getElementById('maps-tab-btn').style.display = '';
+            MapCalibration.init(currentUser.uid);
+          }
           document.getElementById('filter-network').insertAdjacentHTML('beforeend',
             NETWORK_IDS.map(id => `<option value="${id}">${APP_CONFIG.networks[id].icon} ${APP_CONFIG.networks[id].name}</option>`).join(''));
           document.getElementById('user-role').addEventListener('change', applyNetworkLocks);
