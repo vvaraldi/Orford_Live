@@ -56,15 +56,19 @@
 
   var MODULES = {
     infraction: {
+      // stamp is offset by the file's index so two photos with the same name
+      // in one batch cannot resolve to the same path (Android galleries hand
+      // out "image.jpg" repeatedly). Still a single number, so the path shape
+      // is unchanged.
       path: function (o) {
-        return 'infractions/' + o.userId + '/' + o.stamp + '_' + o.filename;
+        return 'infractions/' + o.userId + '/' + (o.stamp + o.index) + '_' + o.filename;
       },
       compress: { overBytes: 1024 * 1024, quality: 0.7, maxWidth: 1200 },
       parallel: false
     },
     signalisation: {
       path: function (o) {
-        return 'signalisations/' + o.userId + '/' + o.stamp + '_' + o.filename;
+        return 'signalisations/' + o.userId + '/' + (o.stamp + o.index) + '_' + o.filename;
       },
       compress: { overBytes: 1024 * 1024, quality: 0.7, maxWidth: 1200 },
       parallel: false
@@ -345,17 +349,37 @@
   // ─── Writing ───────────────────────────────────────────────────────────────
 
   /**
+   * Accepts a File, or {file, coordinates, timestamp} when EXIF has already
+   * been read elsewhere (PhotoPicker does this at pick time).
+   */
+  function toEntry(item) {
+    if (!item) return null;
+    if (item.file) {
+      return {
+        file: item.file,
+        exif: (item.coordinates !== undefined || item.timestamp !== undefined)
+          ? { coordinates: item.coordinates || null, timestamp: item.timestamp || null }
+          : null
+      };
+    }
+    return { file: item, exif: null };
+  }
+
+  /**
    * Phase 1: read EXIF and compress. Always sequential - a canvas resize is
    * the memory-hungry part, and iOS Safari caps total live canvas area, so
    * four at once on a 12MP iPhone photo can fail (toBlob returns null and the
    * original gets uploaded instead).
+   *
+   * EXIF is skipped when the caller already has it, so a PhotoPicker upload
+   * does not parse every file a second time.
    */
-  async function prepareOne(file, moduleName, options) {
+  async function prepareOne(entry, moduleName, options) {
     var profile = profileFor(moduleName);
-    var exif = await readExif(file);
+    var exif = entry.exif || await readExif(entry.file);
     var rule = (options.compress === undefined) ? profile.compress : options.compress;
-    var payload = await maybeCompress(file, rule);
-    return { file: file, payload: payload, exif: exif };
+    var payload = await maybeCompress(entry.file, rule);
+    return { file: entry.file, payload: payload, exif: exif };
   }
 
   /**
@@ -387,9 +411,10 @@
   }
 
   /**
-   * Uploads File objects for one module.
+   * Uploads photos for one module.
    *
-   * @param {File[]} files
+   * @param {Array} files  File objects, or {file, coordinates, timestamp}
+   *                       entries when EXIF has already been read
    * @param {string} moduleName  'infraction' | 'signalisation'
    *                             | 'inspection-trail' | 'inspection-shelter'
    * @param {Object} options
@@ -403,7 +428,9 @@
    */
   async function uploadFiles(files, moduleName, options) {
     options = options || {};
-    var list = Array.prototype.slice.call(files || []);
+    var list = Array.prototype.slice.call(files || [])
+      .map(toEntry)
+      .filter(Boolean);
     if (!list.length) return [];
 
     var profile = profileFor(moduleName);
@@ -460,17 +487,16 @@
       return existing.map(function (p) { return normalizePhoto(p); }).filter(Boolean);
     }
 
-    var uploaded = await uploadFiles(
-      pending.map(function (p) { return p.file; }),
-      moduleName,
-      options
-    );
+    var uploaded = await uploadFiles(pending, moduleName, options);
 
     uploaded.forEach(function (photo) {
       if (picker.markAsUploaded) picker.markAsUploaded(photo.filename, photo.url);
     });
 
-    return (picker.getUploadedPhotos ? picker.getUploadedPhotos() : existing.concat(uploaded))
+    // Built from what we actually uploaded rather than re-reading the picker.
+    // markAsUploaded() matches on filename, so two files with the same name in
+    // one batch would mark the same entry twice and lose the second photo.
+    return existing.concat(uploaded)
       .map(function (p) { return normalizePhoto(p); })
       .filter(Boolean);
   }
