@@ -308,9 +308,12 @@
         statusHtml = `<span class="badge ${badgeClass}">${STATUS_LABELS[r.status] || r.status}</span>`;
       }
       
-      // Photos with GPS location - retrocompat: support both old photoUrl and new photos array
+      // Photos with GPS location.
+      // PhotoService.photosFrom() handles the modern photos array and the
+      // legacy photoUrl field (reattaching the document's scalar coordinates),
+      // and de-duplicates by URL when a record carries both.
       let photoHtml = '<p style="color:var(--theme-text-secondary);">Aucune photo</p>';
-      const photos = r.photos || (r.photoUrl ? [{ url: r.photoUrl, coordinates: r.coordinates }] : []);
+      const photos = PhotoService.photosFrom(r);
       
       if (photos.length > 0) {
         photoHtml = '<div class="photo-gallery" style="display:flex;flex-wrap:wrap;gap:0.5rem;">';

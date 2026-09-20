@@ -553,6 +553,28 @@
       }
     }
 
+    /**
+     * Photo gallery markup for an inspection document.
+     * PhotoService.photosFrom() handles every stored format (legacy string
+     * arrays, modern objects), so this needs no per-photo shape checks.
+     * Shared by both modals below - the markup was previously duplicated.
+     */
+    function renderPhotosSection(insp) {
+      const photos = PhotoService.photosFrom(insp);
+      if (!photos.length) return '';
+
+      const items = photos.map(p => {
+        const c = p.coordinates;
+        let loc = '';
+        if (c && c.latitude && c.longitude) {
+          loc = `<div class="photo-location"><a href="#" onclick="openPhotoLocationModal(${c.latitude},${c.longitude});return false;">Carte locale</a> <a href="https://www.google.com/maps?q=${c.latitude},${c.longitude}" target="_blank" rel="noopener noreferrer">Google</a></div>`;
+        }
+        return `<div class="photo-item"><img src="${p.url}" class="photo-thumb" onclick="window.open('${p.url}','_blank')">${loc}</div>`;
+      }).join('');
+
+      return `<div class="detail-section"><div class="detail-section__title">📷 Photos (${photos.length})</div><div class="photos-grid">${items}</div></div>`;
+    }
+
     // Modals
     function openTrailModal(trailId) {
       const trail = allTrails.find(t => t.id === trailId);
@@ -584,15 +606,7 @@
         if (insp.notes && insp.notes.trim()) {
           html += `<div class="detail-section"><div class="detail-section__title">📝 Notes</div><div class="notes-box">${escapeHtml(insp.notes).replace(/\n/g, '<br>')}</div></div>`;
         }
-        if (insp.photos && insp.photos.length > 0) {
-          html += `<div class="detail-section"><div class="detail-section__title">📷 Photos (${insp.photos.length})</div><div class="photos-grid">${insp.photos.map((p, i) => {
-            const url = typeof p === 'string' ? p : p.url;
-            const coords = typeof p === 'object' ? p.coordinates : null;
-            let loc = '';
-            if (coords) loc = `<div class="photo-location"><a href="#" onclick="openPhotoLocationModal(${coords.latitude},${coords.longitude});return false;">Carte locale</a> <a href="https://www.google.com/maps?q=${coords.latitude},${coords.longitude}" target="_blank" rel="noopener noreferrer">Google</a></div>`;
-            return `<div class="photo-item"><img src="${url}" class="photo-thumb" onclick="window.open('${url}','_blank')">${loc}</div>`;
-          }).join('')}</div></div>`;
-        }
+        html += renderPhotosSection(insp);
         body.innerHTML = html;
       }
       document.getElementById('inspection-modal').classList.add('show');
@@ -626,15 +640,7 @@
         if (insp.notes && insp.notes.trim()) {
           html += `<div class="detail-section"><div class="detail-section__title">📝 Notes</div><div class="notes-box">${escapeHtml(insp.notes).replace(/\n/g, '<br>')}</div></div>`;
         }
-        if (insp.photos && insp.photos.length > 0) {
-          html += `<div class="detail-section"><div class="detail-section__title">📷 Photos (${insp.photos.length})</div><div class="photos-grid">${insp.photos.map((p, i) => {
-            const url = typeof p === 'string' ? p : p.url;
-            const coords = typeof p === 'object' ? p.coordinates : null;
-            let loc = '';
-            if (coords) loc = `<div class="photo-location"><a href="#" onclick="openPhotoLocationModal(${coords.latitude},${coords.longitude});return false;">Carte locale</a> <a href="https://www.google.com/maps?q=${coords.latitude},${coords.longitude}" target="_blank" rel="noopener noreferrer">Google</a></div>`;
-            return `<div class="photo-item"><img src="${url}" class="photo-thumb" onclick="window.open('${url}','_blank')">${loc}</div>`;
-          }).join('')}</div></div>`;
-        }
+        html += renderPhotosSection(insp);
         body.innerHTML = html;
       }
       document.getElementById('inspection-modal').classList.add('show');

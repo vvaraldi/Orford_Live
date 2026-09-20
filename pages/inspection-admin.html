@@ -442,20 +442,22 @@
           };
         });
 
-        // Collect all photos
+        // Collect all photos.
+        // PhotoService.photosFrom() normalises every stored format first.
+        // Spreading the raw value here used to corrupt legacy string photos
+        // into {0:'h',1:'t',...} objects with no url, so those photos were
+        // silently excluded from the outlier analysis below.
         allPhotos = [];
         [...trailInspections, ...shelterInspections].forEach(insp => {
-          if (insp.photos && insp.photos.length > 0) {
-            insp.photos.forEach(p => {
-              allPhotos.push({
-                ...p,
-                inspector: insp.inspector,
-                location: insp.location,
-                inspectionId: insp.id,
-                inspectionType: insp.type
-              });
+          PhotoService.photosFrom(insp).forEach(p => {
+            allPhotos.push({
+              ...p,
+              inspector: insp.inspector,
+              location: insp.location,
+              inspectionId: insp.id,
+              inspectionType: insp.type
             });
-          }
+          });
         });
 
       } catch (e) {
@@ -604,7 +606,8 @@
         return;
       }
       
-      const url = typeof outlierPhoto === 'string' ? outlierPhoto : outlierPhoto.url;
+      // allPhotos entries are normalised by PhotoService, so .url is always present
+      const url = outlierPhoto.url;
       container.innerHTML = `
         <div class="outlier-card">
           <img src="${url}" class="outlier-card__photo" onclick="window.open('${url}', '_blank')" alt="Photo">
@@ -786,12 +789,10 @@
         
         let totalPhotos = 0;
         trailInspSnap.forEach(doc => {
-          const d = doc.data();
-          totalPhotos += d.photos?.length || 0;
+          totalPhotos += PhotoService.photosFrom(doc.data()).length;
         });
         shelterInspSnap.forEach(doc => {
-          const d = doc.data();
-          totalPhotos += d.photos?.length || 0;
+          totalPhotos += PhotoService.photosFrom(doc.data()).length;
         });
         
         document.getElementById('db-trail-inspections').textContent = trailInspSnap.size;
@@ -913,18 +914,9 @@
         // Delete in batches
         let deleted = 0;
         for (const item of toDelete) {
-          // Delete photos
-          if (item.data.photos && item.data.photos.length > 0) {
-            for (const photo of item.data.photos) {
-              try {
-                const photoUrl = typeof photo === 'string' ? photo : photo.url;
-                if (photoUrl) {
-                  const storageRef = firebase.storage().refFromURL(photoUrl);
-                  await storageRef.delete();
-                }
-              } catch (e) { console.warn('Could not delete photo:', e); }
-            }
-          }
+          // Delete photos - handles every stored format, and a missing file
+          // never blocks deleting the document that points at it.
+          await PhotoService.deletePhotosFrom(item.data);
           
           // Delete document
           await db.collection(item.collection).doc(item.id).delete();
@@ -969,20 +961,12 @@
         
         const trailSnap = await db.collection('trail_inspections').get();
         trailSnap.forEach(doc => {
-          const photos = doc.data().photos || [];
-          photos.forEach(p => {
-            const url = typeof p === 'string' ? p : p.url;
-            if (url) validUrls.add(url);
-          });
+          PhotoService.urlsFrom(doc.data()).forEach(url => validUrls.add(url));
         });
         
         const shelterSnap = await db.collection('shelter_inspections').get();
         shelterSnap.forEach(doc => {
-          const photos = doc.data().photos || [];
-          photos.forEach(p => {
-            const url = typeof p === 'string' ? p : p.url;
-            if (url) validUrls.add(url);
-          });
+          PhotoService.urlsFrom(doc.data()).forEach(url => validUrls.add(url));
         });
         
         console.log(`Found ${validUrls.size} valid photo URLs in database`);
@@ -1021,6 +1005,8 @@
         }
         
         // Scan inspections/trails and inspections/shelters folders
+        // NOTE: these paths must stay in sync with the inspection-trail and
+        // inspection-shelter profiles in js/services/photo-service.js.
         await listAllFiles(storage.ref('inspections/trails'));
         await listAllFiles(storage.ref('inspections/shelters'));
         

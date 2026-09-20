@@ -402,7 +402,10 @@
             snow_condition: d.snow_condition,
             issues: d.issues || [],
             notes: d.notes || '',
-            photos: d.photos || [],
+            // Normalised once here: handles legacy string photos, modern objects
+            // and any legacy single-URL field. Everything downstream can then
+            // assume {url, filename, coordinates, timestamp}.
+            photos: PhotoService.photosFrom(d),
             raw: d
           };
         });
@@ -426,7 +429,7 @@
             accessibility_details: d.accessibility_details,
             issues: d.issues || [],
             notes: d.notes || '',
-            photos: d.photos || [],
+            photos: PhotoService.photosFrom(d),
             raw: d
           };
         });
@@ -735,14 +738,13 @@
         html += `<div class="detail-section"><div class="detail-section__title">📝 Notes</div><div class="detail-notes">${escapeHtml(insp.notes)}</div></div>`;
       }
 
-      // Photos
+      // Photos - already normalised by PhotoService at load time
       if (insp.photos && insp.photos.length > 0) {
         html += `<div class="detail-section"><div class="detail-section__title">📷 Photos (${insp.photos.length})</div><div class="detail-photos">${insp.photos.map(p => {
-          const url = typeof p === 'string' ? p : p.url;
-          const coords = typeof p === 'object' ? p.coordinates : null;
+          const coords = p.coordinates;
           let loc = '';
-          if (coords) loc = `<div class="photo-location"><a href="#" onclick="openPhotoLocationModal(${coords.latitude},${coords.longitude});return false;">Carte locale</a> <a href="https://www.google.com/maps?q=${coords.latitude},${coords.longitude}" target="_blank" rel="noopener noreferrer">Google</a></div>`;
-          return `<div class="detail-photo"><img src="${url}" alt="Photo" onclick="window.open('${url}','_blank')">${loc}</div>`;
+          if (coords && coords.latitude && coords.longitude) loc = `<div class="photo-location"><a href="#" onclick="openPhotoLocationModal(${coords.latitude},${coords.longitude});return false;">Carte locale</a> <a href="https://www.google.com/maps?q=${coords.latitude},${coords.longitude}" target="_blank" rel="noopener noreferrer">Google</a></div>`;
+          return `<div class="detail-photo"><img src="${p.url}" alt="Photo" onclick="window.open('${p.url}','_blank')">${loc}</div>`;
         }).join('')}</div></div>`;
       }
 
@@ -822,19 +824,10 @@
         const collection = insp.type === 'trail' ? 'trail_inspections' : 'shelter_inspections';
         console.log('Deleting from collection:', collection);
         
-        // Delete photos from storage
-        if (insp.photos && insp.photos.length > 0) {
-          console.log('Deleting', insp.photos.length, 'photos');
-          for (const photo of insp.photos) {
-            try {
-              const url = typeof photo === 'string' ? photo : photo.url;
-              if (url) {
-                const storageRef = firebase.storage().refFromURL(url);
-                await storageRef.delete();
-              }
-            } catch (e) { console.warn('Could not delete photo:', e); }
-          }
-        }
+        // Delete photos from storage - handles every stored format, and a
+        // missing file never blocks deleting the document.
+        const photoResult = await PhotoService.deletePhotos(insp.photos);
+        console.log('Photos supprimées:', photoResult.deleted, '- échecs:', photoResult.failed);
 
         // Delete document
         console.log('Deleting document:', id);
