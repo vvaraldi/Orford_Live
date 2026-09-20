@@ -54,7 +54,9 @@ const APP_CONFIG = {
     signalisationResume: '/pages/signalisation-resume.html',
     signalisationAdmin: '/pages/signalisation-admin.html',
     // Support (requests)
-    support: '/pages/support.html'
+    support: '/pages/support.html',
+    // Public
+    publicStatus: '/pages/public-status.html'
   },
 
   // ===== MODULE DEFINITIONS =====
