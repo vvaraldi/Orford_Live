@@ -57,6 +57,28 @@
       border-color: #d97706;
     }
     
+    /* Activity (network) badges: icon + name, same on/off look as the app badges */
+    .access-badge--clickable.access-badge--network {
+      width: auto;
+      padding: 0 0.65rem;
+      gap: 0.35rem;
+      font-size: 0.85rem;
+      font-weight: 600;
+    }
+
+    .access-badge--clickable.is-active.access-badge--network {
+      background: rgba(var(--theme-accent-rgb), 0.15);
+      border-color: var(--theme-accent);
+    }
+
+    /* Not editable by the current admin (outside their activities, or a system admin) */
+    .access-badge--locked,
+    .access-badge--locked:hover {
+      cursor: default;
+      transform: none;
+      border-color: transparent;
+    }
+
     .user-table__access {
       display: flex;
       gap: 0.5rem;
@@ -284,6 +306,9 @@
               <option value="active">Actifs</option>
               <option value="inactive">Inactifs</option>
             </select>
+            <select class="form-select form-select--sm" id="filter-network" style="width: auto;">
+              <option value="">Toutes les activités</option>
+            </select>
             <button class="btn btn-primary" onclick="openAddUserModal()">
               <span>➕</span>
               <span>Ajouter</span>
@@ -298,6 +323,7 @@
                 <th>Nom</th>
                 <th>Courriel</th>
                 <th>Rôle</th>
+                <th>Activités</th>
                 <th>Accès (cliquer pour modifier)</th>
                 <th>Statut</th>
                 <th class="table-cell--actions">Actions</th>
@@ -350,7 +376,8 @@
         </div>
         <p class="data-export-section__description">
           Importez plusieurs utilisateurs à partir d'un fichier CSV. Le fichier doit contenir les colonnes: 
-          <strong>name, email, password, role</strong> (optionnel: phone, allowInspection, allowInfraction, allowSignalisation)
+          <strong>name, email, password, role</strong> (optionnel: phone, allowInspection, allowInfraction, allowSignalisation, networks).
+          <strong>networks</strong> : activités séparées par « | », par exemple <code>ski|bike</code>. Sans cette colonne, l'utilisateur reçoit l'activité par défaut (ski).
         </p>
 
         <div class="form-group">
@@ -372,6 +399,7 @@
                   <th>Nom</th>
                   <th>Email</th>
                   <th>Rôle</th>
+                  <th>Activités</th>
                   <th>Accès</th>
                 </tr>
               </thead>
@@ -536,6 +564,7 @@
             <div class="form-group">
               <label class="form-label form-label--required" for="user-email">Courriel</label>
               <input type="email" class="form-input" id="user-email" required>
+              <span class="form-hint" id="user-email-hint" style="display: none;">Le courriel est l'identifiant de connexion : il ne peut pas être modifié ici.</span>
             </div>
           </div>
 
@@ -563,6 +592,12 @@
           </div>
 
           <div class="edit-user-form__access">
+            <div class="edit-user-form__access-title">Activités auxquelles l'utilisateur a accès</div>
+            <div id="network-checkboxes"><!-- built from APP_CONFIG.networks --></div>
+            <span class="form-hint" id="network-hint"></span>
+          </div>
+
+          <div class="edit-user-form__access">
             <div class="edit-user-form__access-title">Permissions d'accès aux applications</div>
             <div class="form-check">
               <input type="checkbox" class="form-check-input" id="access-inspection" checked>
@@ -581,7 +616,7 @@
           <div class="form-group" id="password-group" style="display: none;">
             <label class="form-label form-label--required" for="user-password">Mot de passe temporaire</label>
             <input type="password" class="form-input" id="user-password" minlength="6">
-            <span class="form-hint">L'utilisateur devra changer ce mot de passe à la première connexion.</span>
+            <span class="form-hint">Communiquez-le à l'utilisateur : il pourra le changer depuis « Mon profil ».</span>
           </div>
         </form>
       </div>
@@ -617,6 +652,32 @@
     let filteredUsers = [];
     let editingUserId = null;
     let isCurrentUserSystemAdmin = false;
+
+    // ========================================
+    // ACTIVITIES (networks)
+    // ========================================
+    // A user's access is inspectors/{uid}.networks. Missing = APP_CONFIG.defaultNetworks;
+    // system_admin always has every activity. These rules mirror the Firestore rules.
+
+    const NETWORK_IDS = Object.keys(APP_CONFIG.networks);
+
+    function networksOf(user) {
+      if (user.role === 'system_admin') return NETWORK_IDS;
+      return Array.isArray(user.networks) ? user.networks : APP_CONFIG.defaultNetworks;
+    }
+
+    // Activities the current admin can grant, remove and manage
+    function myNetworks() {
+      return isCurrentUserSystemAdmin ? NETWORK_IDS : networksOf(currentUserData);
+    }
+
+    // An admin manages users who share at least one of their activities; only a
+    // system admin manages system admins
+    function canManage(user) {
+      if (isCurrentUserSystemAdmin) return true;
+      if (user.role === 'system_admin') return false;
+      return networksOf(user).some(id => myNetworks().includes(id));
+    }
 
     // ========================================
     // TAB NAVIGATION
@@ -669,13 +730,15 @@
     function filterAndRenderUsers() {
       const search = document.getElementById('search-users').value.toLowerCase();
       const statusFilter = document.getElementById('filter-status').value;
+      const networkFilter = document.getElementById('filter-network').value;
 
       filteredUsers = users.filter(user => {
-        const matchesSearch = !search || 
+        const matchesSearch = !search ||
           user.name?.toLowerCase().includes(search) ||
           user.email?.toLowerCase().includes(search);
         const matchesStatus = !statusFilter || user.status === statusFilter;
-        return matchesSearch && matchesStatus;
+        const matchesNetwork = !networkFilter || networksOf(user).includes(networkFilter);
+        return matchesSearch && matchesStatus && matchesNetwork;
       });
       renderUsers();
     }
@@ -705,11 +768,12 @@
           roleBadgeClass = 'badge-admin';
           roleLabel = 'Admin';
         }
-        
+        const manageable = canManage(user);
+
         return `
         <tr>
           <td data-label="Nom">
-            <span class="user-table__name" onclick="editUser('${user.id}')">${escapeHtml(user.name || '-')}</span>
+            <span class="user-table__name" ${manageable ? `onclick="editUser('${user.id}')"` : ''}>${escapeHtml(user.name || '-')}</span>
           </td>
           <td data-label="Courriel">${escapeHtml(user.email || '-')}</td>
           <td data-label="Rôle">
@@ -717,43 +781,89 @@
               ${roleLabel}
             </span>
           </td>
+          <td data-label="Activités">
+            <div class="user-table__access">
+              ${NETWORK_IDS.map(id => networkBadge(user, id, manageable)).join('')}
+            </div>
+          </td>
           <td data-label="Accès">
             <div class="user-table__access">
-              <span 
-                class="access-badge--clickable access-badge--inspection ${user.allowInspection === true ? 'is-active' : ''}"
-                title="Inspection - Cliquer pour ${user.allowInspection === true ? 'désactiver' : 'activer'}"
-                onclick="toggleAccess('${user.id}', 'allowInspection', ${user.allowInspection === true})"
-              >🔍</span>
-              <span 
-                class="access-badge--clickable access-badge--infraction ${user.allowInfraction === true ? 'is-active' : ''}" 
-                title="Infraction - Cliquer pour ${user.allowInfraction === true ? 'désactiver' : 'activer'}"
-                onclick="toggleAccess('${user.id}', 'allowInfraction', ${user.allowInfraction === true})"
-              >🚨</span>
-              <span 
-                class="access-badge--clickable access-badge--signalisation ${user.allowSignalisation === true ? 'is-active' : ''}" 
-                title="Signalisation - Cliquer pour ${user.allowSignalisation === true ? 'désactiver' : 'activer'}"
-                onclick="toggleAccess('${user.id}', 'allowSignalisation', ${user.allowSignalisation === true})"
-              >🚧</span>
+              ${appBadge(user, manageable, 'allowInspection', 'inspection', '🔍', 'Inspection')}
+              ${appBadge(user, manageable, 'allowInfraction', 'infraction', '🚨', 'Infraction')}
+              ${appBadge(user, manageable, 'allowSignalisation', 'signalisation', '🚧', 'Signalisation')}
             </div>
           </td>
           <td data-label="Statut">
-            <span class="badge ${user.status === 'active' ? 'badge-success' : 'badge-secondary'}" 
-                  style="cursor: pointer;" 
-                  onclick="toggleUserStatus('${user.id}')" 
-                  title="Cliquer pour ${user.status === 'active' ? 'désactiver' : 'activer'}">
+            <span class="badge ${user.status === 'active' ? 'badge-success' : 'badge-secondary'}"
+                  ${manageable ? `style="cursor: pointer;" onclick="toggleUserStatus('${user.id}')" title="Cliquer pour ${user.status === 'active' ? 'désactiver' : 'activer'}"` : ''}>
               ${user.status === 'active' ? 'Actif' : 'Inactif'}
             </span>
           </td>
           <td class="table-cell--actions" data-label="Actions">
             <div class="user-table__actions">
-              <button class="btn btn-ghost btn-icon btn-icon--sm" onclick="editUser('${user.id}')" title="Modifier">✏️</button>
+              ${manageable
+                ? `<button class="btn btn-ghost btn-icon btn-icon--sm" onclick="editUser('${user.id}')" title="Modifier">✏️</button>`
+                : `<span title="En dehors de vos activités" style="opacity: 0.4;">🔒</span>`}
             </div>
           </td>
         </tr>
       `}).join('');
     }
 
+    // App permission badge (inspection / infraction / signalisation)
+    function appBadge(user, manageable, field, cls, icon, label) {
+      const on = user[field] === true;
+      const attrs = manageable
+        ? `onclick="toggleAccess('${user.id}', '${field}', ${on})" title="${label} - Cliquer pour ${on ? 'désactiver' : 'activer'}"`
+        : `title="${label}"`;
+      return `<span class="access-badge--clickable access-badge--${cls} ${on ? 'is-active' : ''} ${manageable ? '' : 'access-badge--locked'}" ${attrs}>${icon}</span>`;
+    }
+
+    // Activity badge: clickable only for activities the current admin holds themselves
+    function networkBadge(user, id, manageable) {
+      const net = APP_CONFIG.networks[id];
+      const on = networksOf(user).includes(id);
+      const editable = manageable && user.role !== 'system_admin' && myNetworks().includes(id);
+      const attrs = editable
+        ? `onclick="toggleNetwork('${user.id}', '${id}')" title="${net.name} - Cliquer pour ${on ? 'retirer' : 'ajouter'}"`
+        : `title="${net.name}${user.role === 'system_admin' ? ' (System Admin : toutes les activités)' : ''}"`;
+      return `<span class="access-badge--clickable access-badge--network ${on ? 'is-active' : ''} ${editable ? '' : 'access-badge--locked'}" ${attrs}>${net.icon}<span>${net.name}</span></span>`;
+    }
+
+    async function toggleNetwork(userId, networkId) {
+      const user = users.find(u => u.id === userId);
+      if (!user || !canManage(user) || !myNetworks().includes(networkId)) return;
+
+      const current = networksOf(user);
+      const next = current.includes(networkId)
+        ? current.filter(id => id !== networkId)
+        : [...current, networkId];
+
+      if (next.length === 0) {
+        showMessage('Un utilisateur doit garder au moins une activité. Désactivez-le plutôt.', 'warning');
+        return;
+      }
+
+      try {
+        await db.collection('inspectors').doc(userId).update({
+          networks: next,
+          modifiedAt: firebase.firestore.FieldValue.serverTimestamp(),
+          modifiedBy: currentUser.uid
+        });
+        user.networks = next;
+        filterAndRenderUsers();
+        const net = APP_CONFIG.networks[networkId];
+        showMessage(`${net.name} ${next.includes(networkId) ? 'ajouté' : 'retiré'} pour ${user.name || 'utilisateur'}.`, 'success');
+      } catch (error) {
+        console.error('Error toggling network:', error);
+        showMessage('Erreur lors de la modification.', 'error');
+      }
+    }
+
     async function toggleAccess(userId, field, currentValue) {
+      const target = users.find(u => u.id === userId);
+      if (!target || !canManage(target)) return;
+
       try {
         const newValue = !currentValue;
         await db.collection('inspectors').doc(userId).update({
@@ -776,15 +886,59 @@
       }
     }
 
+    // ----- Activity checkboxes in the user modal -----
+
+    function buildNetworkCheckboxes() {
+      document.getElementById('network-checkboxes').innerHTML = NETWORK_IDS.map(id => {
+        const net = APP_CONFIG.networks[id];
+        return `
+          <div class="form-check">
+            <input type="checkbox" class="form-check-input" id="network-${id}" value="${id}">
+            <label class="form-check-label" for="network-${id}">${net.icon} ${net.name}</label>
+          </div>`;
+      }).join('');
+    }
+
+    function setNetworkCheckboxes(selected) {
+      NETWORK_IDS.forEach(id => {
+        document.getElementById(`network-${id}`).checked = selected.includes(id);
+      });
+      applyNetworkLocks();
+    }
+
+    // Only activities the admin holds can be changed; a system admin always has all of them
+    function applyNetworkLocks() {
+      const systemAdminRole = document.getElementById('user-role').value === 'system_admin';
+      let someLocked = false;
+      NETWORK_IDS.forEach(id => {
+        const box = document.getElementById(`network-${id}`);
+        if (systemAdminRole) box.checked = true;
+        box.disabled = systemAdminRole || !myNetworks().includes(id);
+        if (box.disabled) someLocked = true;
+      });
+      document.getElementById('network-hint').textContent = systemAdminRole
+        ? 'Un System Admin a accès à toutes les activités.'
+        : (someLocked ? 'Vous ne pouvez modifier que vos propres activités.' : '');
+    }
+
+    function selectedNetworks() {
+      return NETWORK_IDS.filter(id => document.getElementById(`network-${id}`).checked);
+    }
+
     function openAddUserModal() {
       editingUserId = null;
       document.getElementById('modal-title').textContent = 'Ajouter un utilisateur';
       document.getElementById('user-form').reset();
       document.getElementById('user-id').value = '';
+      document.getElementById('user-email').readOnly = false;
+      document.getElementById('user-email-hint').style.display = 'none';
+      document.getElementById('user-role').disabled = false;
       document.getElementById('password-group').style.display = 'block';
       document.getElementById('user-password').required = true;
       document.getElementById('access-inspection').checked = true;
-      
+      // Prefill the admin's own activity when they only have one
+      setNetworkCheckboxes(myNetworks().length === 1 ? myNetworks() : []);
+
       document.getElementById('user-modal').classList.add('is-active');
       document.body.classList.add('modal-open');
     }
@@ -792,12 +946,19 @@
     function editUser(userId) {
       const user = users.find(u => u.id === userId);
       if (!user) return;
+      if (!canManage(user)) {
+        showMessage('Cet utilisateur n\'appartient à aucune de vos activités.', 'warning');
+        return;
+      }
 
       editingUserId = userId;
       document.getElementById('modal-title').textContent = 'Modifier l\'utilisateur';
       document.getElementById('user-id').value = userId;
       document.getElementById('user-name').value = user.name || '';
       document.getElementById('user-email').value = user.email || '';
+      // The email is the login: changing it here would only change the profile, not the login
+      document.getElementById('user-email').readOnly = true;
+      document.getElementById('user-email-hint').style.display = '';
       document.getElementById('user-phone').value = user.phone || '';
       document.getElementById('user-role').value = user.role || 'inspector';
       document.getElementById('user-status').value = user.status || 'active';
@@ -828,13 +989,9 @@
         systemAdminOption.style.display = 'none';
         roleSelect.disabled = false;
         roleSelect.title = '';
-        
-        // If the user being edited is system_admin but current user is not, they can't change their role
-        if (user.role === 'system_admin') {
-          roleSelect.disabled = true;
-          roleSelect.title = 'Seul un System Admin peut modifier le rôle d\'un autre System Admin';
-        }
       }
+
+      setNetworkCheckboxes(networksOf(user));
 
       document.getElementById('user-modal').classList.add('is-active');
       document.body.classList.add('modal-open');
@@ -858,10 +1015,20 @@
         phone: document.getElementById('user-phone').value.trim() || null,
         role: document.getElementById('user-role').value,
         status: document.getElementById('user-status').value,
+        networks: selectedNetworks(),
         allowInspection: document.getElementById('access-inspection').checked,
         allowInfraction: document.getElementById('access-infraction').checked,
         allowSignalisation: document.getElementById('access-signalisation').checked
       };
+
+      if (userData.networks.length === 0) {
+        showMessage('Choisissez au moins une activité.', 'warning');
+        return;
+      }
+      if (!isNew && userId === currentUser.uid && userData.status !== 'active') {
+        showMessage('Vous ne pouvez pas vous désactiver vous-même.', 'warning');
+        return;
+      }
 
       setButtonLoading(btn, true, 'Enregistrement...');
 
@@ -883,8 +1050,9 @@
           }
           showMessage('Utilisateur créé.', 'success');
         } else {
+          const { email, ...changes } = userData; // the login email is never changed from here
           await db.collection('inspectors').doc(userId).update({
-            ...userData,
+            ...changes,
             modifiedAt: firebase.firestore.FieldValue.serverTimestamp(),
             modifiedBy: currentUser.uid
           });
@@ -902,7 +1070,11 @@
 
     async function toggleUserStatus(userId) {
       const user = users.find(u => u.id === userId);
-      if (!user) return;
+      if (!user || !canManage(user)) return;
+      if (userId === currentUser.uid) {
+        showMessage('Vous ne pouvez pas vous désactiver vous-même.', 'warning');
+        return;
+      }
 
       const newStatus = user.status === 'active' ? 'inactive' : 'active';
 
@@ -930,6 +1102,7 @@
         return {
           Nom: u.name, Courriel: u.email, Téléphone: u.phone || '',
           Rôle: roleLabel,
+          Activités: networksOf(u).map(id => APP_CONFIG.networks[id].name).join(' | '),
           Statut: u.status === 'active' ? 'Actif' : 'Inactif',
           Inspection: u.allowInspection === true ? 'Oui' : 'Non',
           Infraction: u.allowInfraction === true ? 'Oui' : 'Non',
@@ -939,7 +1112,7 @@
 
       if (format === 'csv') {
         const headers = Object.keys(data[0] || {}).join(',');
-        const rows = data.map(row => Object.values(row).map(v => `"${v}"`).join(','));
+        const rows = data.map(row => Object.values(row).map(v => `"${String(v ?? '').replace(/"/g, '""')}"`).join(','));
         downloadFile('\uFEFF' + [headers, ...rows].join('\n'), 'utilisateurs.csv', 'text/csv;charset=utf-8');
       } else {
         downloadFile(JSON.stringify(data, null, 2), 'utilisateurs.json', 'application/json');
@@ -1177,6 +1350,22 @@
         user.allowInfraction = user.allowinfraction === 'true' || user.allowinfraction === '1';
         user.allowSignalisation = user.allowsignalisation === 'true' || user.allowsignalisation === '1';
 
+        // Activities: "ski|bike". A system admin gets all of them; anyone else only gets
+        // activities the importing admin holds. Empty column = default activity.
+        // An empty result is reported per user when the import runs.
+        const requested = (user.networks || '').split(/[|;]/)
+          .map(id => id.trim().toLowerCase())
+          .filter(id => NETWORK_IDS.includes(id));
+        const granted = requested.filter(id => myNetworks().includes(id));
+        const fallback = APP_CONFIG.defaultNetworks.filter(id => myNetworks().includes(id));
+        if (user.role === 'system_admin') {
+          user.networks = [...NETWORK_IDS];
+        } else if (requested.length) {
+          user.networks = granted;
+        } else {
+          user.networks = fallback.length ? fallback : myNetworks().slice(0, 1);
+        }
+
         if (user.name && user.email && user.password) {
           parsedUsers.push(user);
         }
@@ -1206,6 +1395,9 @@
           <td>${escapeHtml(user.name)}</td>
           <td>${escapeHtml(user.email)}</td>
           <td><span class="badge ${roleBadgeClass}">${user.role}</span></td>
+          <td>${user.networks.length
+            ? user.networks.map(id => `${APP_CONFIG.networks[id].icon} ${APP_CONFIG.networks[id].name}`).join(', ')
+            : '<span style="color: var(--color-danger);">⚠ aucune activité permise</span>'}</td>
           <td>
             <span class="access-badge--clickable access-badge--inspection ${user.allowInspection ? 'is-active' : ''}" style="width:24px;height:24px;font-size:0.875rem;">🔍</span>
             <span class="access-badge--clickable access-badge--infraction ${user.allowInfraction ? 'is-active' : ''}" style="width:24px;height:24px;font-size:0.875rem;">🚨</span>
@@ -1266,6 +1458,11 @@
           continue;
         }
 
+        if (user.networks.length === 0) {
+          results.errors.push({ email: user.email, reason: 'Aucune activité que vous pouvez attribuer' });
+          continue;
+        }
+
         // Create user using secondary Firebase app to avoid logging out current user
         let secondaryApp = null;
         try {
@@ -1280,6 +1477,7 @@
             phone: user.phone || null,
             role: user.role,
             status: 'active',
+            networks: user.networks,
             allowInspection: user.allowInspection,
             allowInfraction: user.allowInfraction,
             allowSignalisation: user.allowSignalisation,
@@ -1351,9 +1549,9 @@
     }
 
     function downloadCsvTemplate() {
-      const template = `name,email,password,role,phone,allowInspection,allowInfraction,allowSignalisation
-Jean Dupont,jean.dupont@example.com,MotDePasse123,inspector,514-555-1234,true,false,false
-Marie Tremblay,marie.tremblay@example.com,MotDePasse456,admin,,true,true,true`;
+      const template = `name,email,password,role,phone,allowInspection,allowInfraction,allowSignalisation,networks
+Jean Dupont,jean.dupont@example.com,MotDePasse123,inspector,514-555-1234,true,false,false,ski
+Marie Tremblay,marie.tremblay@example.com,MotDePasse456,admin,,true,true,true,ski|bike`;
       
       downloadFile('\uFEFF' + template, 'modele_import_utilisateurs.csv', 'text/csv;charset=utf-8');
       showMessage('Modèle CSV téléchargé.', 'success');
@@ -1375,11 +1573,17 @@ Marie Tremblay,marie.tremblay@example.com,MotDePasse456,admin,,true,true,true`;
           if (isCurrentUserSystemAdmin) {
             document.getElementById('role-system-admin-option').style.display = '';
           }
-          
+
+          buildNetworkCheckboxes();
+          document.getElementById('filter-network').insertAdjacentHTML('beforeend',
+            NETWORK_IDS.map(id => `<option value="${id}">${APP_CONFIG.networks[id].icon} ${APP_CONFIG.networks[id].name}</option>`).join(''));
+          document.getElementById('user-role').addEventListener('change', applyNetworkLocks);
+
           loadUsers();
           initializeExportDate();
           document.getElementById('search-users').addEventListener('input', debounce(filterAndRenderUsers, 300));
           document.getElementById('filter-status').addEventListener('change', filterAndRenderUsers);
+          document.getElementById('filter-network').addEventListener('change', filterAndRenderUsers);
         }
       });
     }

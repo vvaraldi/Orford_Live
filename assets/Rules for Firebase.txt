@@ -13,6 +13,34 @@ service cloud.firestore {
              get(/databases/$(database)/documents/inspectors/$(request.auth.uid)).data.role == 'system_admin';
     }
     
+    // Activities (networks) a user works in: inspectors/{uid}.networks.
+    // A user without the field is a ski user (existing accounts).
+    function networksOf(uid) {
+      return get(/databases/$(database)/documents/inspectors/$(uid)).data.get('networks', ['ski']);
+    }
+
+    // Activities added to or removed from a user document by the current write
+    function changedNetworks() {
+      return resource.data.get('networks', ['ski']).toSet()
+               .difference(request.resource.data.get('networks', ['ski']).toSet())
+             .union(request.resource.data.get('networks', ['ski']).toSet()
+               .difference(resource.data.get('networks', ['ski']).toSet()));
+    }
+
+    // A system_admin can edit any user. An admin can edit users who share one of
+    // their activities (never a system_admin), and can only add or remove
+    // activities they hold themselves. Every user keeps at least one activity.
+    function adminMayUpdateUser() {
+      return isSystemAdmin() ||
+             (isAdmin() &&
+              resource.data.role != 'system_admin' &&
+              request.resource.data.role != 'system_admin' &&
+              request.resource.data.get('networks', ['ski']).size() > 0 &&
+              resource.data.get('networks', ['ski']).toSet()
+                .intersection(networksOf(request.auth.uid).toSet()).size() > 0 &&
+              changedNetworks().difference(networksOf(request.auth.uid).toSet()).size() == 0);
+    }
+
     // PUBLIC ACCESS - For status page
     match /trails/{document} {
       allow read: if true;
@@ -48,16 +76,18 @@ service cloud.firestore {
     match /inspectors/{userId} {
       allow read: if request.auth != null;
 
-      // Only admins create accounts; only a system_admin can grant system_admin
+      // Only admins create accounts. Only a system_admin can grant system_admin or
+      // any activity; an admin can only give activities they hold, and at least one.
       allow create: if isAdmin() &&
-                    (request.resource.data.role != 'system_admin' || isSystemAdmin());
+                    (request.resource.data.role != 'system_admin' || isSystemAdmin()) &&
+                    (isSystemAdmin() ||
+                     (request.resource.data.get('networks', ['ski']).size() > 0 &&
+                      request.resource.data.get('networks', ['ski']).toSet()
+                        .difference(networksOf(request.auth.uid).toSet()).size() == 0));
 
-      // Admins can edit anyone (but not newly grant system_admin).
+      // Admin edits: see adminMayUpdateUser().
       // Users can only edit their own non-privileged fields (see user-profile.html, theme.js).
-      allow update: if (isAdmin() &&
-                        (request.resource.data.role != 'system_admin' ||
-                         resource.data.role == 'system_admin' ||
-                         isSystemAdmin())) ||
+      allow update: if adminMayUpdateUser() ||
                        (request.auth != null && request.auth.uid == userId &&
                         request.resource.data.diff(resource.data).affectedKeys()
                           .hasOnly(['phone', 'preferences']));

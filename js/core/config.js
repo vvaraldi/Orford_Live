@@ -97,6 +97,15 @@ const APP_CONFIG = {
     }
   },
 
+  // ===== NETWORKS (activities) =====
+  // A user's access is the list of these ids in inspectors/{uid}.networks.
+  // A user without that field is treated as defaultNetworks (existing users are ski).
+  networks: {
+    ski: { id: 'ski', name: 'Ski', icon: '⛷️' },
+    bike: { id: 'bike', name: 'Vélo', icon: '🚵' }
+  },
+  defaultNetworks: ['ski'],
+
   // ===== NAVIGATION (rendered by js/core/layout.js) =====
   // One set per module, chosen with <body data-nav="...">. The current page is
   // <body data-page="...">. Paths are relative to the site root.
@@ -163,6 +172,8 @@ Object.freeze(APP_CONFIG.firebase);
 Object.freeze(APP_CONFIG.routes);
 Object.freeze(APP_CONFIG.modules);
 Object.freeze(APP_CONFIG.nav);
+Object.freeze(APP_CONFIG.networks);
+Object.freeze(APP_CONFIG.defaultNetworks);
 Object.freeze(APP_CONFIG.defaults);
 
 // Export for use
