@@ -111,9 +111,13 @@ const APP_CONFIG = {
   // <body data-page="...">. Paths are relative to the site root.
   // admin: true = only shown to admins (unless it is the current page).
   // desktopIcons: false = the desktop bar shows labels only (mobile always has icons).
+  // desktopOnly: true = not listed in the mobile drawer.
+  // mobileProfile: true = the mobile drawer lists "Mon profil" (only on portal-level pages;
+  // in the apps it stays in the desktop user menu).
   nav: {
     portal: {
       logo: { icon: '🏔️', text: 'Orford Live' },
+      mobileProfile: true,
       items: []
     },
     inspection: {
@@ -148,12 +152,14 @@ const APP_CONFIG = {
     },
     admin: {
       logo: { icon: '🏔️', text: 'Orford Live' },
+      mobileProfile: true,
       items: []
     },
     profile: {
       logo: { icon: '🏔️', text: 'Orford Live' },
+      mobileProfile: true,
       items: [
-        { id: 'user-management', label: 'Administration', icon: '⚙️', href: 'pages/user-management.html', admin: true }
+        { id: 'user-management', label: 'Administration', icon: '⚙️', href: 'pages/user-management.html', admin: true, desktopOnly: true }
       ]
     }
   },
