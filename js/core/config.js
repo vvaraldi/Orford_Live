@@ -97,6 +97,58 @@ const APP_CONFIG = {
     }
   },
 
+  // ===== NAVIGATION (rendered by js/core/layout.js) =====
+  // One set per module, chosen with <body data-nav="...">. The current page is
+  // <body data-page="...">. Paths are relative to the site root.
+  // admin: true = only shown to admins (unless it is the current page).
+  // desktopIcons: false = the desktop bar shows labels only (mobile always has icons).
+  nav: {
+    portal: {
+      logo: { icon: '🏔️', text: 'Orford Live' },
+      items: []
+    },
+    inspection: {
+      logo: { icon: '🔍', text: 'Inspection' },
+      desktopIcons: false,
+      items: [
+        { id: 'inspection-dashboard', label: 'Tableau de bord', icon: '📊', href: 'pages/inspection-dashboard.html' },
+        { id: 'inspection-trail-report', label: 'Rapport sentier', icon: '📝', href: 'pages/inspection-trail-report.html' },
+        { id: 'inspection-shelter-report', label: 'Rapport abri', icon: '📝', href: 'pages/inspection-shelter-report.html' },
+        { id: 'inspection-history', label: 'Historique', icon: '📋', href: 'pages/inspection-history.html' },
+        { id: 'inspection-admin', label: 'Admin', icon: '⚙️', href: 'pages/inspection-admin.html', admin: true }
+      ]
+    },
+    infraction: {
+      logo: { icon: '🚨', text: 'Infractions' },
+      items: [
+        { id: 'infraction-report', label: 'Rapport', icon: '📝', href: 'pages/infraction-report.html' },
+        { id: 'infraction-admin', label: 'Gestion', icon: '📋', href: 'pages/infraction-admin.html', admin: true }
+      ]
+    },
+    signalisation: {
+      logo: { icon: '🚧', text: 'Signalisation' },
+      items: [
+        { id: 'signalisation-report', label: 'Rapport', icon: '📝', href: 'pages/signalisation-report.html' },
+        { id: 'signalisation-resume', label: 'Résumé', icon: '🗺️', href: 'pages/signalisation-resume.html' },
+        { id: 'signalisation-admin', label: 'Gestion', icon: '📋', href: 'pages/signalisation-admin.html', admin: true }
+      ]
+    },
+    support: {
+      logo: { icon: '📋', text: 'Support' },
+      items: []
+    },
+    admin: {
+      logo: { icon: '🏔️', text: 'Orford Live' },
+      items: []
+    },
+    profile: {
+      logo: { icon: '🏔️', text: 'Orford Live' },
+      items: [
+        { id: 'user-management', label: 'Administration', icon: '⚙️', href: 'pages/user-management.html', admin: true }
+      ]
+    }
+  },
+
   // ===== DEFAULT SETTINGS =====
   defaults: {
     theme: 'light',
@@ -110,6 +162,7 @@ Object.freeze(APP_CONFIG.branding);
 Object.freeze(APP_CONFIG.firebase);
 Object.freeze(APP_CONFIG.routes);
 Object.freeze(APP_CONFIG.modules);
+Object.freeze(APP_CONFIG.nav);
 Object.freeze(APP_CONFIG.defaults);
 
 // Export for use

@@ -1,0 +1,134 @@
+/**
+ * layout.js - Shared header and mobile menu for Orford Live
+ * ==========================================================
+ * Renders the skip link, header (logo, nav links, theme toggle, user menu) and
+ * the mobile drawer from APP_CONFIG.nav, so the markup lives in one place.
+ *
+ * Load it right after <body>, after config.js, so the menus exist before
+ * ui.js and theme.js initialise:
+ *
+ *   <body data-nav="inspection" data-page="inspection-dashboard">
+ *     <script src="../js/core/config.js"></script>
+ *     <script src="../js/core/layout.js"></script>
+ *
+ * data-nav   which set of links to use (a key of APP_CONFIG.nav)
+ * data-page  the current page: shown as active, and never hidden even if admin-only
+ */
+(function () {
+  'use strict';
+
+  if (typeof APP_CONFIG === 'undefined' || !APP_CONFIG.nav) return;
+
+  const body = document.body;
+  const nav = APP_CONFIG.nav[body.dataset.nav];
+  if (!nav) return;
+  const pageId = body.dataset.page;
+
+  // Config paths are relative to the site root; pages live in /pages/
+  const inPages = window.location.pathname.includes('/pages/');
+  const url = path => (inPages ? (path.startsWith('pages/') ? path.slice('pages/'.length) : '../' + path) : path);
+
+  const HOME = { id: 'portal', label: 'Portail', icon: '🏠', href: 'index.html' };
+  const PROFILE = { id: 'user-profile', label: 'Mon profil', icon: '👤', href: 'pages/user-profile.html' };
+
+  // Admin-only links start hidden; auth.js shows [data-require-admin] for admins
+  const adminAttrs = item => (item.admin ? ' data-require-admin style="display:none;"' : '');
+
+  // ---- Desktop nav ----------------------------------------------------------
+  function desktopLink(item) {
+    const showIcon = item.id === HOME.id || nav.desktopIcons !== false;
+    const inner = `${showIcon ? `<span>${item.icon}</span>` : ''}<span>${item.label}</span>`;
+    if (item.id === pageId) return `<span class="nav__link nav__link--active">${inner}</span>`;
+    return `<a href="${url(item.href)}" class="nav__link${item.admin ? ' nav__link--admin' : ''}"${adminAttrs(item)}>${inner}</a>`;
+  }
+
+  const desktopLinks = [desktopLink(HOME)];
+  if (nav.items.length) {
+    desktopLinks.push('<div class="nav__divider"></div>');
+    nav.items.forEach(item => desktopLinks.push(desktopLink(item)));
+  }
+
+  // ---- Mobile drawer --------------------------------------------------------
+  function mobileLink(item) {
+    const inner = `<span class="mobile-nav__link-icon">${item.icon}</span><span>${item.label}</span>`;
+    if (item.id === pageId) return `<span class="mobile-nav__link mobile-nav__link--active">${inner}</span>`;
+    return `<a href="${url(item.href)}" class="mobile-nav__link${item.admin ? ' mobile-nav__link--admin' : ''}"${adminAttrs(item)}>${inner}</a>`;
+  }
+
+  const closeIcon = '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>';
+  const menuIcon = '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="3" y1="12" x2="21" y2="12"></line><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="18" x2="21" y2="18"></line></svg>';
+  const moonIcon = '<svg class="theme-toggle__icon theme-toggle__icon--moon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg>';
+  const sunIcon = '<svg class="theme-toggle__icon theme-toggle__icon--sun" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display: none;"><circle cx="12" cy="12" r="5"></circle><line x1="12" y1="1" x2="12" y2="3"></line><line x1="12" y1="21" x2="12" y2="23"></line><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line><line x1="1" y1="12" x2="3" y2="12"></line><line x1="21" y1="12" x2="23" y2="12"></line><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line></svg>';
+
+  const html = `
+    <a href="#main-content" class="skip-link">Aller au contenu principal</a>
+
+    <header class="header">
+      <div class="logo">
+        <span class="logo__icon">${nav.logo.icon}</span>
+        <span class="logo__text">${nav.logo.text}</span>
+      </div>
+
+      <nav class="nav">
+        ${desktopLinks.join('\n        ')}
+        <div class="nav__divider"></div>
+        <button class="theme-toggle" onclick="window.themeManager.toggle()" aria-label="Changer le thème" title="Changer le thème">
+          ${moonIcon}
+          ${sunIcon}
+        </button>
+        <div class="user-menu">
+          <button class="user-menu__trigger">
+            <span class="user-menu__avatar" data-user-initials>--</span>
+            <span class="user-menu__name" data-user-name>Chargement...</span>
+          </button>
+          <div class="user-menu__dropdown">
+            <div class="user-menu__header">
+              <div class="user-menu__header-name" data-user-name>-</div>
+              <div class="user-menu__header-email" data-user-email>-</div>
+            </div>
+            <a href="${url(PROFILE.href)}" class="user-menu__item${pageId === PROFILE.id ? ' is-active' : ''}"><span>${PROFILE.icon}</span><span>${PROFILE.label}</span></a>
+            <div class="user-menu__divider"></div>
+            <button class="user-menu__item user-menu__item--danger" onclick="handleLogout()"><span>🚪</span><span>Déconnexion</span></button>
+          </div>
+        </div>
+      </nav>
+
+      <button class="mobile-menu-btn" id="mobile-menu-btn" aria-label="Menu">${menuIcon}</button>
+    </header>
+
+    <div class="mobile-nav__backdrop" id="mobile-nav-backdrop"></div>
+    <nav class="mobile-nav" id="mobile-nav">
+      <div class="mobile-nav__header">
+        <div class="mobile-nav__logo"><span>${nav.logo.icon}</span><span>${nav.logo.text}</span></div>
+        <button class="mobile-nav__close" id="mobile-nav-close" aria-label="Fermer">${closeIcon}</button>
+      </div>
+
+      <div class="mobile-nav__user">
+        <div class="mobile-nav__user-name" data-user-name>-</div>
+        <div class="mobile-nav__user-role" data-user-role>-</div>
+      </div>
+
+      <div class="mobile-nav__section">
+        ${mobileLink(HOME)}
+      </div>
+      <div class="mobile-nav__divider"></div>
+      <div class="mobile-nav__section">
+        ${nav.items.map(mobileLink).join('\n        ')}
+        ${mobileLink(PROFILE)}
+      </div>
+      <div class="mobile-nav__divider"></div>
+      <div class="mobile-nav__section">
+        <a href="#" class="mobile-nav__link" onclick="handleLogout(); return false;"><span class="mobile-nav__link-icon">🚪</span><span>Déconnexion</span></a>
+      </div>
+
+      <div class="mobile-nav__theme">
+        <span class="mobile-nav__theme-label"><span>🌙</span><span>Mode sombre</span></span>
+        <label class="form-switch">
+          <input type="checkbox" class="form-switch__input mobile-nav__theme-toggle" id="mobile-theme-toggle" onchange="window.themeManager.toggle()">
+        </label>
+      </div>
+    </nav>
+  `;
+
+  body.insertAdjacentHTML('afterbegin', html);
+})();
