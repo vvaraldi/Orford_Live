@@ -42,6 +42,7 @@
 </head>
 <body data-theme="light" data-module="signalisation" data-nav="signalisation" data-page="signalisation-report">
   <script src="../js/core/config.js"></script>
+  <script src="../js/core/network.js"></script>
   <script src="../js/core/layout.js"></script>
   <!-- Loading -->
   <div id="loading" class="page-loading"><div class="loading-spinner"></div><p class="loading-text">Chargement...</p></div>
@@ -272,6 +273,7 @@
         
         snap.forEach(doc => {
           const data = doc.data();
+          if (!Network.matches(data)) return; // this activity's reports only
           userReports.push({ id: doc.id, ...data });
           
           const date = data.createdAt?.toDate?.();
@@ -423,6 +425,7 @@
         }));
         
         const reportData = {
+          network: Network.current(),
           inspectorId: currentUser.uid,
           inspectorName: inspectorNameInput.value,
           status: statusSelect.value || null,

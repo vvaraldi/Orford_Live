@@ -84,6 +84,7 @@
 </head>
 <body data-theme="light" data-module="inspection-rando" data-nav="inspection" data-page="inspection-admin">
   <script src="../js/core/config.js"></script>
+  <script src="../js/core/network.js"></script>
   <script src="../js/core/layout.js"></script>
   <div id="loading" class="page-loading"><div class="loading-spinner"></div><p class="loading-text">Chargement...</p></div>
   
@@ -293,12 +294,18 @@
     const nativeAlert = window.alert.bind(window);
     const nativeConfirm = window.confirm.bind(window);
 
-    // Season start date (last September)
-    const now = new Date();
-    const seasonStart = new Date(now.getMonth() >= 8 ? now.getFullYear() : now.getFullYear() - 1, 8, 1); // September 1st
+    // Statistics count from the start of the current activity's season (config: statsSince),
+    // and the far-photo check uses that activity's map centre; both are set once it is known
+    let seasonStart = null;
+    let MAP_CENTER = null;
 
-    // Map center for distance calculation
-    const MAP_CENTER = { lat: 45.310, lon: -72.230 };
+    function setActivitySettings() {
+      const { statsSince, mapCenter } = Network.config();
+      const now = new Date();
+      const thisYear = new Date(now.getFullYear(), statsSince.month - 1, statsSince.day);
+      seasonStart = thisYear <= now ? thisYear : new Date(now.getFullYear() - 1, statsSince.month - 1, statsSince.day);
+      MAP_CENTER = mapCenter;
+    }
 
     // Data
     let trailInspections = [];
@@ -323,7 +330,12 @@
           if (userData.role === 'system_admin') {
             document.getElementById('tab-btn-management').style.display = '';
           }
-          
+
+          setActivitySettings();
+          // No shelters for this activity: no shelter statistics
+          if (!Network.feature('shelters')) {
+            document.getElementById('stat-shelter-inspections').closest('.stat-card').style.display = 'none';
+          }
           await loadAllData();
           renderStatistics();
           renderCharts();
@@ -359,13 +371,17 @@
 
     async function loadAllData() {
       try {
-        // Load trails
+        // Load trails (this activity's only)
         const trailsSnap = await db.collection('trails').get();
-        trailsSnap.forEach(doc => trails.set(doc.id, { id: doc.id, ...doc.data() }));
+        trails = new Map();
+        trailsSnap.forEach(doc => { if (Network.matches(doc.data())) trails.set(doc.id, { id: doc.id, ...doc.data() }); });
 
-        // Load shelters
-        const sheltersSnap = await db.collection('shelters').get();
-        sheltersSnap.forEach(doc => shelters.set(doc.id, { id: doc.id, ...doc.data() }));
+        // Load shelters (only activities that have shelters)
+        shelters = new Map();
+        if (Network.feature('shelters')) {
+          const sheltersSnap = await db.collection('shelters').get();
+          sheltersSnap.forEach(doc => { if (Network.matches(doc.data())) shelters.set(doc.id, { id: doc.id, ...doc.data() }); });
+        }
 
         // Load inspectors
         const inspSnap = await db.collection('inspectors').get();
@@ -375,7 +391,7 @@
         const trailInspSnap = await db.collection('trail_inspections')
           .where('date', '>=', firebase.firestore.Timestamp.fromDate(seasonStart))
           .get();
-        trailInspections = trailInspSnap.docs.map(doc => {
+        trailInspections = trailInspSnap.docs.filter(doc => trails.has(doc.data().trail_id)).map(doc => { // this activity's trails only
           const d = doc.data();
           return {
             id: doc.id,
@@ -389,10 +405,10 @@
         });
 
         // Load shelter inspections (since season start)
-        const shelterInspSnap = await db.collection('shelter_inspections')
-          .where('date', '>=', firebase.firestore.Timestamp.fromDate(seasonStart))
-          .get();
-        shelterInspections = shelterInspSnap.docs.map(doc => {
+        const shelterInspDocs = shelters.size
+          ? (await db.collection('shelter_inspections').where('date', '>=', firebase.firestore.Timestamp.fromDate(seasonStart)).get()).docs
+          : [];
+        shelterInspections = shelterInspDocs.filter(doc => shelters.has(doc.data().shelter_id)).map(doc => { // this activity's shelters only
           const d = doc.data();
           return {
             id: doc.id,
@@ -546,7 +562,13 @@
 
     function renderOutlierPhoto() {
       const container = document.getElementById('outlier-photo-container');
-      
+
+      // This check needs the activity's map centre (bike has none yet)
+      if (!MAP_CENTER) {
+        container.innerHTML = '<p style="color: var(--theme-text-secondary);">Non disponible pour cette activité (centre de la carte non défini).</p>';
+        return;
+      }
+
       // Find photo furthest from map center
       let maxDistance = 0;
       let outlierPhoto = null;
@@ -790,14 +812,14 @@
         const snap = await db.collection('trail_inspections')
           .where('date', '<=', firebase.firestore.Timestamp.fromDate(beforeDate))
           .get();
-        count += snap.size;
+        count += snap.docs.filter(doc => trails.has(doc.data().trail_id)).length; // current activity only
       }
-      
+
       if (type === 'all' || type === 'shelter') {
         const snap = await db.collection('shelter_inspections')
           .where('date', '<=', firebase.firestore.Timestamp.fromDate(beforeDate))
           .get();
-        count += snap.size;
+        count += snap.docs.filter(doc => shelters.has(doc.data().shelter_id)).length; // current activity only
       }
       
       document.getElementById('delete-count').textContent = count;
@@ -814,7 +836,8 @@
       const beforeDate = new Date(dateStr);
       beforeDate.setHours(23, 59, 59, 999);
       
-      const typeLabel = type === 'all' ? 'toutes les inspections' : type === 'trail' ? 'les inspections de sentiers' : 'les inspections d\'abris';
+      const typeLabel = (type === 'all' ? 'toutes les inspections' : type === 'trail' ? 'les inspections de sentiers' : 'les inspections d\'abris')
+        + ` de l'activité « ${Network.config().name} »`; // deletion never touches another activity
       
       let userConfirmed = nativeConfirm(`Êtes-vous sûr de vouloir supprimer ${typeLabel} avant le ${beforeDate.toLocaleDateString('fr-CA')}?\n\nUn fichier de sauvegarde sera téléchargé automatiquement.\n\nCette action est IRRÉVERSIBLE.`);
       if (userConfirmed && typeof userConfirmed.then === 'function') {
@@ -832,14 +855,14 @@
           const snap = await db.collection('trail_inspections')
             .where('date', '<=', firebase.firestore.Timestamp.fromDate(beforeDate))
             .get();
-          snap.forEach(doc => toDelete.push({ collection: 'trail_inspections', id: doc.id, data: doc.data() }));
+          snap.forEach(doc => { if (trails.has(doc.data().trail_id)) toDelete.push({ collection: 'trail_inspections', id: doc.id, data: doc.data() }); }); // current activity only
         }
         
         if (type === 'all' || type === 'shelter') {
           const snap = await db.collection('shelter_inspections')
             .where('date', '<=', firebase.firestore.Timestamp.fromDate(beforeDate))
             .get();
-          snap.forEach(doc => toDelete.push({ collection: 'shelter_inspections', id: doc.id, data: doc.data() }));
+          snap.forEach(doc => { if (shelters.has(doc.data().shelter_id)) toDelete.push({ collection: 'shelter_inspections', id: doc.id, data: doc.data() }); }); // current activity only
         }
         
         if (toDelete.length === 0) {

@@ -60,6 +60,7 @@
 </head>
 <body data-theme="light" data-module="infraction" data-nav="infraction" data-page="infraction-report">
   <script src="../js/core/config.js"></script>
+  <script src="../js/core/network.js"></script>
   <script src="../js/core/layout.js"></script>
   <!-- Loading -->
   <div id="loading" class="page-loading"><div class="loading-spinner"></div><p class="loading-text">Chargement...</p></div>
@@ -150,14 +151,7 @@
           <div class="form-group">
             <label class="form-label" for="fault-select">Infraction <span class="form-required">*</span></label>
             <select class="form-select" id="fault-select" required>
-              <option value="">-- Sélectionner le type d'infraction --</option>
-              <option value="downhill">Downhill</option>
-              <option value="saut-dangereux">Saut dangereux</option>
-              <option value="ski-hors-piste">Ski hors piste</option>
-              <option value="ski-piste-fermee">Ski piste fermée</option>
-              <option value="saut-des-chaises">Saut des chaises</option>
-              <option value="manoeuvre-dangereuse">Manoeuvre dangereuse</option>
-              <option value="autres">Autres (voir commentaire)</option>
+              <option value="">-- Sélectionner le type d'infraction --</option><!-- filled from the current activity's config -->
             </select>
           </div>
 
@@ -187,11 +181,7 @@
           <div class="form-group" style="margin-top: 1rem;">
             <label class="form-label" for="practice-select">Pratique <span class="form-hint">(optionnel)</span></label>
             <select class="form-select" id="practice-select">
-              <option value="">-- Non spécifié --</option>
-              <option value="ski">Ski</option>
-              <option value="snowboard">Snowboard</option>
-              <option value="raquette">Raquette</option>
-              <option value="autres">Autres</option>
+              <option value="">-- Non spécifié --</option><!-- filled from the current activity's config -->
             </select>
           </div>
 
@@ -225,15 +215,8 @@
   <script src="../js/services/sector-service.js"></script>
 
   <script>
-    const FAULT_LABELS = {
-      'downhill': 'Downhill',
-      'saut-dangereux': 'Saut dangereux',
-      'ski-hors-piste': 'Ski hors piste',
-      'ski-piste-fermee': 'Ski piste fermée',
-      'saut-des-chaises': 'Saut des chaises',
-      'manoeuvre-dangereuse': 'Manoeuvre dangereuse',
-      'autres': 'Autres (voir commentaire)'
-    };
+    // Fault types of the current activity (APP_CONFIG.networks[..].infractions), set at start-up
+    let FAULT_LABELS = {};
 
     // State
     let currentInfractionId = null;
@@ -274,6 +257,7 @@
             document.querySelectorAll('.nav__link--admin, .mobile-nav__link--admin').forEach(el => el.style.display = '');
           }
           setDefaultValues();
+          fillFormLists();
           await loadSectors();
           loadUserInfractions();
         }
@@ -348,6 +332,18 @@
       offenceTime.value = time;
     }
 
+    // Fault types and practices offered for the current activity
+    function fillFormLists() {
+      const { faults, practices } = Network.config().infractions;
+      const fill = (select, labels, placeholder) => select.replaceChildren(
+        new Option(placeholder, ''),
+        ...Object.entries(labels).map(([value, label]) => new Option(label, value))
+      );
+      FAULT_LABELS = faults;
+      fill(faultSelect, faults, '-- Sélectionner le type d\'infraction --');
+      fill(practiceSelect, practices, '-- Non spécifié --');
+    }
+
     async function loadSectors() {
       try {
         sectors = await SectorService.load();
@@ -377,8 +373,9 @@
         
         snap.forEach(doc => {
           const data = doc.data();
+          if (!Network.matches(data)) return; // this activity's reports only
           userInfractions.push({ id: doc.id, ...data });
-          
+
           const date = data.offenceTimestamp?.toDate?.() || data.createdAt?.toDate?.();
           const dateStr = date ? date.toLocaleDateString('fr-CA') : 'Date inconnue';
           const label = `${dateStr} - ${data.offenderName || 'Sans nom'} - ${FAULT_LABELS[data.fault] || data.fault || 'N/A'}`;
@@ -658,6 +655,7 @@
         const offenceTimestamp = new Date(year, month - 1, day, hours, minutes);
         
         const infractionData = {
+          network: Network.current(),
           patrolId: currentUser.uid,
           patrolName: patrolName.value,
           offenceTimestamp: firebase.firestore.Timestamp.fromDate(offenceTimestamp),

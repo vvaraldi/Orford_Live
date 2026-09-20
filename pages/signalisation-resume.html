@@ -74,6 +74,7 @@
 </head>
 <body data-theme="light" data-module="signalisation" data-nav="signalisation" data-page="signalisation-resume">
   <script src="../js/core/config.js"></script>
+  <script src="../js/core/network.js"></script>
   <script src="../js/core/layout.js"></script>
   <div id="loading" class="page-loading"><div class="loading-spinner"></div><p class="loading-text">Chargement...</p></div>
 
@@ -88,7 +89,7 @@
       </div>
       <div class="map-container" id="map-container">
         <div class="map-wrapper" id="map-wrapper">
-          <img src="../assets/map/map3.png" alt="Carte Mont Orford" class="map-image" id="map-image">
+          <img alt="Carte" class="map-image" id="map-image"><!-- src set for the current activity -->
         </div>
       </div>
       <div class="map-legend">
@@ -149,6 +150,7 @@
   <script src="../js/core/firebase-loader.js"></script>
   <script src="../js/core/auth.js"></script>
   <script src="../js/services/photo-service.js"></script>
+  <script src="../js/services/map-service.js"></script>
   <script src="../js/services/sector-service.js"></script>
 
   <script>
@@ -178,42 +180,8 @@
     const sectorNameOf = r => SectorService.nameOf(sectors, r.sector, r.sectorDisplayName);
 
     // GPS to pixel conversion (same as inspection-dashboard)
-    const MAP_WIDTH = 800, MAP_HEIGHT = 700;
-    const calibration = {
-      topLeft:    { lat: 45.296611, lon: -72.243361, x: 0, y: 0 },
-      topRight:   { lat: 45.325861, lon: -72.249972, x: MAP_WIDTH, y: 0 },
-      bottomLeft: { lat: 45.299444, lon: -72.205667, x: 0, y: MAP_HEIGHT }
-    };
-
-    function solveSystem(m) {
-      const det = m[0][0] * (m[1][1] * m[2][2] - m[1][2] * m[2][1])
-                - m[0][1] * (m[1][0] * m[2][2] - m[1][2] * m[2][0])
-                + m[0][2] * (m[1][0] * m[2][1] - m[1][1] * m[2][0]);
-      if (Math.abs(det) < 1e-10) return [0, 0, 0];
-      const detX = m[0][3] * (m[1][1] * m[2][2] - m[1][2] * m[2][1])
-                 - m[0][1] * (m[1][3] * m[2][2] - m[1][2] * m[2][3])
-                 + m[0][2] * (m[1][3] * m[2][1] - m[1][1] * m[2][3]);
-      const detY = m[0][0] * (m[1][3] * m[2][2] - m[1][2] * m[2][3])
-                 - m[0][3] * (m[1][0] * m[2][2] - m[1][2] * m[2][0])
-                 + m[0][2] * (m[1][0] * m[2][3] - m[1][3] * m[2][0]);
-      const detZ = m[0][0] * (m[1][1] * m[2][3] - m[1][3] * m[2][1])
-                 - m[0][1] * (m[1][0] * m[2][3] - m[1][3] * m[2][0])
-                 + m[0][3] * (m[1][0] * m[2][1] - m[1][1] * m[2][0]);
-      return [detX / det, detY / det, detZ / det];
-    }
-
-    const p1 = calibration.topLeft, p2 = calibration.topRight, p3 = calibration.bottomLeft;
-    const matrixX = [[p1.lat, p1.lon, 1, p1.x], [p2.lat, p2.lon, 1, p2.x], [p3.lat, p3.lon, 1, p3.x]];
-    const matrixY = [[p1.lat, p1.lon, 1, p1.y], [p2.lat, p2.lon, 1, p2.y], [p3.lat, p3.lon, 1, p3.y]];
-    const coeffsX = solveSystem(matrixX);
-    const coeffsY = solveSystem(matrixY);
-    const transform = { a: coeffsX[0], b: coeffsX[1], c: coeffsX[2], d: coeffsY[0], e: coeffsY[1], f: coeffsY[2] };
-
-    function gpsToPixel(lat, lon) {
-      const x = Math.round(transform.a * lat + transform.b * lon + transform.c);
-      const y = Math.round(transform.d * lat + transform.e * lon + transform.f);
-      return { x: Math.max(0, Math.min(MAP_WIDTH, x)), y: Math.max(0, Math.min(MAP_HEIGHT, y)) };
-    }
+    // GPS -> pixel on the current network's map (null when that map has no calibration)
+    const gpsToPixel = (lat, lon) => MapService.gpsToPixel(lat, lon);
 
     // escapeHtml is now provided by utils.js
 
@@ -232,6 +200,7 @@
           } catch (e) {
             console.error('Error loading sectors:', e);
           }
+          MapService.showImage(document.getElementById('map-image')); // the current activity's map
           loadReports();
         }
       });
@@ -248,9 +217,10 @@
         
         reportsData = [];
         snap.forEach(doc => {
-          reportsData.push({ id: doc.id, ...doc.data() });
+          const data = { id: doc.id, ...doc.data() };
+          if (Network.matches(data)) reportsData.push(data); // this activity's reports only
         });
-        
+
         renderMapMarkers();
         renderReportsTable();
       } catch (e) {
@@ -261,7 +231,7 @@
           reportsData = [];
           snap.forEach(doc => {
             const data = doc.data();
-            if (data.resolved !== true && data.archived !== true) {
+            if (data.resolved !== true && data.archived !== true && Network.matches(data)) {
               reportsData.push({ id: doc.id, ...data });
             }
           });
@@ -279,8 +249,10 @@
       // Remove existing markers
       wrapper.querySelectorAll('.map-marker').forEach(m => m.remove());
       
-      // Filter reports with GPS coordinates
-      const reportsWithGps = reportsData.filter(r => r.coordinates && r.coordinates.latitude && r.coordinates.longitude);
+      // Reports with GPS coordinates, if this activity's map can place them
+      const reportsWithGps = MapService.canLocate()
+        ? reportsData.filter(r => r.coordinates && r.coordinates.latitude && r.coordinates.longitude)
+        : [];
       document.getElementById('map-count').textContent = `${reportsWithGps.length} rapport(s) avec localisation`;
       
       // Add markers
@@ -406,6 +378,8 @@
     // PhotoMapModal for GPS location display
     const PhotoMapModal = (function() {
       function open(lat, lon) {
+        // This activity's map cannot place GPS positions (no calibration): open Google Maps instead
+        if (!MapService.canLocate()) { window.open(`https://www.google.com/maps?q=${lat},${lon}`, '_blank', 'noopener'); return; }
         let modal = document.getElementById('photo-map-modal');
         if (!modal) {
           document.body.insertAdjacentHTML('beforeend', `
@@ -413,7 +387,7 @@
               <div class="detail-modal__content" style="max-width:900px;">
                 <div class="detail-modal__header"><h3 class="detail-modal__title">📍 Localisation de la photo</h3><button class="detail-modal__close" onclick="PhotoMapModal.close()">×</button></div>
                 <div class="detail-modal__body" style="padding:0;">
-                  <div style="overflow:auto;max-height:60vh;"><div id="photo-map-wrap" style="position:relative;display:inline-block;"><img src="../assets/map/map3.png" style="display:block;width:auto;height:auto;max-width:none;"><div id="photo-marker" style="position:absolute;width:20px;height:20px;background:red;border:3px solid white;border-radius:50%;transform:translate(-50%,-50%);box-shadow:0 2px 8px rgba(0,0,0,0.4);"></div></div></div>
+                  <div style="overflow:auto;max-height:60vh;"><div id="photo-map-wrap" style="position:relative;display:inline-block;"><img src="${MapService.imageUrl()}" style="display:block;width:auto;height:auto;max-width:none;"><div id="photo-marker" style="position:absolute;width:20px;height:20px;background:red;border:3px solid white;border-radius:50%;transform:translate(-50%,-50%);box-shadow:0 2px 8px rgba(0,0,0,0.4);"></div></div></div>
                   <div id="photo-coords" style="padding:1rem;background:var(--theme-surface-alt);border-top:1px solid var(--theme-border);"></div>
                 </div>
                 <div class="detail-modal__footer"><a id="photo-google-link" href="#" target="_blank" rel="noopener noreferrer" class="btn btn-primary">🗺️ Google Maps</a><button class="btn btn-secondary" onclick="PhotoMapModal.close()">Fermer</button></div>

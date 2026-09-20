@@ -99,10 +99,63 @@ const APP_CONFIG = {
 
   // ===== NETWORKS (activities) =====
   // A user's access is the list of these ids in inspectors/{uid}.networks.
-  // defaultNetworks is what a CSV import gives users when its networks column is empty.
+  // defaultNetworks[0] is the network of records saved before the network field existed,
+  // and what a CSV import gives users when its networks column is empty.
+  //
+  // Per network:
+  //   seasonMonths  months (1-12) when this network is the default one; the network with no
+  //                 seasonMonths is the default the rest of the year (see js/core/network.js)
+  //   map           image (path from the site root) shown behind trail / report markers, its size
+  //                 in pixels, and 3 GPS calibration corners (topLeft, topRight, bottomLeft; the
+  //                 pixels are the image corners). No calibration = GPS positions cannot be
+  //                 drawn on that map (Google Maps links still work).
+  //   features      what the network has: shelters, snowCondition (ski-only inspection field)
+  //   infractions   the fault types and practices offered on the infraction form (id -> label)
+  //   publicTitle   what the public status page calls this activity's trails
+  //   statsSince    month/day the inspection statistics start counting each year
+  //   mapCenter     GPS centre of the activity's map (distance-from-centre photo check); none = skipped
   networks: {
-    ski: { id: 'ski', name: 'Ski', icon: '⛷️' },
-    bike: { id: 'bike', name: 'Vélo', icon: '🚵' }
+    ski: {
+      id: 'ski', name: 'Ski', icon: '⛷️',
+      map: {
+        image: 'assets/map/map3.png', width: 800, height: 700,
+        calibration: {
+          topLeft:    { lat: 45.296611, lon: -72.243361 },
+          topRight:   { lat: 45.325861, lon: -72.249972 },
+          bottomLeft: { lat: 45.299444, lon: -72.205667 }
+        }
+      },
+      features: { shelters: true, snowCondition: true },
+      publicTitle: 'État des sentiers de randonnée alpine',
+      statsSince: { month: 9, day: 1 }, // 1 September
+      mapCenter: { lat: 45.310, lon: -72.230 },
+      infractions: {
+        faults: {
+          'downhill': 'Downhill',
+          'saut-dangereux': 'Saut dangereux',
+          'ski-hors-piste': 'Ski hors piste',
+          'ski-piste-fermee': 'Ski piste fermée',
+          'saut-des-chaises': 'Saut des chaises',
+          'manoeuvre-dangereuse': 'Manoeuvre dangereuse',
+          'autres': 'Autres (voir commentaire)'
+        },
+        practices: { 'ski': 'Ski', 'snowboard': 'Snowboard', 'raquette': 'Raquette', 'autres': 'Autres' }
+      }
+    },
+    bike: {
+      id: 'bike', name: 'Vélo', icon: '🚵',
+      seasonMonths: [5, 6, 7, 8, 9, 10], // 1 May to 31 October
+      map: { image: 'assets/map/bike.png', width: null, height: null, calibration: null }, // TO PROVIDE
+      features: { shelters: false, snowCondition: false },
+      publicTitle: 'État des sentiers de vélo de montagne',
+      statsSince: { month: 5, day: 1 }, // 1 May
+      mapCenter: null, // TO PROVIDE with the bike map
+      // TO COMPLETE: the bike fault types and practices (placeholders for now)
+      infractions: {
+        faults: { 'autres': 'Autres (voir commentaire)' },
+        practices: { 'velo': 'Vélo', 'autres': 'Autres' }
+      }
+    }
   },
   defaultNetworks: ['ski'],
 
@@ -112,6 +165,7 @@ const APP_CONFIG = {
   // admin: true = only shown to admins (unless it is the current page).
   // desktopIcons: false = the desktop bar shows labels only (mobile always has icons).
   // desktopOnly: true = not listed in the mobile drawer.
+  // requires: 'shelters' = only shown when the current network has that feature.
   // mobileProfile: true = the mobile drawer lists "Mon profil" (only on portal-level pages;
   // in the apps it stays in the desktop user menu).
   nav: {
@@ -126,7 +180,7 @@ const APP_CONFIG = {
       items: [
         { id: 'inspection-dashboard', label: 'Tableau de bord', icon: '📊', href: 'pages/inspection-dashboard.html' },
         { id: 'inspection-trail-report', label: 'Rapport sentier', icon: '📝', href: 'pages/inspection-trail-report.html' },
-        { id: 'inspection-shelter-report', label: 'Rapport abri', icon: '📝', href: 'pages/inspection-shelter-report.html' },
+        { id: 'inspection-shelter-report', label: 'Rapport abri', icon: '📝', href: 'pages/inspection-shelter-report.html', requires: 'shelters' },
         { id: 'inspection-history', label: 'Historique', icon: '📋', href: 'pages/inspection-history.html' },
         { id: 'inspection-admin', label: 'Admin', icon: '⚙️', href: 'pages/inspection-admin.html', admin: true }
       ]

@@ -14,7 +14,7 @@
  * Records store the sector id and the trail name. Look a sector up with find()
  * so an old alias still resolves to the current sector.
  *
- * Requires: firebase-loader.js + auth.js (window.db), config.js (APP_CONFIG).
+ * Requires: firebase-loader.js + auth.js (window.db), config.js (APP_CONFIG), network.js.
  * Load it after auth.js.
  */
 (function (global) {
@@ -53,12 +53,11 @@
   }
 
   /**
-   * The sectors of one network. Until the app has a "current activity"
-   * (network switcher), this defaults to the default network (ski).
+   * The sectors of one network; by default the current activity's (Network.current()).
    */
   async function load(network) {
-    // APP_CONFIG is a global const (config.js): visible as a bare name, not as window.APP_CONFIG
-    var wanted = network || APP_CONFIG.defaultNetworks[0];
+    // APP_CONFIG / Network are global consts: visible as bare names, not as window.X
+    var wanted = network || Network.current() || APP_CONFIG.defaultNetworks[0];
     var all = await loadAll();
     return all.filter(function (s) { return s.network === wanted; });
   }

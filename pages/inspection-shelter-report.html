@@ -60,6 +60,7 @@
 </head>
 <body data-theme="light" data-module="inspection-rando" data-nav="inspection" data-page="inspection-shelter-report">
   <script src="../js/core/config.js"></script>
+  <script src="../js/core/network.js"></script>
   <script src="../js/core/layout.js"></script>
   <div id="loading" class="page-loading"><div class="loading-spinner"></div><p class="loading-text">Chargement du formulaire...</p></div>
   <div class="form-loading-overlay" id="form-loading"><div class="form-loading-content"><div class="loading-spinner"></div><p class="loading-text" id="loading-text">Enregistrement en cours...</p></div></div>
@@ -208,6 +209,17 @@
           if (userData.role === 'admin' || userData.role === 'system_admin') {
             document.querySelectorAll('.nav__link--admin, .mobile-nav__link--admin').forEach(el => el.style.display = '');
           }
+          // Not every activity has shelters (bike does not): replace the form with a notice
+          if (!Network.feature('shelters')) {
+            form.style.display = 'none';
+            const notice = document.createElement('div');
+            notice.className = 'section-card';
+            notice.style.cssText = 'padding: 2rem; text-align: center;';
+            notice.innerHTML = `<p style="font-size:1.1rem;margin-bottom:1rem;">Il n'y a pas d'abris pour l'activité « ${Network.config().name} ».</p>
+              <a class="btn btn-primary" href="inspection-dashboard.html">Retour au tableau de bord</a>`;
+            form.after(notice);
+            return;
+          }
           await loadShelters();
         }
       });
@@ -254,6 +266,7 @@
         shelterSelect.innerHTML = '<option value="">Sélectionner un abri</option>';
         snapshot.forEach(doc => {
           const s = doc.data();
+          if (!Network.matches(s)) return; // this activity's shelters only
           const opt = document.createElement('option');
           opt.value = doc.id;
           opt.textContent = s.name;
@@ -295,6 +308,7 @@
         // Build form data
         const dateTime = new Date(`${inspectionDate.value}T${inspectionTime.value}`);
         const formData = {
+          network: Network.current(),
           shelter_id: shelterSelect.value,
           inspector_id: inspectorId.value,
           inspector_name: inspectorName.value,

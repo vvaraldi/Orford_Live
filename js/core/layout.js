@@ -31,15 +31,23 @@
   const HOME = { id: 'portal', label: 'Portail', icon: '🏠', href: 'index.html' };
   const PROFILE = { id: 'user-profile', label: 'Mon profil', icon: '👤', href: 'pages/user-profile.html' };
 
-  // Admin-only links start hidden; auth.js shows [data-require-admin] for admins
-  const adminAttrs = item => (item.admin ? ' data-require-admin style="display:none;"' : '');
+  // Admin-only links start hidden; auth.js shows [data-require-admin] for admins.
+  // Links that need a network feature (config: requires) start hidden too; they are
+  // shown once the current network is known and has that feature (see below).
+  function itemAttrs(item) {
+    const attrs = [];
+    if (item.admin) attrs.push('data-require-admin');
+    if (item.requires) attrs.push(`data-requires="${item.requires}"`);
+    if (item.admin || item.requires) attrs.push('style="display:none;"');
+    return attrs.length ? ' ' + attrs.join(' ') : '';
+  }
 
   // ---- Desktop nav ----------------------------------------------------------
   function desktopLink(item) {
     const showIcon = item.id === HOME.id || nav.desktopIcons !== false;
     const inner = `${showIcon ? `<span>${item.icon}</span>` : ''}<span>${item.label}</span>`;
     if (item.id === pageId) return `<span class="nav__link nav__link--active">${inner}</span>`;
-    return `<a href="${url(item.href)}" class="nav__link${item.admin ? ' nav__link--admin' : ''}"${adminAttrs(item)}>${inner}</a>`;
+    return `<a href="${url(item.href)}" class="nav__link${item.admin ? ' nav__link--admin' : ''}"${itemAttrs(item)}>${inner}</a>`;
   }
 
   const desktopLinks = [desktopLink(HOME)];
@@ -52,7 +60,7 @@
   function mobileLink(item) {
     const inner = `<span class="mobile-nav__link-icon">${item.icon}</span><span>${item.label}</span>`;
     if (item.id === pageId) return `<span class="mobile-nav__link mobile-nav__link--active">${inner}</span>`;
-    return `<a href="${url(item.href)}" class="mobile-nav__link${item.admin ? ' mobile-nav__link--admin' : ''}"${adminAttrs(item)}>${inner}</a>`;
+    return `<a href="${url(item.href)}" class="mobile-nav__link${item.admin ? ' mobile-nav__link--admin' : ''}"${itemAttrs(item)}>${inner}</a>`;
   }
 
   // Middle section of the drawer: the module's links, plus "Mon profil" on portal-level pages
@@ -76,6 +84,7 @@
       <nav class="nav">
         ${desktopLinks.join('\n        ')}
         <div class="nav__divider"></div>
+        <button type="button" class="network-switch" id="network-switch" hidden></button>
         <button class="theme-toggle" onclick="window.themeManager.toggle()" aria-label="Changer le thème" title="Changer le thème">
           ${moonIcon}
           ${sunIcon}
@@ -112,6 +121,10 @@
         <div class="mobile-nav__user-role" data-user-role>-</div>
       </div>
 
+      <div class="mobile-nav__section" id="mobile-network" hidden>
+        <div class="mobile-nav__section-title">Activité</div>
+      </div>
+
       <div class="mobile-nav__section">
         ${mobileLink(HOME)}
       </div>
@@ -134,4 +147,40 @@
   `;
 
   body.insertAdjacentHTML('afterbegin', html);
+
+  // ---- Activity (network) switcher ---------------------------------------------------
+  // Filled once the user is known (network.js fires "networkReady" from auth.js). Only
+  // users with more than one activity see it. Switching reloads the page.
+  document.addEventListener('networkReady', event => {
+    const { current, allowed } = event.detail;
+    const networks = APP_CONFIG.networks;
+
+    // Links that need a network feature
+    document.querySelectorAll('[data-requires]').forEach(el => {
+      el.style.display = Network.feature(el.dataset.requires) ? '' : 'none';
+    });
+
+    if (allowed.length < 2) return;
+
+    // Desktop: one button showing the current activity; a click goes to the next one
+    const button = document.getElementById('network-switch');
+    const next = allowed[(allowed.indexOf(current) + 1) % allowed.length];
+    button.innerHTML = `<span>${networks[current].icon}</span><span>${networks[current].name}</span>`;
+    button.title = `Activité : ${networks[current].name}. Passer à ${networks[next].name}`;
+    button.setAttribute('aria-label', button.title);
+    button.onclick = () => Network.set(next);
+    button.hidden = false;
+
+    // Mobile: one link per activity
+    const section = document.getElementById('mobile-network');
+    allowed.forEach(id => {
+      const link = document.createElement('a');
+      link.href = '#';
+      link.className = `mobile-nav__link${id === current ? ' mobile-nav__link--active' : ''}`;
+      link.innerHTML = `<span class="mobile-nav__link-icon">${networks[id].icon}</span><span>${networks[id].name}</span>`;
+      link.onclick = e => { e.preventDefault(); Network.set(id); };
+      section.appendChild(link);
+    });
+    section.hidden = false;
+  });
 })();

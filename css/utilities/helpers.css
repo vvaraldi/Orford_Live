@@ -2,6 +2,11 @@
    HELPERS.CSS - Utility Classes
    ======================================== */
 
+/* ===== MAPS ===== */
+/* MapService.showImage() adds .is-missing when an activity's map image is not there yet:
+   markers positioned for that image would float over nothing, so they are hidden */
+.map-wrapper.is-missing .map-marker { display: none; }
+
 /* ===== DISPLAY ===== */
 .d-none { display: none !important; }
 .d-block { display: block !important; }

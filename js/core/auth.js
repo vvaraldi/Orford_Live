@@ -110,6 +110,14 @@ function checkAuthStatus(options = {}) {
             }
           }
 
+          // Which activity (ski, bike...) the user works in; needs their networks.
+          // A user without any activity cannot use the app.
+          if (typeof Network !== 'undefined' && !Network.setUser(currentUserData)) {
+            showAccessDenied('Aucune activité ne vous est attribuée. Contactez l\'administrateur.');
+            await auth.signOut();
+            return;
+          }
+
           // Show content
           if (loading) loading.style.display = 'none';
           if (mainContent) mainContent.style.display = 'block';

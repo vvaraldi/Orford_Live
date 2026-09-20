@@ -60,6 +60,7 @@
 </head>
 <body data-theme="light" data-module="inspection-rando" data-nav="inspection" data-page="inspection-trail-report">
   <script src="../js/core/config.js"></script>
+  <script src="../js/core/network.js"></script>
   <script src="../js/core/layout.js"></script>
   <div id="loading" class="page-loading"><div class="loading-spinner"></div><p class="loading-text">Chargement du formulaire...</p></div>
   <div class="form-loading-overlay" id="form-loading"><div class="form-loading-content"><div class="loading-spinner"></div><p class="loading-text" id="loading-text">Enregistrement en cours...</p></div></div>
@@ -97,7 +98,7 @@
               </div>
             </div>
           </div>
-          <div class="form-group" style="margin-top: 1rem;"><label class="form-label">Conditions de neige <span class="form-label-optional">(optionnel)</span></label>
+          <div class="form-group" id="snow-condition-group" style="margin-top: 1rem;"><label class="form-label">Conditions de neige <span class="form-label-optional">(optionnel)</span></label>
             <div class="radio-group">
               <div class="radio-item"><input type="radio" id="snow-good" name="snow-condition" value="good" class="form-radio"><label for="snow-good" class="radio-label"><span class="radio-indicator good"></span><span class="radio-text">Bonnes conditions</span></label></div>
               <div class="radio-item"><input type="radio" id="snow-warning" name="snow-condition" value="warning" class="form-radio"><label for="snow-warning" class="radio-label"><span class="radio-indicator warning"></span><span class="radio-text">Conditions moyennes</span></label></div>
@@ -187,6 +188,8 @@
           if (userData.role === 'admin' || userData.role === 'system_admin') {
             document.querySelectorAll('.nav__link--admin, .mobile-nav__link--admin').forEach(el => el.style.display = '');
           }
+          // Snow conditions only exist for activities that have them (ski)
+          document.getElementById('snow-condition-group').style.display = Network.feature('snowCondition') ? '' : 'none';
           await loadTrails();
         }
       });
@@ -235,6 +238,7 @@
         trailSelect.innerHTML = '<option value="">Sélectionner un sentier</option>';
         snapshot.forEach(doc => {
           const t = doc.data();
+          if (!Network.matches(t)) return; // this activity's trails only
           const diffMap = {'easy':'Facile','medium':'Intermédiaire','hard':'Difficile'};
           const opt = document.createElement('option');
           opt.value = doc.id;
@@ -303,6 +307,7 @@
         if (otherIssues.value.trim()) issues.push(otherIssues.value.trim());
         const dateTime = new Date(`${inspectionDate.value}T${inspectionTime.value}`);
         const formData = {
+          network: Network.current(),
           trail_id: trailSelect.value,
           inspector_id: inspectorId.value,
           inspector_name: inspectorName.value,
@@ -310,7 +315,7 @@
           previous_trail_status: currentTrailStatus || 'unknown',
           trail_status: form.querySelector('input[name="trail-status"]:checked').value,
           condition: form.querySelector('input[name="condition"]:checked').value,
-          snow_condition: form.querySelector('input[name="snow-condition"]:checked')?.value || null,
+          snow_condition: Network.feature('snowCondition') ? (form.querySelector('input[name="snow-condition"]:checked')?.value || null) : null,
           issues: issues,
           notes: comments.value.trim(),
           photos: [],

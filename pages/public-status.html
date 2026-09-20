@@ -38,6 +38,7 @@
     .ps-marker--open { background: #10b981; }
     .ps-marker--closed { background: #ef4444; }
     .ps-marker--unknown { background: #6b7280; }
+    .ps-map__wrapper.is-missing .ps-marker { display: none; } /* the activity's map image is not there yet */
 
     .ps-legend { display: flex; gap: 1.25rem; flex-wrap: wrap; padding: 0.6rem 0.25rem 0; font-size: 0.8rem; color: var(--theme-text-light); }
     .ps-legend span { display: inline-flex; align-items: center; gap: 0.4rem; }
@@ -57,7 +58,7 @@
 </head>
 <body data-theme="light" data-module="status">
   <header class="ps-header">
-    <h1>🏔️ Mont Orford - État des sentiers de randonnée alpine</h1>
+    <h1 id="page-title">🏔️ Mont Orford</h1>
     <div class="ps-header__meta">
       <span>Dernière mise à jour : <strong id="last-update">--</strong></span>
       <a href="../index.html">Portail</a>
@@ -71,7 +72,7 @@
 
     <div class="ps-map">
       <div class="ps-map__wrapper" id="map-wrapper">
-        <img src="../assets/map/map3.png" alt="Carte des sentiers du Mont Orford" id="map-image">
+        <img alt="Carte des sentiers du Mont Orford" id="map-image"><!-- src set for the season's activity -->
       </div>
     </div>
     <div class="ps-legend">
@@ -85,6 +86,8 @@
 
   <!-- Shared JS (no login needed on this page) -->
   <script src="../js/core/config.js"></script>
+  <script src="../js/core/network.js"></script>
+  <script src="../js/services/map-service.js"></script>
   <script src="../js/core/utils.js"></script>
   <script src="../js/core/theme.js"></script>
 
@@ -100,8 +103,9 @@
       return trail.status === 'open' || trail.status === 'closed' ? trail.status : 'unknown';
     }
 
+    // Marker label: the trail's `number` if it has one, else its id without the prefix (trail_3, bike_3 -> 3)
     function numberOf(trail) {
-      return trail.id.replace('trail_', '');
+      return trail.number != null ? String(trail.number) : trail.id.replace(/^[a-z]+_/, '');
     }
 
     function render() {
@@ -198,7 +202,8 @@
           el('loading').textContent = 'Connexion en cours...';
           return;
         }
-        trails = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        // The season's activity only (trails saved before the network field count as ski)
+        trails = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })).filter(t => Network.matches(t));
         el('loading').hidden = true;
         el('error').hidden = true;
         render();
@@ -210,6 +215,12 @@
 
     function init() {
       el('footer').textContent = APP_CONFIG.branding.footerText;
+
+      // Which activity to show: the season's (bike May-Oct, ski otherwise), or ?network=bike|ski
+      const network = APP_CONFIG.networks[Network.usePublic()];
+      el('page-title').textContent = `🏔️ Mont Orford - ${network.publicTitle}`;
+      document.title = `Mont Orford - ${network.publicTitle}`;
+      MapService.showImage(el('map-image'));
 
       const themeBtn = el('theme-btn');
       const syncThemeBtn = () => { themeBtn.textContent = window.themeManager.isDark() ? '☀️' : '🌙'; };

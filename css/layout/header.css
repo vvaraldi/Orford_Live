@@ -86,6 +86,31 @@
   background-color: rgba(255, 255, 255, 0.3);
 }
 
+/* ===== ACTIVITY SWITCH (ski / bike; only for users with several activities) ===== */
+.network-switch {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  height: 36px;
+  padding: 0 var(--space-3);
+  font-size: var(--text-sm);
+  font-weight: var(--font-semibold);
+  color: var(--color-white);
+  background-color: rgba(255, 255, 255, 0.15);
+  border: 1px solid rgba(255, 255, 255, 0.4);
+  border-radius: var(--border-radius-full);
+  cursor: pointer;
+  transition: var(--transition-fast);
+}
+
+.network-switch:hover {
+  background-color: rgba(255, 255, 255, 0.28);
+}
+
+.network-switch[hidden] {
+  display: none;
+}
+
 /* ===== THEME TOGGLE (In Header) ===== */
 .theme-toggle {
   display: flex;
