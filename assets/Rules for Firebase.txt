@@ -14,17 +14,17 @@ service cloud.firestore {
     }
     
     // Activities (networks) a user works in: inspectors/{uid}.networks.
-    // A user without the field is a ski user (existing accounts).
+    // Every user document has the field; without it these rules deny (fail closed).
     function networksOf(uid) {
-      return get(/databases/$(database)/documents/inspectors/$(uid)).data.get('networks', ['ski']);
+      return get(/databases/$(database)/documents/inspectors/$(uid)).data.networks;
     }
 
     // Activities added to or removed from a user document by the current write
     function changedNetworks() {
-      return resource.data.get('networks', ['ski']).toSet()
-               .difference(request.resource.data.get('networks', ['ski']).toSet())
-             .union(request.resource.data.get('networks', ['ski']).toSet()
-               .difference(resource.data.get('networks', ['ski']).toSet()));
+      return resource.data.networks.toSet()
+               .difference(request.resource.data.networks.toSet())
+             .union(request.resource.data.networks.toSet()
+               .difference(resource.data.networks.toSet()));
     }
 
     // A system_admin can edit any user. An admin can edit users who share one of
@@ -35,8 +35,8 @@ service cloud.firestore {
              (isAdmin() &&
               resource.data.role != 'system_admin' &&
               request.resource.data.role != 'system_admin' &&
-              request.resource.data.get('networks', ['ski']).size() > 0 &&
-              resource.data.get('networks', ['ski']).toSet()
+              request.resource.data.networks.size() > 0 &&
+              resource.data.networks.toSet()
                 .intersection(networksOf(request.auth.uid).toSet()).size() > 0 &&
               changedNetworks().difference(networksOf(request.auth.uid).toSet()).size() == 0);
     }
@@ -81,8 +81,8 @@ service cloud.firestore {
       allow create: if isAdmin() &&
                     (request.resource.data.role != 'system_admin' || isSystemAdmin()) &&
                     (isSystemAdmin() ||
-                     (request.resource.data.get('networks', ['ski']).size() > 0 &&
-                      request.resource.data.get('networks', ['ski']).toSet()
+                     (request.resource.data.networks.size() > 0 &&
+                      request.resource.data.networks.toSet()
                         .difference(networksOf(request.auth.uid).toSet()).size() == 0));
 
       // Admin edits: see adminMayUpdateUser().

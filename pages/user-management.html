@@ -656,14 +656,14 @@
     // ========================================
     // ACTIVITIES (networks)
     // ========================================
-    // A user's access is inspectors/{uid}.networks. Missing = APP_CONFIG.defaultNetworks;
-    // system_admin always has every activity. These rules mirror the Firestore rules.
+    // A user's access is inspectors/{uid}.networks; system_admin always has every activity.
+    // These rules mirror the Firestore rules.
 
     const NETWORK_IDS = Object.keys(APP_CONFIG.networks);
 
     function networksOf(user) {
       if (user.role === 'system_admin') return NETWORK_IDS;
-      return Array.isArray(user.networks) ? user.networks : APP_CONFIG.defaultNetworks;
+      return Array.isArray(user.networks) ? user.networks : [];
     }
 
     // Activities the current admin can grant, remove and manage
@@ -711,7 +711,6 @@
         snapshot.forEach(doc => {
           users.push({ id: doc.id, ...doc.data() });
         });
-        await backfillNetworks(); // TEMPORARY, see below
         updateStatistics();
         filterAndRenderUsers();
       } catch (error) {
@@ -719,35 +718,6 @@
         showMessage('Erreur lors du chargement des utilisateurs.', 'error');
       } finally {
         tableLoading.style.display = 'none';
-      }
-    }
-
-    // TEMPORARY one-time backfill: writes the activities on users that don't have the field
-    // yet (system admin only, nothing else is written). Remove it together with the
-    // "missing = APP_CONFIG.defaultNetworks" fallbacks (networksOf here, `get('networks', ['ski'])`
-    // in the Firestore rules) once every user has the field.
-    async function backfillNetworks() {
-      if (!isCurrentUserSystemAdmin) return;
-      const missing = users.filter(u => !Array.isArray(u.networks));
-      if (missing.length === 0) return;
-
-      const defaultsFor = u => (u.role === 'system_admin' ? [...NETWORK_IDS] : [...APP_CONFIG.defaultNetworks]);
-      let written = 0;
-
-      try {
-        for (let i = 0; i < missing.length; i += 400) { // a batch holds at most 500 writes
-          const chunk = missing.slice(i, i + 400);
-          const batch = db.batch();
-          chunk.forEach(u => batch.update(db.collection('inspectors').doc(u.id), { networks: defaultsFor(u) }));
-          await batch.commit();
-          chunk.forEach(u => { u.networks = defaultsFor(u); }); // local copy only once it is saved
-          written += chunk.length;
-        }
-        console.info(`Backfill: networks written for ${written} user(s)`);
-        showMessage(`${written} utilisateur(s) initialisé(s) avec leur activité.`, 'success');
-      } catch (error) {
-        console.error('Backfill of networks failed:', error);
-        showMessage(`Initialisation des activités incomplète (${written}/${missing.length}). Voir la console.`, 'warning');
       }
     }
 

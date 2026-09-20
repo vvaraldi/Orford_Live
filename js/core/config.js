@@ -99,7 +99,7 @@ const APP_CONFIG = {
 
   // ===== NETWORKS (activities) =====
   // A user's access is the list of these ids in inspectors/{uid}.networks.
-  // A user without that field is treated as defaultNetworks (existing users are ski).
+  // defaultNetworks is what a CSV import gives users when its networks column is empty.
   networks: {
     ski: { id: 'ski', name: 'Ski', icon: '⛷️' },
     bike: { id: 'bike', name: 'Vélo', icon: '🚵' }
