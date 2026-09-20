@@ -10,16 +10,14 @@
  *   'affine'       3 points. For a flat map drawn to scale (ski map).
  *   'perspective'  4 points. For a map drawn in perspective (a projective transform).
  *
- * Where the calibration comes from, per activity:
- *   1. Firestore maps/{network}: { mode, points: [{x, y, lat, lon}], width, height }
- *      written by the Cartes page (used only if width/height still match the map);
- *   2. else the code default: APP_CONFIG.networks[id].map.calibration (3 image
- *      corners), read as 3 points;
- *   3. else none: canLocate() is false and gpsToPixel() returns null. Callers then
- *      fall back to a Google Maps link.
+ * The calibration of an activity is Firestore maps/{network}:
+ *   { mode, points: [{x, y, lat, lon}], width, height }
+ * written by the Cartes page, and used only if width/height still match the map in
+ * config.js. Without one, canLocate() is false and gpsToPixel() returns null; callers then
+ * fall back to a Google Maps link.
  *
  * load() reads Firestore once; it starts by itself when the user is known
- * ("networkReady"). Until it is done the code defaults apply.
+ * ("networkReady"). Until it is done nothing can be located.
  *
  * Requires config.js (APP_CONFIG) and network.js (Network).
  */
@@ -145,35 +143,20 @@ const MapService = (function () {
     return network ? network.map : null;
   }
 
-  // The code default (3 image corners) read as 3 control points
-  function pointsFromConfig(map) {
-    const c = map && map.calibration;
-    if (!c || !map.width || !map.height) return null;
-    return [
-      { x: 0, y: 0, lat: c.topLeft.lat, lon: c.topLeft.lon },
-      { x: map.width, y: 0, lat: c.topRight.lat, lon: c.topRight.lon },
-      { x: 0, y: map.height, lat: c.bottomLeft.lat, lon: c.bottomLeft.lon }
-    ];
-  }
-
   /**
-   * The calibration in force for an activity: { source, mode, points, ... } or null.
-   * source: 'firestore' | 'code'. stale: true when a saved calibration was made for another
-   * image size (it is then ignored, the code default applies).
+   * The calibration in force for an activity: { mode, points, updatedAt } or null.
+   * A calibration saved for another image size is ignored: { stale: true } is returned
+   * instead (the map has to be calibrated again).
    */
   function definition(networkId) {
     const id = networkId || Network.current();
     const map = mapOf(id);
     const doc = stored[id];
-    let stale = false;
-    if (doc && MODES[doc.mode] && Array.isArray(doc.points)) {
-      if (map && doc.width === map.width && doc.height === map.height) {
-        return { source: 'firestore', mode: doc.mode, points: doc.points.map(p => ({ ...p })), updatedAt: doc.updatedAt || null };
-      }
-      stale = true;
+    if (!doc || !MODES[doc.mode] || !Array.isArray(doc.points)) return null;
+    if (map && doc.width === map.width && doc.height === map.height) {
+      return { mode: doc.mode, points: doc.points.map(p => ({ ...p })), updatedAt: doc.updatedAt || null };
     }
-    const points = pointsFromConfig(map);
-    return points ? { source: 'code', mode: 'affine', points, stale } : (stale ? { source: null, mode: null, points: null, stale } : null);
+    return { mode: null, points: null, stale: true };
   }
 
   function transformFor(networkId) {
@@ -194,7 +177,7 @@ const MapService = (function () {
         Object.keys(stored).forEach(id => delete stored[id]);
         snapshot.forEach(doc => { stored[doc.id] = doc.data(); });
       } catch (error) {
-        console.warn('MapService: saved calibrations could not be read, using the code defaults.', error);
+        console.warn('MapService: saved calibrations could not be read.', error);
       }
       Object.keys(transforms).forEach(id => delete transforms[id]);
     })();

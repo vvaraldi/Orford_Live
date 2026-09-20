@@ -86,10 +86,8 @@ const MapCalibration = (function () {
   function renderSource(def) {
     const el = $('cal-source');
     const method = m => (m === 'perspective' ? '4 points, perspective' : '3 points, carte plate');
-    if (def && def.source === 'firestore') {
-      el.textContent = `Calibration enregistrée dans la base (${method(def.mode)}).`;
-    } else if (def && def.source === 'code') {
-      el.textContent = `Valeurs par défaut du code (${method(def.mode)}) : pas encore enregistrées dans la base. « Enregistrer » les y copie ; ensuite la base fait foi.`;
+    if (def && def.mode) {
+      el.textContent = `Calibration enregistrée (${method(def.mode)}).`;
     } else {
       el.textContent = 'Aucune calibration pour cette carte : les positions GPS ne peuvent pas être placées.';
     }

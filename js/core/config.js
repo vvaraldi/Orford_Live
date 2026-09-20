@@ -111,10 +111,11 @@ const APP_CONFIG = {
   // Per network:
   //   seasonMonths  months (1-12) when this network is the default one; the network with no
   //                 seasonMonths is the default the rest of the year (see js/core/network.js)
-  //   map           image (path from the site root) shown behind trail / report markers, its size
-  //                 in pixels, and 3 GPS calibration corners (topLeft, topRight, bottomLeft; the
-  //                 pixels are the image corners). No calibration = GPS positions cannot be
-  //                 drawn on that map (Google Maps links still work).
+  //   map           image (path from the site root) shown behind trail / report markers, and its
+  //                 size in pixels (trail coordinates are pixels on it). The GPS calibration is
+  //                 not here: it is saved by the system admin in Administration > Cartes
+  //                 (Firestore maps/{network}). No calibration = GPS positions cannot be drawn
+  //                 on that map (Google Maps links still work).
   //   features      what the network has: shelters, snowCondition (ski-only inspection field)
   //   infractions   the fault types and practices offered on the infraction form (id -> label)
   //   publicTitle   what the public status page calls this activity's trails
@@ -123,14 +124,7 @@ const APP_CONFIG = {
   networks: {
     ski: {
       id: 'ski', name: 'Ski', icon: '⛷️',
-      map: {
-        image: 'assets/map/Ski-Touring_Map.png', width: 800, height: 700,
-        calibration: {
-          topLeft:    { lat: 45.296611, lon: -72.243361 },
-          topRight:   { lat: 45.325861, lon: -72.249972 },
-          bottomLeft: { lat: 45.299444, lon: -72.205667 }
-        }
-      },
+      map: { image: 'assets/map/Ski-Touring_Map.png', width: 800, height: 700 },
       features: { shelters: true, snowCondition: true },
       publicTitle: 'État des sentiers de randonnée alpine',
       statsSince: { month: 9, day: 1 }, // 1 September
@@ -152,9 +146,7 @@ const APP_CONFIG = {
       id: 'bike', name: 'Vélo', icon: '🚵',
       seasonMonths: [5, 6, 7, 8, 9, 10], // 1 May to 31 October
       // The illustrated map (Bike_Map.jpg, not to scale) resized to 1600 px wide: trail coordinates are pixels on THIS image.
-      // calibration: null = no code default; set it in Administration > Cartes (saved in Firestore maps/bike).
-      // Without any calibration, photo positions are not drawn on the map (a Google Maps link is used).
-      map: { image: 'assets/map/Bike_Map_web.jpg', width: 1600, height: 919, calibration: null },
+      map: { image: 'assets/map/Bike_Map_web.jpg', width: 1600, height: 919 },
       features: { shelters: false, snowCondition: false },
       publicTitle: 'État des sentiers de vélo de montagne',
       statsSince: { month: 5, day: 1 }, // 1 May
@@ -243,8 +235,8 @@ Object.freeze(APP_CONFIG.defaultNetworks);
 Object.freeze(APP_CONFIG.defaults);
 
 // ===== Apply the branding to the page (browser only) =====
-// - <title> and <meta name="description">: "<page's own text> - <name>" (skipped if the tag has
-//   data-no-brand, or already contains the name)
+// - <title>: "<name> - <page's own text>"; <meta name="description">: "<page's own text> - <name>"
+//   (each skipped if the tag has data-no-brand, or already contains the name)
 // - <link rel="icon" data-brand>: the logo image, or the emoji drawn as an icon
 // - [data-brand-name] / [data-brand-tagline] / [data-brand-logo]: filled in (login page)
 (function applyBranding() {
@@ -256,7 +248,7 @@ Object.freeze(APP_CONFIG.defaults);
 
   const title = document.querySelector('title');
   if (title && !title.hasAttribute('data-no-brand') && !title.textContent.includes(brand.name)) {
-    title.textContent = `${title.textContent} - ${brand.name}`;
+    title.textContent = `${brand.name} - ${title.textContent}`; // "Regis - Administration"
   }
   const description = document.querySelector('meta[name="description"]');
   if (description && !description.hasAttribute('data-no-brand') && !description.content.includes(brand.name)) {
