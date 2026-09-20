@@ -567,7 +567,7 @@
         const c = p.coordinates;
         let loc = '';
         if (c && c.latitude && c.longitude) {
-          loc = `<div class="photo-location"><a href="#" onclick="openPhotoLocationModal(${c.latitude},${c.longitude});return false;">Carte locale</a> <a href="https://www.google.com/maps?q=${c.latitude},${c.longitude}" target="_blank" rel="noopener noreferrer">Google</a></div>`;
+          loc = `<div class="photo-location"><a href="#" onclick="openPhotoLocationModal(${c.latitude},${c.longitude});return false;" title="Carte locale">📍 Carte</a> <a href="https://www.google.com/maps?q=${c.latitude},${c.longitude}" target="_blank" rel="noopener noreferrer" title="Google Maps" aria-label="Google Maps">🗺️</a></div>`;
         }
         return `<div class="photo-item"><img src="${p.url}" class="photo-thumb" onclick="window.open('${p.url}','_blank')">${loc}</div>`;
       }).join('');
