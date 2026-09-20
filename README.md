@@ -12,3 +12,15 @@ Phase 5: Public Status + Polish
 
 Phase 6: Migration Support
 6.1 Firebase rules updateIf needed for new structure
+
+
+
+
+
+Bike
+1 Right now TRAILS_DATA is hardcoded inline in infraction-report.html, again in the signalisation app, while the inspection app uses a real trails Firestore collection. Three copies of the same list, drifting.
+2 Add activity for trails and shelters
+
+
+
+Avant le bike... simplification de la partie ski
