@@ -15,9 +15,9 @@
 // Do NOT rename the localStorage keys 'orford-theme' / 'orford-network' (js/core/theme.js,
 // network.js): they are invisible to users and renaming them would reset everyone's settings.
 const BRANDING = {
-  name: 'Orford Live',
+  name: 'Regis',                   // trial name
   logo: '🏔️',                     // emoji, used when there is no logoImage
-  logoImage: null,                 // or a path from the site root, e.g. 'assets/images/logo.png'
+  logoImage: 'assets/Logo_Mont-Orford transparent.png', // path from the site root (far left of the header; needs a transparent background), or null for the emoji
   tagline: 'Patrouille Mont Orford',
   footerText: '© 2025 Patrouille Mont Orford'
 };
@@ -124,7 +124,7 @@ const APP_CONFIG = {
     ski: {
       id: 'ski', name: 'Ski', icon: '⛷️',
       map: {
-        image: 'assets/map/map3.png', width: 800, height: 700,
+        image: 'assets/map/Ski-Touring_Map.png', width: 800, height: 700,
         calibration: {
           topLeft:    { lat: 45.296611, lon: -72.243361 },
           topRight:   { lat: 45.325861, lon: -72.249972 },
@@ -151,7 +151,9 @@ const APP_CONFIG = {
     bike: {
       id: 'bike', name: 'Vélo', icon: '🚵',
       seasonMonths: [5, 6, 7, 8, 9, 10], // 1 May to 31 October
-      map: { image: 'assets/map/bike.png', width: null, height: null, calibration: null }, // TO PROVIDE
+      // The illustrated map (Bike_Map.jpg, not to scale) resized to 1600 px wide: trail coordinates are pixels on THIS image.
+      // calibration: null = no GPS conversion yet (photo positions are then not drawn on the map)
+      map: { image: 'assets/map/Bike_Map_web.jpg', width: 1600, height: 919, calibration: null },
       features: { shelters: false, snowCondition: false },
       publicTitle: 'État des sentiers de vélo de montagne',
       statsSince: { month: 5, day: 1 }, // 1 May
@@ -168,20 +170,20 @@ const APP_CONFIG = {
   // ===== NAVIGATION (rendered by js/core/layout.js) =====
   // One set per module, chosen with <body data-nav="...">. The current page is
   // <body data-page="...">. Paths are relative to the site root.
+  // The header always shows the portal logo and name (BRANDING); title: 'Inspection' adds
+  // "  -  Inspection" after the name (no title on the portal and profile pages).
   // admin: true = only shown to admins (unless it is the current page).
   // desktopIcons: false = the desktop bar shows labels only (mobile always has icons).
-  // desktopOnly: true = not listed in the mobile drawer.
   // requires: 'shelters' = only shown when the current network has that feature.
   // mobileProfile: true = the mobile drawer lists "Mon profil" (only on portal-level pages;
   // in the apps it stays in the desktop user menu).
   nav: {
     portal: {
-      logo: { icon: BRANDING.logo, image: BRANDING.logoImage, text: BRANDING.name },
       mobileProfile: true,
       items: []
     },
     inspection: {
-      logo: { icon: '🔍', text: 'Inspection' },
+      title: 'Inspection',
       desktopIcons: false,
       items: [
         { id: 'inspection-dashboard', label: 'Tableau de bord', icon: '📊', href: 'pages/inspection-dashboard.html' },
@@ -192,14 +194,14 @@ const APP_CONFIG = {
       ]
     },
     infraction: {
-      logo: { icon: '🚨', text: 'Infractions' },
+      title: 'Infractions',
       items: [
         { id: 'infraction-report', label: 'Rapport', icon: '📝', href: 'pages/infraction-report.html' },
         { id: 'infraction-admin', label: 'Gestion', icon: '📋', href: 'pages/infraction-admin.html', admin: true }
       ]
     },
     signalisation: {
-      logo: { icon: '🚧', text: 'Signalisation' },
+      title: 'Signalisation',
       items: [
         { id: 'signalisation-report', label: 'Rapport', icon: '📝', href: 'pages/signalisation-report.html' },
         { id: 'signalisation-resume', label: 'Résumé', icon: '🗺️', href: 'pages/signalisation-resume.html' },
@@ -207,20 +209,17 @@ const APP_CONFIG = {
       ]
     },
     support: {
-      logo: { icon: '📋', text: 'Support' },
+      title: 'Support',
       items: []
     },
     admin: {
-      logo: { icon: BRANDING.logo, image: BRANDING.logoImage, text: BRANDING.name },
+      title: 'Administration',
       mobileProfile: true,
       items: []
     },
     profile: {
-      logo: { icon: BRANDING.logo, image: BRANDING.logoImage, text: BRANDING.name },
       mobileProfile: true,
-      items: [
-        { id: 'user-management', label: 'Administration', icon: '⚙️', href: 'pages/user-management.html', admin: true, desktopOnly: true }
-      ]
+      items: []
     }
   },
 

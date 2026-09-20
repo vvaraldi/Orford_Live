@@ -1,12 +1,14 @@
 # Assets Folder
 
-## Map Image Required
+## Maps (`map/`)
 
-The inspection dashboard requires the map image file: `map/map3.png`
+Each activity has its own map image, set in `js/core/config.js` (`APP_CONFIG.networks.<activity>.map`).
+Trail and shelter marker coordinates are pixels on that image, so keep its size stable once trails exist.
 
-This file should be copied from your original `Inspection_Rando_Orford/assets/` folder.
+- `map/Ski-Touring_Map.png` - ski map (800x700 px), with GPS calibration
+- `map/Bike_Map_web.jpg` - bike map (1600x919 px), no GPS calibration yet
+- `map/Bike_Map.jpg` - full-size original of the bike map (2205x1267 px), not used by the site
 
-The map image is used to display trail and shelter markers on the inspection dashboard.
+## Logo
 
-## Expected file:
-- `map/map3.png` - Main trail map of Mont Orford (approximately 1200x900 pixels)
+`Logo_Mont-Orford transparent.png` is the portal logo (`BRANDING.logoImage` in `js/core/config.js`).

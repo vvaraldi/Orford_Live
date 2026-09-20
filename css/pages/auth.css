@@ -37,8 +37,12 @@
 
 /* Logo image (BRANDING.logoImage) instead of the emoji */
 .auth-card__logo img {
-  max-height: 4.5rem;
+  max-height: 5rem;
   width: auto;
+  margin: 0 auto;                   /* images are display:block in the reset */
+  padding: var(--space-2);
+  background: #fff;                 /* white tile: the logo is dark blue, unreadable on the dark header */
+  border-radius: var(--border-radius-lg);
 }
 
 .auth-card__title {
@@ -51,6 +55,7 @@
 .auth-card__subtitle {
   font-size: var(--text-sm);
   margin-top: var(--space-2);
+  color: var(--color-white);        /* a global p colour made it dark on the dark header */
   opacity: 0.9;
 }
 

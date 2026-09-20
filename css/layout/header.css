@@ -10,38 +10,71 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
+  flex-shrink: 0;
   height: var(--header-height);
-  padding: 0 var(--space-5);
-  background: var(--theme-gradient);
+  padding: 0 var(--space-5) 0 0;
   color: var(--color-white);
   box-shadow: var(--shadow-md);
 }
 
-/* ===== LOGO ===== */
+/* Banner colours: white (left) to the app's own colour (right). The white part is longer
+   than the title so the nav links, on the coloured side, stay white on a solid colour. */
+.header,
+.mobile-nav__header {
+  --header-title-color: #1f2937;
+  background: linear-gradient(90deg, #fff 0%, #fff 12%, var(--theme-header-from) 60%, var(--theme-header-to) 100%);
+}
+
+/* ===== LOGO =====
+   The logo is dark blue, so the banner goes from white (left) to the app's own colour
+   (right), see --theme-header-from/to in modules.css.
+   The logo block keeps its own white -> transparent fade so the dark title stays
+   readable on white whatever the screen width. */
 .logo {
   display: flex;
   align-items: center;
+  align-self: stretch;
   gap: var(--space-3);
+  min-width: 0;
+  padding-right: var(--space-12);
+  background: linear-gradient(90deg, #fff calc(100% - var(--space-12)), rgba(255, 255, 255, 0) 100%);
   text-decoration: none;
-  color: var(--color-white);
+  color: var(--header-title-color);
 }
 
 .logo__icon {
+  padding-left: var(--space-5);
   font-size: 1.75rem;
   line-height: 1;
 }
 
-/* Logo image (BRANDING.logoImage) instead of the emoji */
+/* Logo image (BRANDING.logoImage): as tall as the banner, without making it taller */
 .logo__image {
-  height: 2rem;
+  height: var(--header-height);
   width: auto;
   display: block;
+  flex-shrink: 0;
 }
 
 .logo__text {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   font-size: var(--text-xl);
   font-weight: var(--font-bold);
   letter-spacing: -0.02em;
+}
+
+/* "  -  App": the separator keeps its double spaces */
+.logo__sep {
+  white-space: pre;
+  font-weight: var(--font-normal);
+  opacity: 0.6;
+}
+
+.logo__app {
+  font-weight: var(--font-semibold);
 }
 
 .logo:hover {
@@ -64,6 +97,7 @@
   font-weight: var(--font-medium);
   color: rgba(255, 255, 255, 0.85);
   text-decoration: none;
+  white-space: nowrap;
   border-radius: var(--border-radius-md);
   transition: var(--transition-fast);
 }
@@ -329,19 +363,43 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: var(--space-4);
-  background: var(--theme-gradient);
+  height: var(--header-height-mobile);
+  padding: 0 var(--space-4) 0 0;
   color: var(--color-white);
 }
 
+/* Same logo + name as the banner; the app title goes on a second line */
 .mobile-nav__logo {
   display: flex;
   align-items: center;
   gap: var(--space-2);
+  min-width: 0;
+  align-self: stretch;
   font-size: var(--text-lg);
   font-weight: var(--font-bold);
-  color: var(--color-white);
+  color: var(--header-title-color);
   text-decoration: none;
+}
+
+.mobile-nav__logo .logo__image {
+  height: var(--header-height-mobile);
+}
+
+.mobile-nav__logo .logo__text {
+  white-space: normal;
+  line-height: 1.2;
+  font-size: var(--text-lg);
+}
+
+.mobile-nav__logo .logo__sep {
+  display: none;
+}
+
+.mobile-nav__logo .logo__app {
+  display: block;
+  font-size: var(--text-sm);
+  font-weight: var(--font-medium);
+  opacity: 0.75;
 }
 
 .mobile-nav__close {
@@ -440,31 +498,59 @@
 }
 
 /* ===== RESPONSIVE ===== */
-@media (max-width: 768px) {
-  .header {
-    height: var(--header-height-mobile);
-    padding: 0 var(--space-4);
+/* The logo + "name - app" title takes room: the user's name folds into the avatar and the
+   links get tighter first... */
+@media (max-width: 1400px) {
+  .user-menu__name {
+    display: none;
   }
-  
-  .logo__text {
-    font-size: var(--text-lg);
+
+  .nav__link {
+    padding: var(--space-2);
   }
-  
+}
+
+/* ...then the menu moves into the drawer */
+@media (max-width: 1200px) {
   .nav,
   .nav__divider,
   .theme-toggle,
   .user-menu {
     display: none;
   }
-  
+
   .mobile-menu-btn {
     display: flex;
   }
 }
 
-@media (min-width: 769px) {
+@media (min-width: 1201px) {
   .mobile-nav,
   .mobile-nav__backdrop {
     display: none;
+  }
+}
+
+@media (max-width: 768px) {
+  .header {
+    height: var(--header-height-mobile);
+  }
+
+  .header,
+  .mobile-nav__header {
+    padding-right: var(--space-4);
+  }
+
+  .logo {
+    padding-right: var(--space-6);
+    background: linear-gradient(90deg, #fff calc(100% - var(--space-6)), rgba(255, 255, 255, 0) 100%);
+  }
+
+  .logo__image {
+    height: var(--header-height-mobile);
+  }
+
+  .logo__text {
+    font-size: var(--text-base);
   }
 }

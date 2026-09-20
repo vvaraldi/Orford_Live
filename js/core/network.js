@@ -98,7 +98,7 @@ const Network = (function () {
   const matches = doc => of(doc) === currentId;
   const filter = docs => docs.filter(matches);
 
-  /** A path from the site root ("assets/map/map3.png") as a URL valid from the current page. */
+  /** A path from the site root ("assets/map/Ski-Touring_Map.png") as a URL valid from the current page. */
   function url(path) {
     if (!window.location.pathname.includes('/pages/')) return path;
     return path.startsWith('pages/') ? path.slice('pages/'.length) : '../' + path;
