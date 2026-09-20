@@ -321,6 +321,9 @@
     let qrCodeImageUrl = null;
     let html5QrCode = null;
     let userInfractions = [];
+    // Storage files (photos + QR image) the loaded record showed; empty for a new report.
+    // On modify, whatever the inspector removed or replaced is deleted from Storage.
+    let loadedFileUrls = [];
 
     // Elements
     let reportSelector, duplicateContainer, duplicateBtn;
@@ -500,6 +503,9 @@
       // QR Code
       if (infraction.offenderQRCode) {
         qrCodeData = infraction.offenderQRCode;
+        qrCodeImageUrl = null; // don't carry over the previously selected record's image
+        qrCodeImageData = null;
+        qrImagePreview.style.display = 'none';
         qrDataDisplay.textContent = qrCodeData;
         qrPreview.classList.add('show');
         if (infraction.offenderQRImageUrl) {
@@ -526,6 +532,9 @@
         photoPicker.clear();
       }
       
+      loadedFileUrls = photoPicker.getPhotos().map(p => p.url);
+      if (qrCodeImageUrl) loadedFileUrls.push(qrCodeImageUrl);
+
       // Toggle buttons
       saveBtn.style.display = 'none';
       modifyBtn.style.display = '';
@@ -537,6 +546,7 @@
     function duplicateReport() {
       currentInfractionId = null;
       isNewReport = true;
+      loadedFileUrls = []; // the copy shares the original's files: never delete them from here
       
       // Reset timestamps
       setDefaultValues();
@@ -553,6 +563,7 @@
     function resetForm() {
       currentInfractionId = null;
       isNewReport = true;
+      loadedFileUrls = [];
       reportSelector.value = 'new';
       
       setDefaultValues();
@@ -807,7 +818,28 @@
           modifiedAt: firebase.firestore.FieldValue.serverTimestamp()
         };
         
+        // A legacy record keeps its single photo in offenderImageUrl. Once the form has
+        // carried it into photos[] (or the inspector removed it) the old field must go,
+        // otherwise a removed photo comes back when the record is reopened.
+        const saved = userInfractions.find(i => i.id === currentInfractionId);
+        if (saved?.offenderImageUrl && loadedFileUrls.includes(saved.offenderImageUrl)) {
+          updateData.offenderImageUrl = firebase.firestore.FieldValue.delete();
+        }
+
         await db.collection('infractions').doc(currentInfractionId).update(updateData);
+
+        // Record saved: delete the files the inspector removed or replaced.
+        // Files still used by another of their reports (duplicates) are kept.
+        const keptUrls = photos.map(p => p.url);
+        if (uploadedQrUrl) keptUrls.push(uploadedQrUrl);
+        await PhotoService.deleteRemoved(
+          loadedFileUrls,
+          keptUrls,
+          db.collection('infractions').where('patrolId', '==', currentUser.uid),
+          currentInfractionId,
+          ['offenderQRImageUrl']
+        );
+        loadedFileUrls = keptUrls;
         
         showToast('Infraction modifiée avec succès', 'success');
         loadUserInfractions();

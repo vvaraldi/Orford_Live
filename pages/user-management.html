@@ -842,9 +842,9 @@
           <td data-label="Accès">
             <div class="user-table__access">
               <span 
-                class="access-badge--clickable access-badge--inspection ${user.allowInspection !== false ? 'is-active' : ''}" 
-                title="Inspection - Cliquer pour ${user.allowInspection !== false ? 'désactiver' : 'activer'}"
-                onclick="toggleAccess('${user.id}', 'allowInspection', ${user.allowInspection !== false})"
+                class="access-badge--clickable access-badge--inspection ${user.allowInspection === true ? 'is-active' : ''}"
+                title="Inspection - Cliquer pour ${user.allowInspection === true ? 'désactiver' : 'activer'}"
+                onclick="toggleAccess('${user.id}', 'allowInspection', ${user.allowInspection === true})"
               >🔍</span>
               <span 
                 class="access-badge--clickable access-badge--infraction ${user.allowInfraction === true ? 'is-active' : ''}" 
@@ -923,7 +923,7 @@
       document.getElementById('user-phone').value = user.phone || '';
       document.getElementById('user-role').value = user.role || 'inspector';
       document.getElementById('user-status').value = user.status || 'active';
-      document.getElementById('access-inspection').checked = user.allowInspection !== false;
+      document.getElementById('access-inspection').checked = user.allowInspection === true;
       document.getElementById('access-infraction').checked = user.allowInfraction === true;
       document.getElementById('access-signalisation').checked = user.allowSignalisation === true;
       
@@ -990,13 +990,20 @@
       try {
         if (isNew) {
           const password = document.getElementById('user-password').value;
-          const userCredential = await auth.createUserWithEmailAndPassword(userData.email, password);
-          await db.collection('inspectors').doc(userCredential.user.uid).set({
-            ...userData,
-            createdAt: firebase.firestore.FieldValue.serverTimestamp(),
-            createdBy: currentUser.uid
-          });
-          showMessage('Utilisateur créé. Veuillez vous reconnecter.', 'success');
+          // Create the account on a secondary app so the admin stays signed in;
+          // the inspectors doc is then written as the admin (required by Firestore rules)
+          const secondaryApp = firebase.initializeApp(APP_CONFIG.firebase, `secondary-${Date.now()}`);
+          try {
+            const userCredential = await secondaryApp.auth().createUserWithEmailAndPassword(userData.email, password);
+            await db.collection('inspectors').doc(userCredential.user.uid).set({
+              ...userData,
+              createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+              createdBy: currentUser.uid
+            });
+          } finally {
+            try { await secondaryApp.delete(); } catch (e) {}
+          }
+          showMessage('Utilisateur créé.', 'success');
         } else {
           await db.collection('inspectors').doc(userId).update({
             ...userData,
@@ -1046,7 +1053,7 @@
           Nom: u.name, Courriel: u.email, Téléphone: u.phone || '',
           Rôle: roleLabel,
           Statut: u.status === 'active' ? 'Actif' : 'Inactif',
-          Inspection: u.allowInspection !== false ? 'Oui' : 'Non',
+          Inspection: u.allowInspection === true ? 'Oui' : 'Non',
           Infraction: u.allowInfraction === true ? 'Oui' : 'Non',
           Signalisation: u.allowSignalisation === true ? 'Oui' : 'Non'
         };

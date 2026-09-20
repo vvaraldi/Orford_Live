@@ -224,7 +224,7 @@ function updateNavPermissions(userData) {
   // Inspection links
   const inspectionLinks = document.querySelectorAll('[data-require-inspection]');
   inspectionLinks.forEach(el => {
-    el.style.display = userData.allowInspection !== false ? '' : 'none';
+    el.style.display = userData.allowInspection === true ? '' : 'none';
   });
 
   // Infraction links

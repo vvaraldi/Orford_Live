@@ -47,8 +47,22 @@ service cloud.firestore {
     // PROTECTED ACCESS
     match /inspectors/{userId} {
       allow read: if request.auth != null;
-      allow write: if request.auth != null && 
-                   (request.auth.uid == userId || isAdmin());
+
+      // Only admins create accounts; only a system_admin can grant system_admin
+      allow create: if isAdmin() &&
+                    (request.resource.data.role != 'system_admin' || isSystemAdmin());
+
+      // Admins can edit anyone (but not newly grant system_admin).
+      // Users can only edit their own non-privileged fields (see user-profile.html, theme.js).
+      allow update: if (isAdmin() &&
+                        (request.resource.data.role != 'system_admin' ||
+                         resource.data.role == 'system_admin' ||
+                         isSystemAdmin())) ||
+                       (request.auth != null && request.auth.uid == userId &&
+                        request.resource.data.diff(resource.data).affectedKeys()
+                          .hasOnly(['phone', 'preferences']));
+
+      allow delete: if isSystemAdmin();
     }
     
     match /config/{document} {
@@ -109,10 +123,24 @@ service firebase.storage {
   match /b/{bucket}/o {
     match /{allPaths=**} {
       allow read: if true;
-      allow write: if request.auth != null;
-      allow delete: if request.auth != null && 
-                    (request.auth.uid == resource.metadata.uploadedBy ||
-                     firestore.get(/databases/(default)/documents/inspectors/$(request.auth.uid)).data.role in ['admin', 'system_admin']);
+
+      // Images only, max 15 MB
+      allow create, update: if request.auth != null &&
+                            request.resource.size < 15 * 1024 * 1024 &&
+                            request.resource.contentType.matches('image/.*');
+
+      // Admin only: matches record deletion (inspection-history, inspection-admin orphan cleaner)
+      allow delete: if request.auth != null &&
+                    firestore.get(/databases/(default)/documents/inspectors/$(request.auth.uid)).data.role in ['admin', 'system_admin'];
+    }
+
+    // Inspectors can delete files in their own folder: removing a photo while
+    // editing an infraction / signalisation report (PhotoService.deleteRemoved)
+    match /infractions/{userId}/{file=**} {
+      allow delete: if request.auth != null && request.auth.uid == userId;
+    }
+    match /signalisations/{userId}/{file=**} {
+      allow delete: if request.auth != null && request.auth.uid == userId;
     }
   }
 }

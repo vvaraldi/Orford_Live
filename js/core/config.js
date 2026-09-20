@@ -45,17 +45,16 @@ const APP_CONFIG = {
     inspectionTrailReport: '/pages/inspection-trail-report.html',
     inspectionShelterReport: '/pages/inspection-shelter-report.html',
     inspectionHistory: '/pages/inspection-history.html',
+    inspectionAdmin: '/pages/inspection-admin.html',
     // Infraction module
     infractionReport: '/pages/infraction-report.html',
-    infractionManagement: '/pages/infraction-management.html',
+    infractionAdmin: '/pages/infraction-admin.html',
     // Signalisation module
     signalisationReport: '/pages/signalisation-report.html',
-    signalisationManagement: '/pages/signalisation-management.html',
-    // Request module (Demandes)
-    requestCreate: '/pages/request-create.html',
-    requestManagement: '/pages/request-management.html',
-    // Public
-    publicStatus: '/pages/public-status.html'
+    signalisationResume: '/pages/signalisation-resume.html',
+    signalisationAdmin: '/pages/signalisation-admin.html',
+    // Support (requests)
+    support: '/pages/support.html'
   },
 
   // ===== MODULE DEFINITIONS =====

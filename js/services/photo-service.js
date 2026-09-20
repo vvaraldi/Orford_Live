@@ -533,6 +533,46 @@
   }
 
   /**
+   * After an edit has been saved: deletes the files the record showed before
+   * and no longer does. A file another record of the same owner still points
+   * to is kept - a duplicated report shares its files with the original.
+   * Never throws: a leftover file is better than a failed save, and if the
+   * sibling check cannot run, nothing is deleted.
+   *
+   * before / after  URLs the form loaded / the URLs the record now holds
+   * siblingsQuery   the owner's records, e.g. col.where('patrolId', '==', uid)
+   * excludeId       the edited record (already saved, so it only holds `after`)
+   * extraUrlFields  non-photo URL fields that also count as references
+   *                 (e.g. the infraction QR image)
+   */
+  async function deleteRemoved(before, after, siblingsQuery, excludeId, extraUrlFields) {
+    var kept = {};
+    (after || []).forEach(function (u) { kept[u] = true; });
+    var removed = (before || []).filter(function (u, i, all) {
+      return u && !kept[u] && all.indexOf(u) === i;
+    });
+    if (!removed.length) return { deleted: 0, failed: 0, kept: 0 };
+
+    var inUse = {};
+    try {
+      var snap = await siblingsQuery.get();
+      snap.forEach(function (doc) {
+        if (doc.id === excludeId) return;
+        var data = doc.data();
+        urlsFrom(data).forEach(function (u) { inUse[u] = true; });
+        (extraUrlFields || []).forEach(function (f) { if (data[f]) inUse[data[f]] = true; });
+      });
+    } catch (e) {
+      console.warn('Verification des photos partagees echouee, aucune suppression:', e);
+      return { deleted: 0, failed: 0, kept: removed.length };
+    }
+
+    var doomed = removed.filter(function (u) { return !inUse[u]; });
+    var result = await deletePhotos(doomed);
+    return { deleted: result.deleted, failed: result.failed, kept: removed.length - doomed.length };
+  }
+
+  /**
    * Every photo URL on a document - for inspection-admin's orphan scanner,
    * which currently repeats the string/object check twice.
    */
@@ -562,7 +602,8 @@
     uploadFromPicker: uploadFromPicker,
     // deleting
     deletePhotos: deletePhotos,
-    deletePhotosFrom: deletePhotosFrom
+    deletePhotosFrom: deletePhotosFrom,
+    deleteRemoved: deleteRemoved
   };
 
 })(typeof window !== 'undefined' ? window : this);

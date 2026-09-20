@@ -251,6 +251,9 @@
     // State
     let userReports = [];
     let currentReportId = null;
+    // Storage files the loaded report showed; empty for a new report.
+    // On modify, whatever the inspector removed is deleted from Storage.
+    let loadedFileUrls = [];
     let isNewReport = true;
     let photoPicker = null;
 
@@ -405,6 +408,8 @@
         photoPicker.clear();
       }
       
+      loadedFileUrls = photoPicker.getPhotos().map(p => p.url);
+
       saveBtn.style.display = 'none';
       modifyBtn.style.display = '';
       clearValidation();
@@ -413,6 +418,7 @@
     function resetForm() {
       currentReportId = null;
       isNewReport = true;
+      loadedFileUrls = [];
       reportSelector.value = 'new';
       setDefaultValues();
       statusSelect.value = '';
@@ -562,7 +568,26 @@
           modifiedAt: firebase.firestore.FieldValue.serverTimestamp()
         };
         
+        // A legacy record keeps its single photo in photoUrl. Once the form has carried it
+        // into photos[] (or the inspector removed it) the old field must go, otherwise a
+        // removed photo comes back when the report is reopened.
+        const saved = userReports.find(r => r.id === currentReportId);
+        if (saved?.photoUrl && loadedFileUrls.includes(saved.photoUrl)) {
+          updateData.photoUrl = firebase.firestore.FieldValue.delete();
+        }
+
         await db.collection('signalisations').doc(currentReportId).update(updateData);
+
+        // Report saved: delete the files the inspector removed.
+        // Files still used by another of their reports are kept.
+        const keptUrls = photos.map(p => p.url);
+        await PhotoService.deleteRemoved(
+          loadedFileUrls,
+          keptUrls,
+          db.collection('signalisations').where('inspectorId', '==', currentUser.uid),
+          currentReportId
+        );
+        loadedFileUrls = keptUrls;
         
         showToast('Rapport modifié avec succès', 'success');
         loadUserReports();
