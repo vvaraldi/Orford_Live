@@ -1,5 +1,5 @@
 /**
- * photo-service.js - Shared photo handling for Orford Live
+ * photo-service.js - Shared photo handling for the portal
  * =========================================================
  * Consolidates the photo pipelines currently duplicated across:
  *   pages/infraction-report.html      (uploadPhoto + compressImage)

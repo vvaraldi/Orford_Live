@@ -3,12 +3,12 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="description" content="État en direct des sentiers de randonnée alpine du Mont Orford">
+  <meta name="description" data-no-brand content="État en direct des sentiers de randonnée alpine du Mont Orford">
   <meta name="theme-color" content="#1b4b72">
-  <title>Mont Orford - État des sentiers</title>
+  <title data-no-brand>Mont Orford - État des sentiers</title>
 
   <!-- Favicon -->
-  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏔️</text></svg>">
+  <link rel="icon" data-brand href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏔️</text></svg>">
 
   <!-- CSS -->
   <link rel="stylesheet" href="../css/main.css">
@@ -58,7 +58,7 @@
 </head>
 <body data-theme="light" data-module="status">
   <header class="ps-header">
-    <h1 id="page-title">🏔️ Mont Orford</h1>
+    <h1 id="page-title">Mont Orford</h1>
     <div class="ps-header__meta">
       <span>Dernière mise à jour : <strong id="last-update">--</strong></span>
       <a href="../index.html">Portail</a>
@@ -218,7 +218,8 @@
 
       // Which activity to show: the season's (bike May-Oct, ski otherwise), or ?network=bike|ski
       const network = APP_CONFIG.networks[Network.usePublic()];
-      el('page-title').textContent = `🏔️ Mont Orford - ${network.publicTitle}`;
+      const brand = APP_CONFIG.branding;
+      el('page-title').textContent = `${brand.logoImage ? '' : brand.logo + ' '}Mont Orford - ${network.publicTitle}`;
       document.title = `Mont Orford - ${network.publicTitle}`;
       MapService.showImage(el('map-image'));
 

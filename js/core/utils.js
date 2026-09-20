@@ -1,5 +1,5 @@
 /**
- * utils.js - Utility Functions for Orford Live
+ * utils.js - Utility Functions for the portal
  * =============================================
  * Common utility functions used across the application
  */

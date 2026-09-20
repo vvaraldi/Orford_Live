@@ -1,23 +1,29 @@
 /**
- * config.js - Main Configuration for Orford Live
- * ================================================
+ * config.js - Main Configuration for the portal
+ * ==============================================
  * Central configuration file for branding, Firebase, and app settings.
- * 
+ *
  * TO CUSTOMIZE THE APP:
- * - Change APP_CONFIG.branding for name/logo
+ * - Rename the portal / change its logo: edit BRANDING just below (nothing else)
  * - Firebase config should match your project
  */
 
+// ===== BRANDING: the ONE place for the portal's name and logo =====
+// The header logo, the browser tab title and description, the favicon and the login page
+// all read this (see "Apply the branding" at the end of this file). Pages only write their
+// own part of the title ("Connexion"); the name is added for them.
+// Do NOT rename the localStorage keys 'orford-theme' / 'orford-network' (js/core/theme.js,
+// network.js): they are invisible to users and renaming them would reset everyone's settings.
+const BRANDING = {
+  name: 'Orford Live',
+  logo: '🏔️',                     // emoji, used when there is no logoImage
+  logoImage: null,                 // or a path from the site root, e.g. 'assets/images/logo.png'
+  tagline: 'Patrouille Mont Orford',
+  footerText: '© 2025 Patrouille Mont Orford'
+};
+
 const APP_CONFIG = {
-  // ===== BRANDING (Easy to modify) =====
-  branding: {
-    name: 'Orford Live',
-    shortName: 'Orford',
-    logo: '🏔️',                      // Emoji logo
-    // logoImage: 'assets/images/logo.png',  // Alternative: path to image file
-    tagline: 'Patrouille Mont Orford',
-    footerText: '© 2025 Patrouille Mont Orford'
-  },
+  branding: BRANDING,
 
   // ===== FIREBASE CONFIGURATION =====
   firebase: {
@@ -170,7 +176,7 @@ const APP_CONFIG = {
   // in the apps it stays in the desktop user menu).
   nav: {
     portal: {
-      logo: { icon: '🏔️', text: 'Orford Live' },
+      logo: { icon: BRANDING.logo, image: BRANDING.logoImage, text: BRANDING.name },
       mobileProfile: true,
       items: []
     },
@@ -205,12 +211,12 @@ const APP_CONFIG = {
       items: []
     },
     admin: {
-      logo: { icon: '🏔️', text: 'Orford Live' },
+      logo: { icon: BRANDING.logo, image: BRANDING.logoImage, text: BRANDING.name },
       mobileProfile: true,
       items: []
     },
     profile: {
-      logo: { icon: '🏔️', text: 'Orford Live' },
+      logo: { icon: BRANDING.logo, image: BRANDING.logoImage, text: BRANDING.name },
       mobileProfile: true,
       items: [
         { id: 'user-management', label: 'Administration', icon: '⚙️', href: 'pages/user-management.html', admin: true, desktopOnly: true }
@@ -235,6 +241,52 @@ Object.freeze(APP_CONFIG.nav);
 Object.freeze(APP_CONFIG.networks);
 Object.freeze(APP_CONFIG.defaultNetworks);
 Object.freeze(APP_CONFIG.defaults);
+
+// ===== Apply the branding to the page (browser only) =====
+// - <title> and <meta name="description">: "<page's own text> - <name>" (skipped if the tag has
+//   data-no-brand, or already contains the name)
+// - <link rel="icon" data-brand>: the logo image, or the emoji drawn as an icon
+// - [data-brand-name] / [data-brand-tagline] / [data-brand-logo]: filled in (login page)
+(function applyBranding() {
+  if (typeof document === 'undefined') return;
+  const brand = APP_CONFIG.branding;
+
+  // A path from the site root, as a URL valid from the current page
+  const siteUrl = path => (window.location.pathname.includes('/pages/') ? '../' + path : path);
+
+  const title = document.querySelector('title');
+  if (title && !title.hasAttribute('data-no-brand') && !title.textContent.includes(brand.name)) {
+    title.textContent = `${title.textContent} - ${brand.name}`;
+  }
+  const description = document.querySelector('meta[name="description"]');
+  if (description && !description.hasAttribute('data-no-brand') && !description.content.includes(brand.name)) {
+    description.content = `${description.content} - ${brand.name}`;
+  }
+
+  document.querySelectorAll('link[rel="icon"][data-brand]').forEach(link => {
+    link.href = brand.logoImage
+      ? siteUrl(brand.logoImage)
+      : 'data:image/svg+xml,' + encodeURIComponent(
+          `<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>${brand.logo}</text></svg>`);
+  });
+
+  const fill = () => {
+    document.querySelectorAll('[data-brand-name]').forEach(el => { el.textContent = brand.name; });
+    document.querySelectorAll('[data-brand-tagline]').forEach(el => { el.textContent = brand.tagline; });
+    document.querySelectorAll('[data-brand-logo]').forEach(el => {
+      el.textContent = '';
+      if (brand.logoImage) {
+        const image = document.createElement('img');
+        image.src = siteUrl(brand.logoImage);
+        image.alt = brand.name;
+        el.appendChild(image);
+      } else {
+        el.textContent = brand.logo;
+      }
+    });
+  };
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', fill); else fill();
+})();
 
 // Export for use
 if (typeof module !== 'undefined' && module.exports) {

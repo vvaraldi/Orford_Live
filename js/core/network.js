@@ -1,5 +1,5 @@
 /**
- * network.js - The current activity (network) for Orford Live
+ * network.js - The current activity (network) for the portal
  * ===========================================================
  * Which activity (ski, bike, ...) the user is working in, and what that
  * activity has (map, shelters, ...). Settings live in APP_CONFIG.networks.

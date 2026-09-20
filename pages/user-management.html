@@ -3,12 +3,12 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="description" content="Gestion des utilisateurs - Orford Live">
+  <meta name="description" content="Gestion des utilisateurs">
   <meta name="theme-color" content="#1b4b72">
-  <title>Administration - Orford Live</title>
+  <title>Administration</title>
   
   <!-- Favicon -->
-  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏔️</text></svg>">
+  <link rel="icon" data-brand href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏔️</text></svg>">
   
   <!-- CSS -->
   <link rel="stylesheet" href="../css/main.css">
@@ -595,23 +595,6 @@
         </div>
 
         <div class="export-status" id="export-status"></div>
-      </div>
-
-      <!-- TEMPORARY: one-time backfill, removed once it has run -->
-      <div class="data-export-section" id="backfill-section" style="display: none;">
-        <div class="data-export-section__header">
-          <span>🗂️</span>
-          <h3>Initialiser l'activité des données existantes</h3>
-        </div>
-        <p class="data-export-section__description">
-          Ajoute l'activité « ski » aux sentiers, abris, inspections, infractions et signalisations qui n'en ont pas encore.
-          À exécuter une seule fois (sans danger si répété). Lit chaque collection une fois : quelques secondes à quelques minutes.
-        </p>
-        <button class="btn btn-secondary" id="backfill-btn" onclick="backfillDataNetworks()">
-          <span>▶️</span>
-          <span>Initialiser les données</span>
-        </button>
-        <div class="export-status" id="backfill-status"></div>
       </div>
     </div>
   </main>
@@ -1357,52 +1340,6 @@
       }
     }
 
-    // TEMPORARY one-time backfill (system admin): gives the default network to every record that
-    // has none. Records saved before the network field existed are read as ski everywhere until
-    // this has run; once it has, remove this function, its button, and the "missing = ski"
-    // fallbacks (Network.of in js/core/network.js, `get('network', 'ski')` in the Firestore rules).
-    async function backfillDataNetworks() {
-      const collections = ['trails', 'shelters', 'trail_inspections', 'shelter_inspections', 'inspections', 'infractions', 'signalisations'];
-      const value = APP_CONFIG.defaultNetworks[0];
-      const button = document.getElementById('backfill-btn');
-      const status = document.getElementById('backfill-status');
-
-      const go = await confirm({
-        title: 'Initialiser les données',
-        message: `Ajouter l'activité « ${APP_CONFIG.networks[value].name} » à tous les enregistrements qui n'en ont pas?`,
-        description: 'Aucune donnée existante n\'est modifiée ou supprimée : seul le champ activité est ajouté.',
-        confirmText: 'Lancer'
-      });
-      if (!go) return;
-
-      setButtonLoading(button, true, '⏳ En cours...');
-      const report = [];
-      try {
-        for (const name of collections) {
-          status.className = 'export-status show info';
-          status.textContent = `Lecture de ${name}...`;
-          const snapshot = await db.collection(name).get();
-          const missing = snapshot.docs.filter(doc => !doc.data().network);
-
-          for (let i = 0; i < missing.length; i += 400) { // a batch holds at most 500 writes
-            const batch = db.batch();
-            missing.slice(i, i + 400).forEach(doc => batch.update(doc.ref, { network: value }));
-            await batch.commit();
-            status.textContent = `${name} : ${Math.min(i + 400, missing.length)} / ${missing.length}...`;
-          }
-          report.push(`${name} ${missing.length}/${snapshot.size}`);
-        }
-        status.className = 'export-status show success';
-        status.textContent = `✓ Terminé (mis à jour / total) : ${report.join(' · ')}`;
-      } catch (error) {
-        console.error('Backfill of data networks failed:', error);
-        status.className = 'export-status show error';
-        status.textContent = `✗ Interrompu : ${error.message}. Déjà fait : ${report.join(' · ') || 'rien'}. Relancez pour continuer.`;
-      } finally {
-        setButtonLoading(button, false);
-      }
-    }
-
     function downloadFile(content, filename, type) {
       const blob = new Blob([content], { type });
       const a = document.createElement('a');
@@ -1840,7 +1777,6 @@ Marie Tremblay,marie.tremblay@example.com,MotDePasse456,admin,,true,true,true,sk
           buildNetworkCheckboxes();
           document.getElementById('new-sector-network').innerHTML = myNetworks().map(id =>
             `<option value="${id}">${APP_CONFIG.networks[id].icon} ${APP_CONFIG.networks[id].name}</option>`).join('');
-          document.getElementById('backfill-section').style.display = isCurrentUserSystemAdmin ? '' : 'none'; // TEMPORARY
           // Data export: an admin exports their own activities; only a system admin can export all at once
           document.getElementById('export-network').innerHTML =
             (isCurrentUserSystemAdmin ? '<option value="">Toutes les activités</option>' : '') +

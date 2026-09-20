@@ -1,5 +1,5 @@
 /**
- * theme.js - Theme Management for Orford Live
+ * theme.js - Theme Management for the portal
  * ============================================
  * Handles light/dark theme switching with Firebase sync
  */

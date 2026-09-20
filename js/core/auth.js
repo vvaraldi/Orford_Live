@@ -1,5 +1,5 @@
 /**
- * auth.js - Authentication for Orford Live
+ * auth.js - Authentication for the portal
  * =========================================
  * Firebase authentication and user management
  */

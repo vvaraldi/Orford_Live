@@ -1,5 +1,5 @@
 /**
- * ui.js - UI Components for Orford Live
+ * ui.js - UI Components for the portal
  * ======================================
  * Mobile menu, modals, and other UI interactions
  */

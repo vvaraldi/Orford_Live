@@ -35,6 +35,12 @@
   margin-bottom: var(--space-3);
 }
 
+/* Logo image (BRANDING.logoImage) instead of the emoji */
+.auth-card__logo img {
+  max-height: 4.5rem;
+  width: auto;
+}
+
 .auth-card__title {
   font-size: var(--text-2xl);
   font-weight: var(--font-bold);
