@@ -117,13 +117,7 @@
           <div class="form-group">
             <label class="form-label" for="sector-select">Secteur <span class="form-required">*</span></label>
             <select class="form-select" id="sector-select" required>
-              <option value="">-- Sélectionner un secteur --</option>
-              <option value="mont-orford">Mont-Orford</option>
-              <option value="mont-giroux-nord">Mont Giroux Nord</option>
-              <option value="mont-giroux-est">Mont Giroux Est</option>
-              <option value="alfred-desrochers">Mont Alfred-DesRochers</option>
-              <option value="remontees">Remontées mécaniques</option>
-              <option value="randonnee-alpine">Randonnée alpine</option>
+              <option value="">-- Sélectionner un secteur --</option><!-- filled by SectorService -->
             </select>
           </div>
 
@@ -163,39 +157,9 @@
   <script src="../js/core/auth.js"></script>
   <script src="../js/utils/photo-picker.js"></script>
   <script src="../js/services/photo-service.js"></script>
+  <script src="../js/services/sector-service.js"></script>
 
   <script>
-    // Trails data
-    // Trails data - liste alpine de référence (alignée sur infraction-report.html).
-    // Les clés de secteur restent celles d'origine pour rester compatibles avec
-    // les signalisations déjà enregistrées et le filtre de signalisation-admin.
-    const TRAILS_DATA = {
-      'mont-orford': {
-        name: 'Mont-Orford',
-        trails: ['Trois Ruisseaux','Grande Coulée','Inter','Maxi','4 KM','Escapade','Boisée','Balade','Connection','Passe-Partout','Belette','L\'Initiation','Mini-Passe','Super','Contour','L\'Intrépide','Passe de l\'Ours','Chevreuil','Porc-Épic','Passe à Liguori','Petit Canyon','L\'Orignal','L\'Écureuil','Arcade','L\'Entre-Deux','Diversion','Rochers Jumeaux','Express','Passe','Parc familial']
-      },
-      'mont-giroux-nord': {
-        name: 'Mont Giroux Nord',
-        trails: ['Magog','Familiale','Jean-d\'Avignon','Pente Douce','Magnum','Parc principal','Parc Découverte','La 45','Mitaine','La Passe 45','Forêt magique','Accès','L\'Alternative','Petite Coulée','Gagnon','Bowen','Lièvre','Adams']
-      },
-      'mont-giroux-est': {
-        name: 'Mont Giroux Est',
-        trails: ['Sherbrooke','Slalom','Passe Montagne','Labrecque','Lacroix','Dubreuil','Boogie','Sasquatch','Nicolas Fontaine','Lloyd Langlois']
-      },
-      'alfred-desrochers': {
-        name: 'Mont Alfred-DesRochers',
-        trails: ['Petite Ours','Descente','Le Lien','Ookpic','Grande-Allée','Cascade','Toussiski']
-      },
-      'remontees': {
-        name: 'Remontées mécaniques',
-        trails: ['Rapido','Hybride','Alfred-Desrochers','Quad Giroux Nord','Quad Giroux Est','Tapis Giroux Nord 1','Tapis Giroux Nord 2']
-      },
-      'randonnee-alpine': {
-        name: 'Randonnée alpine',
-        trails: ['La tortue','Le Renard','Le tracé du Lynx','Le lièvre','Le campagnol','La mille-Pattes','L\'hermine','L\'alouette','L\'adams','La carcajou','L\'urubu']
-      }
-    };
-
     const STATUS_LABELS = {
       'ouverte': '🟢 Ouverte',
       'attention-requise': '🟡 Attention requise',
@@ -204,6 +168,7 @@
 
     // State
     let userReports = [];
+    let sectors = []; // sectors and their trails, from Firestore (SectorService)
     let currentReportId = null;
     // Storage files the loaded report showed; empty for a new report.
     // On modify, whatever the inspector removed is deleted from Storage.
@@ -228,11 +193,12 @@
         requireAuth: true,
         requiredPermission: 'allowSignalisation',
         permissionDefault: false,
-        onAuthenticated: (userData) => {
+        onAuthenticated: async (userData) => {
           if (userData.role === 'admin' || userData.role === 'system_admin') {
             document.querySelectorAll('.nav__link--admin, .mobile-nav__link--admin').forEach(el => el.style.display = '');
           }
           setDefaultValues();
+          await loadSectors();
           loadUserReports();
         }
       });
@@ -278,17 +244,19 @@
       reportTime.value = time;
     }
 
-    function populateTrails() {
-      const sectorId = sectorSelect.value;
-      trailSelect.innerHTML = '<option value="">-- Sélectionner une piste --</option>';
-      if (sectorId && TRAILS_DATA[sectorId]) {
-        TRAILS_DATA[sectorId].trails.forEach(trail => {
-          const opt = document.createElement('option');
-          opt.value = trail;
-          opt.textContent = trail;
-          trailSelect.appendChild(opt);
-        });
+    async function loadSectors() {
+      try {
+        sectors = await SectorService.load();
+      } catch (e) {
+        console.error('Error loading sectors:', e);
+        showToast('Impossible de charger les secteurs. Rechargez la page.', 'error');
       }
+      SectorService.fillSectors(sectorSelect, sectors, '-- Sélectionner un secteur --');
+    }
+
+    function populateTrails() {
+      const sector = SectorService.find(sectors, sectorSelect.value);
+      SectorService.fillTrails(trailSelect, sector, '-- Sélectionner une piste --');
     }
 
     async function loadUserReports() {
@@ -342,9 +310,10 @@
       }
       
       statusSelect.value = report.status || '';
-      sectorSelect.value = report.sector || '';
+      // The record may carry an older sector id (alias): it resolves to the current sector
+      SectorService.selectSector(sectorSelect, sectors, report.sector);
       populateTrails();
-      trailSelect.value = report.trail || '';
+      SectorService.selectTrail(trailSelect, report.trail);
       commentsInput.value = report.comments || '';
       
       // Handle photos - retrocompat: support both old photoUrl and new photos array
@@ -376,7 +345,7 @@
       reportSelector.value = 'new';
       setDefaultValues();
       statusSelect.value = '';
-      sectorSelect.value = '';
+      SectorService.fillSectors(sectorSelect, sectors, '-- Sélectionner un secteur --');
       trailSelect.innerHTML = '<option value="">-- Sélectionner d\'abord un secteur --</option>';
       commentsInput.value = '';
       photoPicker.clear();
@@ -462,7 +431,7 @@
           // Keep coordinates field for first photo (for map markers retrocompat)
           coordinates: photos.length > 0 && photos[0].coordinates ? photos[0].coordinates : null,
           sector: sectorSelect.value,
-          sectorDisplayName: TRAILS_DATA[sectorSelect.value]?.name || sectorSelect.value,
+          sectorDisplayName: SectorService.nameOf(sectors, sectorSelect.value),
           trail: trailSelect.value,
           comments: commentsInput.value.trim() || null,
           resolved: false,
@@ -516,7 +485,7 @@
           photos: photos,
           coordinates: photos.length > 0 && photos[0].coordinates ? photos[0].coordinates : null,
           sector: sectorSelect.value,
-          sectorDisplayName: TRAILS_DATA[sectorSelect.value]?.name || sectorSelect.value,
+          sectorDisplayName: SectorService.nameOf(sectors, sectorSelect.value),
           trail: trailSelect.value,
           comments: commentsInput.value.trim() || null,
           modifiedAt: firebase.firestore.FieldValue.serverTimestamp()

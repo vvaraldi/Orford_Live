@@ -149,17 +149,9 @@
   <script src="../js/core/firebase-loader.js"></script>
   <script src="../js/core/auth.js"></script>
   <script src="../js/services/photo-service.js"></script>
+  <script src="../js/services/sector-service.js"></script>
 
   <script>
-    const TRAILS_DATA = {
-      'mont-orford': { name: 'Mont-Orford' },
-      'mont-giroux-nord': { name: 'Mont Giroux Nord' },
-      'mont-giroux-est': { name: 'Mont Giroux Est' },
-      'alfred-desrochers': { name: 'Mont Alfred-DesRochers' },
-      'remontees': { name: 'Remontées mécaniques' },
-      'randonnee-alpine': { name: 'Randonnée alpine' }
-    };
-
     const STATUS_LABELS = {
       'ouverte': '🟢 Ouverte',
       'attention-requise': '🟡 Attention requise',
@@ -180,6 +172,10 @@
 
     let reportsData = [];
     let currentReportId = null;
+    let sectors = []; // every sector (names), from Firestore (SectorService)
+
+    // If the sectors cannot be loaded the page still shows the name stored on each report
+    const sectorNameOf = r => SectorService.nameOf(sectors, r.sector, r.sectorDisplayName);
 
     // GPS to pixel conversion (same as inspection-dashboard)
     const MAP_WIDTH = 800, MAP_HEIGHT = 700;
@@ -226,10 +222,15 @@
         requireAuth: true,
         requiredPermission: 'allowSignalisation',
         permissionDefault: false,
-        onAuthenticated: (userData) => {
+        onAuthenticated: async (userData) => {
           // Show admin link if admin
           if (userData.role === 'admin' || userData.role === 'system_admin') {
             document.querySelectorAll('.nav__link--admin, .mobile-nav__link--admin').forEach(el => el.style.display = '');
+          }
+          try {
+            sectors = await SectorService.loadAll();
+          } catch (e) {
+            console.error('Error loading sectors:', e);
           }
           loadReports();
         }
@@ -311,7 +312,7 @@
       tbody.innerHTML = reportsData.map(r => {
         const date = r.createdAt?.toDate?.();
         const dateStr = date ? date.toLocaleDateString('fr-CA', { year: 'numeric', month: 'short', day: 'numeric' }) : '-';
-        const sectorName = r.sectorDisplayName || TRAILS_DATA[r.sector]?.name || r.sector || '-';
+        const sectorName = sectorNameOf(r);
         
         let statusHtml = '<span style="color:var(--theme-text-secondary);">-</span>';
         if (r.status) {
@@ -336,8 +337,8 @@
       const date = r.createdAt?.toDate?.();
       const dateStr = date ? date.toLocaleDateString('fr-CA', { year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '-';
       const modifiedStr = r.modifiedAt?.toDate?.()?.toLocaleDateString('fr-CA', { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) || '';
-      const sectorName = r.sectorDisplayName || TRAILS_DATA[r.sector]?.name || r.sector || '-';
-      
+      const sectorName = sectorNameOf(r);
+
       let statusHtml = '<span style="color:var(--theme-text-secondary);">Non spécifié</span>';
       if (r.status) {
         const badgeClass = STATUS_BADGE_CLASS[r.status] || '';

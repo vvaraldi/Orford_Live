@@ -83,6 +83,14 @@
       display: flex;
       gap: 0.5rem;
     }
+
+    /* Sectors tab */
+    .sector-network { margin: 1.25rem 0 0.5rem; font-size: 1rem; }
+    .sector-card { border: 1px solid var(--theme-border); border-radius: var(--radius-lg); padding: 1rem; margin-bottom: 0.75rem; background: var(--theme-surface); }
+    .sector-card__head { display: flex; gap: 0.75rem; align-items: center; flex-wrap: wrap; margin-bottom: 0.5rem; }
+    .sector-card__head .form-input { flex: 1; min-width: 200px; font-weight: 600; }
+    .sector-card__meta { font-size: 0.75rem; color: var(--theme-text-light); }
+    .sector-card__foot { display: flex; justify-content: flex-end; margin-top: 0.5rem; }
     
     /* Tab styles */
     .admin-tabs {
@@ -253,6 +261,9 @@
       <button class="admin-tabs__btn is-active" data-tab="users" onclick="switchTab('users')">
         👥 Utilisateurs
       </button>
+      <button class="admin-tabs__btn" data-tab="sectors" onclick="switchTab('sectors')">
+        🗺️ Secteurs
+      </button>
       <button class="admin-tabs__btn" data-tab="import" onclick="switchTab('import')">
         📥 Import
       </button>
@@ -363,6 +374,52 @@
             <span>⬇️</span>
             <span>Exporter utilisateurs</span>
           </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- TAB: SECTORS AND TRAILS -->
+    <div class="admin-tab-content" id="sectors-tab">
+      <div class="data-export-section">
+        <div class="data-export-section__header">
+          <span>🗺️</span>
+          <h3>Secteurs et pistes</h3>
+        </div>
+        <p class="data-export-section__description">
+          Les secteurs et leurs pistes ou sentiers alimentent les formulaires d'infractions et de signalisations.
+          Une piste par ligne. Renommer ou retirer une piste ne modifie pas les rapports déjà enregistrés.
+        </p>
+
+        <div id="sectors-list"></div>
+
+        <div class="mt-4" id="sectors-seed" style="display: none;">
+          <p class="form-hint">Aucun secteur n'est encore enregistré pour l'activité ski.</p>
+          <button class="btn btn-secondary" onclick="loadStarterSectors()">
+            <span>📥</span>
+            <span>Charger les secteurs de départ (ski)</span>
+          </button>
+        </div>
+
+        <div class="mt-6" style="padding-top: var(--space-lg); border-top: 1px solid var(--theme-border);">
+          <div class="data-export-section__header">
+            <span>➕</span>
+            <h4>Ajouter un secteur</h4>
+          </div>
+          <div class="edit-user-form__row">
+            <div class="form-group">
+              <label class="form-label" for="new-sector-network">Activité</label>
+              <select class="form-select" id="new-sector-network"></select>
+            </div>
+            <div class="form-group">
+              <label class="form-label" for="new-sector-name">Nom du secteur</label>
+              <input type="text" class="form-input" id="new-sector-name">
+            </div>
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="new-sector-trails">Pistes ou sentiers (un par ligne)</label>
+            <textarea class="form-textarea" id="new-sector-trails" rows="5"></textarea>
+          </div>
+          <button class="btn btn-primary" onclick="addSector()">Ajouter le secteur</button>
         </div>
       </div>
     </div>
@@ -645,6 +702,7 @@
   <script src="../js/core/ui.js"></script>
   <script src="../js/core/firebase-loader.js"></script>
   <script src="../js/core/auth.js"></script>
+  <script src="../js/services/sector-service.js"></script>
 
   <!-- Page JS -->
   <script>
@@ -1558,6 +1616,190 @@ Marie Tremblay,marie.tremblay@example.com,MotDePasse456,admin,,true,true,true,sk
     }
 
     // ========================================
+    // SECTORS AND TRAILS
+    // ========================================
+    // Firestore `sectors/{id}`: { name, network, order, trails[], aliases[] }.
+    // The infraction and signalisation forms read them through SectorService.
+
+    let allSectors = [];
+
+    // Starting data: the lists that used to be hardcoded in the infraction and signalisation
+    // pages. Only used by "Charger les secteurs de départ"; once the sectors exist in
+    // Firestore this can be removed. `aliases` are ids older records may still carry.
+    const STARTER_SECTORS = [
+      { id: 'mont-orford', name: 'Mont-Orford', order: 1, aliases: [],
+        trails: ["Trois Ruisseaux","Grande Coulée","Inter","Maxi","4 KM","Escapade","Boisée","Balade","Connection","Passe-Partout","Belette","L'Initiation","Mini-Passe","Super","Contour","L'Intrépide","Passe de l'Ours","Chevreuil","Porc-Épic","Passe à Liguori","Petit Canyon","L'Orignal","L'Écureuil","Arcade","L'Entre-Deux","Diversion","Rochers Jumeaux","Express","Passe","Parc familial"] },
+      { id: 'mont-giroux-nord', name: 'Mont Giroux Nord', order: 2, aliases: ['giroux-nord'],
+        trails: ["Magog","Familiale","Jean-d'Avignon","Pente Douce","Magnum","Parc principal","Parc Découverte","La 45","Mitaine","La Passe 45","Forêt magique","Accès","L'Alternative","Petite Coulée","Gagnon","Bowen","Lièvre","Adams"] },
+      { id: 'mont-giroux-est', name: 'Mont Giroux Est', order: 3, aliases: ['giroux-est'],
+        trails: ["Sherbrooke","Slalom","Passe Montagne","Labrecque","Lacroix","Dubreuil","Boogie","Sasquatch","Nicolas Fontaine","Lloyd Langlois"] },
+      { id: 'alfred-desrochers', name: 'Mont Alfred-DesRochers', order: 4, aliases: [],
+        trails: ["Petite Ours","Descente","Le Lien","Ookpic","Grande-Allée","Cascade","Toussiski"] },
+      { id: 'remontees', name: 'Remontées mécaniques', order: 5, aliases: [],
+        trails: ["Rapido","Hybride","Alfred-Desrochers","Quad Giroux Nord","Quad Giroux Est","Tapis Giroux Nord 1","Tapis Giroux Nord 2"] },
+      { id: 'randonnee-alpine', name: 'Randonnée alpine', order: 6, aliases: [],
+        trails: ["La tortue","Le Renard","Le tracé du Lynx","Le lièvre","Le campagnol","La mille-Pattes","L'hermine","L'alouette","L'adams","La carcajou","L'urubu"] }
+    ].map(sector => ({ ...sector, network: 'ski' }));
+
+    // One trail per line: trimmed, no blanks, no duplicates
+    function trailsFromText(text) {
+      const seen = new Set();
+      return text.split(/\r?\n/).map(line => line.trim()).filter(line => line && !seen.has(line) && seen.add(line));
+    }
+
+    function slugify(text) {
+      return text.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase()
+        .replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+    }
+
+    async function loadSectorsAdmin(force) {
+      try {
+        allSectors = await SectorService.loadAll(force);
+      } catch (error) {
+        console.error('Error loading sectors:', error);
+        showMessage('Erreur lors du chargement des secteurs.', 'error');
+        allSectors = [];
+      }
+      renderSectors();
+    }
+
+    function sectorMeta(sector) {
+      const aliases = sector.aliases.length ? ` · anciens identifiants : ${sector.aliases.join(', ')}` : '';
+      return `${sector.id}${aliases} · ${sector.trails.length} piste(s)`;
+    }
+
+    function sectorCard(sector) {
+      const card = document.createElement('div');
+      card.className = 'sector-card';
+      card.innerHTML = `
+        <div class="sector-card__head">
+          <input type="text" class="form-input" data-field="name" aria-label="Nom du secteur">
+          <span class="sector-card__meta"></span>
+        </div>
+        <textarea class="form-textarea" rows="6" data-field="trails" aria-label="Pistes du secteur"></textarea>
+        <div class="sector-card__foot">
+          <button type="button" class="btn btn-primary btn-sm">Enregistrer</button>
+        </div>`;
+      // Values are set as properties, never as HTML
+      card.querySelector('[data-field="name"]').value = sector.name || '';
+      card.querySelector('[data-field="trails"]').value = sector.trails.join('\n');
+      card.querySelector('.sector-card__meta').textContent = sectorMeta(sector);
+      card.querySelector('button').addEventListener('click', event => saveSector(sector, card, event.currentTarget));
+      return card;
+    }
+
+    function renderSectors() {
+      const list = document.getElementById('sectors-list');
+      list.replaceChildren();
+
+      // Admins manage the sectors of the activities they hold
+      NETWORK_IDS.filter(id => myNetworks().includes(id)).forEach(id => {
+        const inNetwork = allSectors.filter(sector => sector.network === id);
+        if (!inNetwork.length) return;
+        const heading = document.createElement('h4');
+        heading.className = 'sector-network';
+        heading.textContent = `${APP_CONFIG.networks[id].icon} ${APP_CONFIG.networks[id].name}`;
+        list.append(heading, ...inNetwork.map(sectorCard));
+      });
+
+      // The starting data is offered until the ski network has its first sector
+      const canSeed = myNetworks().includes('ski') && !allSectors.some(sector => sector.network === 'ski');
+      document.getElementById('sectors-seed').style.display = canSeed ? '' : 'none';
+    }
+
+    async function saveSector(sector, card, button) {
+      const name = card.querySelector('[data-field="name"]').value.trim();
+      const trails = trailsFromText(card.querySelector('[data-field="trails"]').value);
+      if (!name) {
+        showMessage('Le nom du secteur est requis.', 'warning');
+        return;
+      }
+
+      setButtonLoading(button, true, 'Enregistrement...');
+      try {
+        await db.collection('sectors').doc(sector.id).update({
+          name,
+          trails,
+          modifiedAt: firebase.firestore.FieldValue.serverTimestamp(),
+          modifiedBy: currentUser.uid
+        });
+        Object.assign(sector, { name, trails });
+        card.querySelector('[data-field="trails"]').value = trails.join('\n'); // shows the cleaned list
+        card.querySelector('.sector-card__meta').textContent = sectorMeta(sector);
+        showMessage(`Secteur « ${name} » enregistré.`, 'success');
+      } catch (error) {
+        console.error('Error saving sector:', error);
+        showMessage('Erreur lors de l\'enregistrement du secteur.', 'error');
+      } finally {
+        setButtonLoading(button, false);
+      }
+    }
+
+    async function addSector() {
+      const network = document.getElementById('new-sector-network').value;
+      const name = document.getElementById('new-sector-name').value.trim();
+      const trails = trailsFromText(document.getElementById('new-sector-trails').value);
+
+      if (!network || !myNetworks().includes(network)) {
+        showMessage('Choisissez une activité.', 'warning');
+        return;
+      }
+      if (!name) {
+        showMessage('Le nom du secteur est requis.', 'warning');
+        return;
+      }
+
+      // The id is a readable slug of the name, made unique (ids and aliases are global)
+      const taken = new Set(allSectors.flatMap(sector => [sector.id, ...sector.aliases]));
+      const base = slugify(name) || 'secteur';
+      let id = base;
+      for (let n = 2; taken.has(id); n++) id = `${base}-${n}`;
+      const order = Math.max(0, ...allSectors.filter(sector => sector.network === network).map(sector => sector.order || 0)) + 1;
+
+      try {
+        await db.collection('sectors').doc(id).set({
+          name,
+          network,
+          order,
+          trails,
+          aliases: [],
+          createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+          createdBy: currentUser.uid
+        });
+        document.getElementById('new-sector-name').value = '';
+        document.getElementById('new-sector-trails').value = '';
+        showMessage(`Secteur « ${name} » ajouté.`, 'success');
+        await loadSectorsAdmin(true);
+      } catch (error) {
+        console.error('Error adding sector:', error);
+        showMessage('Erreur lors de l\'ajout du secteur.', 'error');
+      }
+    }
+
+    async function loadStarterSectors() {
+      const existing = new Set(allSectors.map(sector => sector.id));
+      const toWrite = STARTER_SECTORS.filter(sector => !existing.has(sector.id));
+      if (toWrite.length === 0) return;
+
+      try {
+        const batch = db.batch();
+        toWrite.forEach(({ id, ...data }) => {
+          batch.set(db.collection('sectors').doc(id), {
+            ...data,
+            createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+            createdBy: currentUser.uid
+          });
+        });
+        await batch.commit();
+        showMessage(`${toWrite.length} secteur(s) de départ chargé(s).`, 'success');
+        await loadSectorsAdmin(true);
+      } catch (error) {
+        console.error('Error loading starter sectors:', error);
+        showMessage('Erreur lors du chargement des secteurs de départ.', 'error');
+      }
+    }
+
+    // ========================================
     // INITIALIZATION
     // ========================================
 
@@ -1575,6 +1817,9 @@ Marie Tremblay,marie.tremblay@example.com,MotDePasse456,admin,,true,true,true,sk
           }
 
           buildNetworkCheckboxes();
+          document.getElementById('new-sector-network').innerHTML = myNetworks().map(id =>
+            `<option value="${id}">${APP_CONFIG.networks[id].icon} ${APP_CONFIG.networks[id].name}</option>`).join('');
+          loadSectorsAdmin();
           document.getElementById('filter-network').insertAdjacentHTML('beforeend',
             NETWORK_IDS.map(id => `<option value="${id}">${APP_CONFIG.networks[id].icon} ${APP_CONFIG.networks[id].name}</option>`).join(''));
           document.getElementById('user-role').addEventListener('change', applyNetworkLocks);

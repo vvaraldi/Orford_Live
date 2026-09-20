@@ -148,6 +148,7 @@
   <script src="../js/core/firebase-loader.js"></script>
   <script src="../js/core/auth.js"></script>
   <script src="../js/services/photo-service.js"></script>
+  <script src="../js/services/sector-service.js"></script>
 
   <script>
     const FAULT_LABELS = {
@@ -171,13 +172,23 @@
     let showArchived = false;
     let sortBy = 'date';
     let currentInfractionId = null;
+    let sectors = []; // every sector (names), from Firestore (SectorService)
+
+    // Infractions store the sector id only. If the sectors cannot be loaded the page
+    // falls back to showing that id.
+    const sectorNameOf = inf => SectorService.nameOf(sectors, inf.sector, inf.sectorName);
 
     function initInfractionAdmin() {
       checkAuthStatus({
         requireAuth: true,
         requireAdmin: true,
-        onAuthenticated: () => {
+        onAuthenticated: async () => {
           bindEvents();
+          try {
+            sectors = await SectorService.loadAll();
+          } catch (e) {
+            console.error('Error loading sectors:', e);
+          }
           loadInfractions();
         }
       });
@@ -254,7 +265,7 @@
       tbody.innerHTML = sorted.map(inf => {
         const date = inf.offenceTimestamp?.toDate?.() || inf.createdAt?.toDate?.();
         const dateStr = date ? date.toLocaleDateString('fr-CA') : '-';
-        const location = inf.trail ? `${inf.trail}${inf.offPiste ? ' (HP)' : ''}` : (inf.sectorName || inf.sector || '-');
+        const location = inf.trail ? `${inf.trail}${inf.offPiste ? ' (HP)' : ''}` : sectorNameOf(inf);
         const status = inf.archived ? '<span class="status-archived">Archivée</span>' : '<span class="status-active">Active</span>';
         
         return `
@@ -285,9 +296,9 @@
       const createdStr = inf.createdAt?.toDate?.()?.toLocaleDateString('fr-CA', { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) || '-';
       const modifiedStr = inf.modifiedAt?.toDate?.()?.toLocaleDateString('fr-CA', { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) || '';
       
-      const location = inf.trail 
-        ? `${inf.sector} - ${inf.trail}${inf.offPiste ? ' (Hors-piste)' : ''}`
-        : (inf.sector || '-') + (inf.offPiste ? ' (Hors-piste)' : '');
+      const location = inf.trail
+        ? `${sectorNameOf(inf)} - ${inf.trail}${inf.offPiste ? ' (Hors-piste)' : ''}`
+        : sectorNameOf(inf) + (inf.offPiste ? ' (Hors-piste)' : '');
       
       // Photos.
       // PhotoService.photosFrom() handles the modern photos array and the
