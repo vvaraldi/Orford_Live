@@ -392,14 +392,6 @@
 
         <div id="sectors-list"></div>
 
-        <div class="mt-4" id="sectors-seed" style="display: none;">
-          <p class="form-hint">Aucun secteur n'est encore enregistré pour l'activité ski.</p>
-          <button class="btn btn-secondary" onclick="loadStarterSectors()">
-            <span>📥</span>
-            <span>Charger les secteurs de départ (ski)</span>
-          </button>
-        </div>
-
         <div class="mt-6" style="padding-top: var(--space-lg); border-top: 1px solid var(--theme-border);">
           <div class="data-export-section__header">
             <span>➕</span>
@@ -1623,24 +1615,6 @@ Marie Tremblay,marie.tremblay@example.com,MotDePasse456,admin,,true,true,true,sk
 
     let allSectors = [];
 
-    // Starting data: the lists that used to be hardcoded in the infraction and signalisation
-    // pages. Only used by "Charger les secteurs de départ"; once the sectors exist in
-    // Firestore this can be removed. `aliases` are ids older records may still carry.
-    const STARTER_SECTORS = [
-      { id: 'mont-orford', name: 'Mont-Orford', order: 1, aliases: [],
-        trails: ["Trois Ruisseaux","Grande Coulée","Inter","Maxi","4 KM","Escapade","Boisée","Balade","Connection","Passe-Partout","Belette","L'Initiation","Mini-Passe","Super","Contour","L'Intrépide","Passe de l'Ours","Chevreuil","Porc-Épic","Passe à Liguori","Petit Canyon","L'Orignal","L'Écureuil","Arcade","L'Entre-Deux","Diversion","Rochers Jumeaux","Express","Passe","Parc familial"] },
-      { id: 'mont-giroux-nord', name: 'Mont Giroux Nord', order: 2, aliases: ['giroux-nord'],
-        trails: ["Magog","Familiale","Jean-d'Avignon","Pente Douce","Magnum","Parc principal","Parc Découverte","La 45","Mitaine","La Passe 45","Forêt magique","Accès","L'Alternative","Petite Coulée","Gagnon","Bowen","Lièvre","Adams"] },
-      { id: 'mont-giroux-est', name: 'Mont Giroux Est', order: 3, aliases: ['giroux-est'],
-        trails: ["Sherbrooke","Slalom","Passe Montagne","Labrecque","Lacroix","Dubreuil","Boogie","Sasquatch","Nicolas Fontaine","Lloyd Langlois"] },
-      { id: 'alfred-desrochers', name: 'Mont Alfred-DesRochers', order: 4, aliases: [],
-        trails: ["Petite Ours","Descente","Le Lien","Ookpic","Grande-Allée","Cascade","Toussiski"] },
-      { id: 'remontees', name: 'Remontées mécaniques', order: 5, aliases: [],
-        trails: ["Rapido","Hybride","Alfred-Desrochers","Quad Giroux Nord","Quad Giroux Est","Tapis Giroux Nord 1","Tapis Giroux Nord 2"] },
-      { id: 'randonnee-alpine', name: 'Randonnée alpine', order: 6, aliases: [],
-        trails: ["La tortue","Le Renard","Le tracé du Lynx","Le lièvre","Le campagnol","La mille-Pattes","L'hermine","L'alouette","L'adams","La carcajou","L'urubu"] }
-    ].map(sector => ({ ...sector, network: 'ski' }));
-
     // One trail per line: trimmed, no blanks, no duplicates
     function trailsFromText(text) {
       const seen = new Set();
@@ -1701,10 +1675,6 @@ Marie Tremblay,marie.tremblay@example.com,MotDePasse456,admin,,true,true,true,sk
         heading.textContent = `${APP_CONFIG.networks[id].icon} ${APP_CONFIG.networks[id].name}`;
         list.append(heading, ...inNetwork.map(sectorCard));
       });
-
-      // The starting data is offered until the ski network has its first sector
-      const canSeed = myNetworks().includes('ski') && !allSectors.some(sector => sector.network === 'ski');
-      document.getElementById('sectors-seed').style.display = canSeed ? '' : 'none';
     }
 
     async function saveSector(sector, card, button) {
@@ -1773,29 +1743,6 @@ Marie Tremblay,marie.tremblay@example.com,MotDePasse456,admin,,true,true,true,sk
       } catch (error) {
         console.error('Error adding sector:', error);
         showMessage('Erreur lors de l\'ajout du secteur.', 'error');
-      }
-    }
-
-    async function loadStarterSectors() {
-      const existing = new Set(allSectors.map(sector => sector.id));
-      const toWrite = STARTER_SECTORS.filter(sector => !existing.has(sector.id));
-      if (toWrite.length === 0) return;
-
-      try {
-        const batch = db.batch();
-        toWrite.forEach(({ id, ...data }) => {
-          batch.set(db.collection('sectors').doc(id), {
-            ...data,
-            createdAt: firebase.firestore.FieldValue.serverTimestamp(),
-            createdBy: currentUser.uid
-          });
-        });
-        await batch.commit();
-        showMessage(`${toWrite.length} secteur(s) de départ chargé(s).`, 'success');
-        await loadSectorsAdmin(true);
-      } catch (error) {
-        console.error('Error loading starter sectors:', error);
-        showMessage('Erreur lors du chargement des secteurs de départ.', 'error');
       }
     }
 
