@@ -225,10 +225,16 @@ class Modal {
 
 /**
  * Create and show a confirmation modal
+ *
+ * NOT called confirm(): a global function named confirm / alert replaces the browser's own
+ * window.confirm / window.alert for every script of the page. Those return a Promise here, and a
+ * Promise is always truthy, so `if (!confirm('Sure?')) return;` never stopped anything: the action
+ * ran while the dialog was still on screen (and alert('text') showed "undefined"). The pages call
+ * the native, synchronous versions; use these (with await) only for a styled dialog.
  * @param {Object} options - Modal options
  * @returns {Promise<boolean>} User's choice
  */
-function confirm(options) {
+function confirmDialog(options) {
   return new Promise((resolve) => {
     let resolved = false;
     const modal = new Modal({
@@ -268,7 +274,7 @@ function confirm(options) {
  * @returns {Promise<boolean>} User's choice
  */
 function confirmDelete(itemName) {
-  return confirm({
+  return confirmDialog({
     title: 'Confirmer la suppression',
     icon: '🗑️',
     iconType: 'danger',
@@ -280,11 +286,11 @@ function confirmDelete(itemName) {
 }
 
 /**
- * Show an alert modal
+ * Show an alert modal (not called alert(): see confirmDialog)
  * @param {Object} options - Alert options
  * @returns {Promise<void>}
  */
-function alert(options) {
+function alertDialog(options) {
   return new Promise((resolve) => {
     const modal = new Modal({
       title: options.title || 'Information',
@@ -427,9 +433,9 @@ if (typeof module !== 'undefined' && module.exports) {
     MobileMenu,
     Modal,
     UserMenu,
-    confirm,
+    confirmDialog,
     confirmDelete,
-    alert,
+    alertDialog,
     initUI
   };
 }

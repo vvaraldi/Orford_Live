@@ -291,10 +291,6 @@
   <script src="../js/services/trail-service.js"></script>
 
   <script>
-    // Store native functions
-    const nativeAlert = window.alert.bind(window);
-    const nativeConfirm = window.confirm.bind(window);
-
     // Statistics count from the start of the current activity's season (config: statsSince),
     // and the far-photo check uses that activity's map centre; both are set once it is known
     let seasonStart = null;
@@ -840,11 +836,7 @@
       const typeLabel = (type === 'all' ? 'toutes les inspections' : type === 'trail' ? 'les inspections de sentiers' : 'les inspections d\'abris')
         + ` de l'activité « ${Network.config().name} »`; // deletion never touches another activity
       
-      let userConfirmed = nativeConfirm(`Êtes-vous sûr de vouloir supprimer ${typeLabel} avant le ${beforeDate.toLocaleDateString('fr-CA')}?\n\nUn fichier de sauvegarde sera téléchargé automatiquement.\n\nCette action est IRRÉVERSIBLE.`);
-      if (userConfirmed && typeof userConfirmed.then === 'function') {
-        userConfirmed = await userConfirmed;
-      }
-      if (userConfirmed !== true) return;
+      if (!confirm(`Êtes-vous sûr de vouloir supprimer ${typeLabel} avant le ${beforeDate.toLocaleDateString('fr-CA')}?\n\nUn fichier de sauvegarde sera téléchargé automatiquement.\n\nCette action est IRRÉVERSIBLE.`)) return;
       
       try {
         showMessage('Création de la sauvegarde...', 'info');
@@ -1052,11 +1044,7 @@
     async function deleteOrphans() {
       if (orphanFiles.length === 0) return;
       
-      let userConfirmed = nativeConfirm(`Supprimer ${orphanFiles.length} fichier(s) orphelin(s)?\n\nCette action est irréversible.`);
-      if (userConfirmed && typeof userConfirmed.then === 'function') {
-        userConfirmed = await userConfirmed;
-      }
-      if (userConfirmed !== true) return;
+      if (!confirm(`Supprimer ${orphanFiles.length} fichier(s) orphelin(s)?\n\nCette action est irréversible.`)) return;
       
       const resultsEl = document.getElementById('orphan-results');
       const btnDelete = document.getElementById('btn-delete-orphans');

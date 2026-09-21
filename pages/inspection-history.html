@@ -259,10 +259,6 @@
     let sortDirection = 'desc';
     let filtersVisible = true;
     let isAdmin = false;
-    
-    // Store native browser functions before any library can override them
-    const nativeAlert = window.alert.bind(window);
-    const nativeConfirm = window.confirm.bind(window);
 
     // Elements
     const tableBody = document.getElementById('inspections-table');
@@ -273,21 +269,6 @@
     const detailModal = document.getElementById('detail-modal');
     const modalTitle = document.getElementById('modal-title');
     const modalBody = document.getElementById('modal-body');
-
-    // Debug: Intercept any call to alert to find source of "undefined"
-    (function() {
-      const origAlert = window.alert;
-      window.alert = function(msg) {
-        console.log('=== ALERT INTERCEPTED ===');
-        console.log('Message:', msg);
-        console.log('Stack trace:', new Error().stack);
-        if (msg === undefined || msg === 'undefined') {
-          console.error('UNDEFINED ALERT - Stack:', new Error().stack);
-          return; // Don't show undefined alerts
-        }
-        return origAlert.call(window, msg);
-      };
-    })();
 
     // Init
     function initHistory() {
@@ -755,27 +736,15 @@
       const insp = allInspections.find(i => i.id === id);
       if (!insp) {
         console.log('Inspection not found:', id);
-        nativeAlert('Inspection non trouvée');
+        alert('Inspection non trouvée');
         return;
       }
 
       const locationName = insp.location || 'lieu inconnu';
       console.log('Showing confirm for:', locationName);
       
-      // Use native confirm
-      let userConfirmed = nativeConfirm(`Êtes-vous sûr de vouloir supprimer cette inspection de "${locationName}"?\n\nCette action est irréversible.`);
-      
-      // If confirm returns a Promise, await it
-      if (userConfirmed && typeof userConfirmed.then === 'function') {
-        console.log('Confirm returned a Promise, awaiting...');
-        userConfirmed = await userConfirmed;
-      }
-      
-      console.log('User confirmed:', userConfirmed, typeof userConfirmed);
-      
-      if (userConfirmed !== true) {
-        console.log('User cancelled or invalid response');
-        // Re-enable button
+      if (!confirm(`Êtes-vous sûr de vouloir supprimer cette inspection de "${locationName}"?\n\nCette action est irréversible.`)) {
+        // Cancelled: re-enable button
         if (event && event.target) {
           event.target.disabled = false;
         }
