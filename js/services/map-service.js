@@ -268,15 +268,15 @@ const MapService = (function () {
   }
 
   /**
-   * The maps the report locations (infractions, signalisations) can be shown on for an activity,
-   * the default one first. The default is the first that is calibrated (a map that cannot place
-   * GPS positions is only worth showing when none can).
+   * The maps the report locations (infractions, signalisations) can be shown on for an activity
+   * (networks.<id>.reportMaps). `default` is the first one: for ski the downhill map, shown even
+   * before it is calibrated (its positions then wait for the calibration, and the switch offers
+   * the other map). `usable` are those that have a GPS calibration.
    */
   function reportMaps(networkId) {
     const network = APP_CONFIG.networks[networkId || Network.current()];
     const ids = (network && network.reportMaps) || (network ? [network.map] : []);
-    const usable = ids.filter(id => canLocate(id));
-    return { all: ids, default: usable[0] || ids[0] || null };
+    return { all: ids, default: ids[0] || null, usable: ids.filter(id => canLocate(id)) };
   }
 
   // The calibrations are read as soon as the user (and so Firestore) is ready

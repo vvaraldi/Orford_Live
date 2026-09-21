@@ -8,9 +8,10 @@
  *                                  activity can place that position)
  *   PhotoMapModal.close()
  *
- * The map shown first is the default one (the first calibrated map of reportMaps); the map
- * picked with the switch is kept while the page stays open. A map that has no GPS
- * calibration (Administration > Cartes) cannot be picked.
+ * The map shown first is the default one (the first of reportMaps: for ski the downhill map);
+ * the map picked with the switch is kept while the page stays open. Every map can be picked:
+ * on one that has no GPS calibration yet (Administration > Cartes) the map is shown without the
+ * marker, with a note.
  *
  * Uses the .detail-modal markup of the infraction-admin, signalisation-admin and
  * signalisation-resume pages. Requires config.js, network.js and map-service.js.
@@ -51,39 +52,41 @@ const PhotoMapModal = (function () {
     all.forEach(id => {
       const button = document.createElement('button');
       button.type = 'button';
-      const placeable = !!MapService.gpsToPixel(lat, lon, id);
       button.className = 'btn btn-sm ' + (id === chosen ? 'btn-primary' : 'btn-secondary');
       button.textContent = `${APP_CONFIG.maps[id].icon} ${APP_CONFIG.maps[id].name}`;
-      button.disabled = !placeable;
-      if (!placeable) button.title = 'Cette carte n\'est pas calibrée (Administration > Cartes) ou la position est hors carte';
+      if (!MapService.gpsToPixel(lat, lon, id)) button.title = 'Carte non calibrée (Administration > Cartes) : la position ne peut pas y être placée';
       button.addEventListener('click', () => { chosen = pinned = id; render(); });
       box.appendChild(button);
     });
 
+    // The chosen map is always shown; the marker only when it can place the position
     const pixel = MapService.gpsToPixel(lat, lon, chosen);
     const image = $('photo-map-img');
     const wrap = $('photo-map-wrap').parentElement;
     const center = () => {
-      wrap.scrollLeft = Math.max(0, pixel.x - wrap.clientWidth / 2);
-      wrap.scrollTop = Math.max(0, pixel.y - wrap.clientHeight / 2);
+      wrap.scrollLeft = pixel ? Math.max(0, pixel.x - wrap.clientWidth / 2) : 0;
+      wrap.scrollTop = pixel ? Math.max(0, pixel.y - wrap.clientHeight / 2) : 0;
     };
     image.onload = center;
     const url = MapService.imageUrl(chosen);
     if (image.getAttribute('src') !== url) image.src = url; else center();
     image.alt = `Carte ${APP_CONFIG.maps[chosen].name}`;
-    $('photo-marker').style.left = pixel.x + 'px';
-    $('photo-marker').style.top = pixel.y + 'px';
-    $('photo-coords').innerHTML = `<strong>GPS:</strong> ${lat.toFixed(6)}°, ${lon.toFixed(6)}°`;
+    $('photo-marker').style.display = pixel ? '' : 'none';
+    if (pixel) {
+      $('photo-marker').style.left = pixel.x + 'px';
+      $('photo-marker').style.top = pixel.y + 'px';
+    }
+    $('photo-coords').innerHTML = `<strong>GPS:</strong> ${lat.toFixed(6)}°, ${lon.toFixed(6)}°` +
+      (pixel ? '' : `<br><span style="color:var(--theme-text-secondary);">La position ne peut pas être placée sur cette carte (carte non calibrée, ou position hors carte) : essayez l'autre carte ci-dessus, ou Google Maps.</span>`);
     $('photo-google-link').href = `https://www.google.com/maps?q=${lat},${lon}`;
   }
 
   function open(lat, lon) {
     const { all, default: def } = MapService.reportMaps();
-    const usable = all.filter(id => MapService.gpsToPixel(lat, lon, id));
-    // No map of this activity can place the position (not calibrated): Google Maps instead
-    if (!usable.length) { window.open(`https://www.google.com/maps?q=${lat},${lon}`, '_blank', 'noopener'); return; }
+    // No map of this activity can place the position at all (none calibrated): Google Maps instead
+    if (!all.some(id => MapService.gpsToPixel(lat, lon, id))) { window.open(`https://www.google.com/maps?q=${lat},${lon}`, '_blank', 'noopener'); return; }
 
-    chosen = pinned && usable.includes(pinned) ? pinned : (usable.includes(def) ? def : usable[0]);
+    chosen = pinned && all.includes(pinned) ? pinned : def;
     position = { lat, lon };
     if (!$('photo-map-modal')) build();
     render();

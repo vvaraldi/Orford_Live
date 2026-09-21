@@ -263,7 +263,7 @@
         button.type = 'button';
         button.className = 'btn btn-sm ' + (id === resumeMap ? 'btn-primary' : 'btn-secondary');
         button.textContent = `${APP_CONFIG.maps[id].icon} ${APP_CONFIG.maps[id].name}`;
-        button.title = MapService.canLocate(id) ? '' : 'Carte non calibrée (Administration > Cartes) : aucune position ne peut y être placée';
+        button.title = MapService.canLocate(id) ? '' : 'Carte non calibrée (Administration > Cartes) : les positions ne peuvent pas y être placées';
         button.addEventListener('click', () => {
           resumeMap = id;
           buildMapSwitch();
