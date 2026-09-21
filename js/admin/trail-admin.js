@@ -145,9 +145,9 @@ const TrailAdmin = (function () {
     g.setAttribute('transform', `translate(${position.left} ${position.top})`);
     g.setAttribute('class', className);
     const circle = document.createElementNS(SVG_NS, 'circle');
-    circle.setAttribute('r', 15);
+    circle.setAttribute('r', 12);
     const text = document.createElementNS(SVG_NS, 'text');
-    text.setAttribute('y', 5);
+    text.setAttribute('y', 4);
     text.setAttribute('text-anchor', 'middle');
     text.textContent = label;
     g.append(circle, text);

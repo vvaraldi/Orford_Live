@@ -107,6 +107,10 @@
   --font-primary: 'Segoe UI', -apple-system, BlinkMacSystemFont, 'Helvetica Neue', sans-serif;
   --font-secondary: Georgia, 'Times New Roman', serif;
   --font-mono: 'SF Mono', 'Fira Code', 'Consolas', monospace;
+  /* Banner title: bold caps, loaded in main.css */
+  --font-brand: 'Archivo', 'Arial Narrow', Arial, sans-serif;
+  /* The dark blue of the logo (Logo_Mont-Orford transparent.png) */
+  --color-logo-blue: #00577f;
   
   /* Font Sizes */
   --text-xs: 0.75rem;      /* 12px */

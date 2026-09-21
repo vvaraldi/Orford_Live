@@ -13,6 +13,9 @@
    7. Responsive (breakpoints)
    ======================================== */
 
+/* Font of the banner title (a free grotesque close to the bold caps of montorford.com). Must stay the first import. */
+@import url('https://fonts.googleapis.com/css2?family=Archivo:wght@700&display=swap');
+
 /* ===== 1. CONFIGURATION ===== */
 @import 'config/variables.css';
 @import 'config/themes.css';
