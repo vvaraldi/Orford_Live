@@ -8,8 +8,8 @@
  *
  * Sectors (the areas the infraction and signalisation forms group trails under) are managed
  * here too, by system admins only: they add, rename and order sectors, assign the sector of
- * trails (one by one or several at once), and run the one-time migration of the old name lists
- * (trail-migration.js). A trail without a sector is highlighted: the forms cannot offer it.
+ * trails (one by one or several at once). A trail without a sector is highlighted: the forms
+ * cannot offer it.
  *
  * Each kind of trail has its own map (APP_CONFIG.trailKinds.<kind>.map): the map shown follows
  * the type filter, or the type of the trail being edited.
@@ -39,12 +39,10 @@ const TrailAdmin = (function () {
     selected: new Set(), // trail ids ticked for a bulk sector assignment
     editing: null,     // { id: string|null, trail: object|null } while the editor is open
     placing: false,    // the next click on the map sets the position
-    position: null,    // { left, top } of the trail being edited
-    migrationKinds: {} // sector id -> kind chosen in the migration preview
+    position: null     // { left, top } of the trail being edited
   };
   let userId = null;
   let isSystemAdmin = false;
-  let allowedNetworks = [];
 
   const kindsOfNetwork = () => APP_CONFIG.networks[state.network].trailKinds;
   const inNetwork = () => state.trails.filter(t => Network.of(t) === state.network);
@@ -475,8 +473,9 @@ const TrailAdmin = (function () {
       number !== '' && t.number != null && String(t.number) === number && TrailService.kindOf(t) === kind);
   }
 
-  /** Saves the editor. next = true: then open the next trail without a position, ready to be placed. */
+  /** Saves the editor. next = true: then open the next trail of the list. */
   async function save(next) {
+    if (!state.editing) return;
     const name = $('tr-name').value.trim();
     const number = $('tr-number').value.trim();
     const kind = $('tr-kind').value;
@@ -523,7 +522,7 @@ const TrailAdmin = (function () {
       showMessage(`Sentier « ${name} » enregistré.`, 'success');
       closeEditor();
       await load();
-      if (next) openNextWithoutPosition(savedId);
+      if (next) openNext(savedId);
     } catch (error) {
       console.error('Error saving the trail:', error);
       showMessage(`Enregistrement impossible : ${error.message || 'erreur inconnue'}`, 'error');
@@ -532,15 +531,15 @@ const TrailAdmin = (function () {
     }
   }
 
-  // After a save: the next trail of the list (from the one just saved, wrapping round) that has no position
-  function openNextWithoutPosition(afterId) {
-    const rows = visibleRows().filter(t => !TrailService.isArchived(t) && !(t.coordinates && t.coordinates.left != null));
-    if (!rows.length) { showMessage('Tous les sentiers de cette liste ont une position.', 'info'); return; }
-    const all = visibleRows();
-    const start = all.findIndex(t => t.id === afterId);
-    const following = all.slice(start + 1).concat(all.slice(0, start + 1)).find(t => rows.includes(t));
-    startEdit(following);
-    state.placing = true;   // ready: the next click on the map places it
+  // After a save: the next trail of the displayed list (with or without a position). A trail without
+  // a position is opened ready to be placed: the next click on the map sets it.
+  function openNext(afterId) {
+    const rows = visibleRows();
+    const index = rows.findIndex(t => t.id === afterId);
+    const next = index >= 0 ? rows[index + 1] : null;
+    if (!next) { showMessage('C\'était le dernier sentier de la liste.', 'info'); return; }
+    startEdit(next);
+    state.placing = !(next.coordinates && next.coordinates.left != null);
     updatePlacing();
   }
 
@@ -673,89 +672,6 @@ const TrailAdmin = (function () {
     }
   }
 
-  // ---- One-time migration of the old name lists (system admin, temporary) --------------------------------------------
-  const ACTION_TEXT = { create: 'Créer', link: 'Relier', skip: 'Déjà fait', check: 'À vérifier' };
-
-  function migrationPlan() {
-    const sectors = state.sectors.filter(s => allowedNetworks.includes(s.network));
-    return TrailMigration.plan({ sectors, trails: state.trails, kinds: state.migrationKinds });
-  }
-
-  function renderMigration() {
-    const box = $('migration-preview');
-    box.replaceChildren();
-    const plan = migrationPlan();
-    const withNames = [...new Set(plan.rows.map(r => r.sector))];
-    if (!withNames.length) {
-      box.appendChild(el('p', 'cal-source', 'Aucun secteur n\'a de liste de noms à convertir.'));
-      $('migration-apply').hidden = true;
-      return;
-    }
-
-    const summary = el('p', 'cal-status ' + (plan.counts.create + plan.counts.link ? 'info' : 'ok'),
-      `${plan.counts.create} à créer · ${plan.counts.link} à relier à un sentier existant · ${plan.counts.skip} déjà fait · ${plan.counts.check} à vérifier`);
-    box.appendChild(summary);
-
-    withNames.forEach(sector => {
-      const rows = plan.rows.filter(r => r.sector === sector);
-      const head = el('div', 'migration-sector');
-      head.appendChild(el('strong', '', `${sector.name} (${rows.length})`));
-      const select = document.createElement('select');
-      select.className = 'form-select';
-      select.setAttribute('aria-label', `Type des sentiers de ${sector.name}`);
-      APP_CONFIG.networks[sector.network].trailKinds.forEach(k => select.appendChild(new Option(TrailService.kindLabel(k), k)));
-      select.value = rows[0].kind;
-      select.addEventListener('change', () => { state.migrationKinds[sector.id] = select.value; renderMigration(); });
-      head.appendChild(select);
-      box.appendChild(head);
-
-      const list = el('ul', 'migration-list');
-      rows.forEach(r => {
-        const detail = r.action === 'link' ? ` « ${r.trail.name} » (${r.trail.id})` : (r.reason ? ` (${r.reason})` : '');
-        list.appendChild(el('li', `migration-${r.action}`, `${ACTION_TEXT[r.action]} : ${r.name}${detail}`));
-      });
-      box.appendChild(list);
-    });
-
-    if (plan.unmatched.length) {
-      box.appendChild(el('p', 'cal-source', `Sentiers existants sans correspondance (ils restent sans secteur, à attribuer ensuite) : ${plan.unmatched.map(t => t.name || t.id).join(', ')}`));
-    }
-    $('migration-apply').hidden = false;
-    $('migration-apply').disabled = plan.counts.create + plan.counts.link === 0;
-    $('migration-apply').textContent = `Appliquer : ${plan.counts.create} création(s), ${plan.counts.link} liaison(s)`;
-  }
-
-  async function prepareMigration() {
-    await loadSectors(true);
-    try {
-      const snapshot = await window.db.collection('trails').get();
-      state.trails = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-    } catch (error) {
-      showMessage('Erreur lors du chargement des sentiers.', 'error');
-      return;
-    }
-    state.migrationKinds = {};
-    renderMigration();
-  }
-
-  async function applyMigration() {
-    const plan = migrationPlan();
-    if (!window.confirm(`Créer ${plan.counts.create} sentier(s) et en relier ${plan.counts.link} à leur secteur ?\n\nRien n'est supprimé ni modifié d'autre.`)) return;
-    const button = $('migration-apply');
-    setButtonLoading(button, true, 'Migration...');
-    try {
-      const result = await TrailMigration.apply(plan, window.db, userId, state.trails.map(t => t.id));
-      showMessage(`Migration terminée : ${result.created} sentier(s) créé(s), ${result.linked} relié(s).`, 'success');
-      await load();
-      renderMigration();
-    } catch (error) {
-      console.error('Migration error:', error);
-      showMessage(`Migration interrompue : ${error.message || 'erreur inconnue'}. Vous pouvez la relancer : ce qui est déjà fait est ignoré.`, 'error');
-    } finally {
-      setButtonLoading(button, false);
-    }
-  }
-
   // ---- Start ------------------------------------------------------------------------------------------------------------
   function selectNetwork(id) {
     state.network = id;
@@ -773,15 +689,14 @@ const TrailAdmin = (function () {
 
   /**
    * @param networkIds the activities the current admin manages
-   * @param options    { isSystemAdmin }: sectors, sector assignment and the migration are system admin only
+   * @param options    { isSystemAdmin }: sectors and sector assignment are system admin only
    */
   async function init(uid, networkIds, options) {
     userId = uid;
     isSystemAdmin = !!(options && options.isSystemAdmin);
-    allowedNetworks = networkIds;
 
-    // System admin only: sector column of the editor, bulk bar, sector panel, migration panel
-    ['trail-bulk', 'sector-panel', 'migration-panel', 'trail-th-select'].forEach(id => { $(id).hidden = !isSystemAdmin; });
+    // System admin only: sector column of the editor, bulk bar, sector panel
+    ['trail-bulk', 'sector-panel', 'trail-th-select'].forEach(id => { $(id).hidden = !isSystemAdmin; });
 
     $('trail-network').innerHTML = networkIds.map(id => `<option value="${id}">${APP_CONFIG.networks[id].icon} ${APP_CONFIG.networks[id].name}</option>`).join('');
     $('trail-network').addEventListener('change', event => selectNetwork(event.target.value));
@@ -803,8 +718,6 @@ const TrailAdmin = (function () {
     $('trail-select-all').addEventListener('change', event => toggleSelectAll(event.target.checked));
     $('trail-bulk-apply').addEventListener('click', bulkAssign);
     $('sector-new-add').addEventListener('click', addSector);
-    $('migration-prepare').addEventListener('click', prepareMigration);
-    $('migration-apply').addEventListener('click', applyMigration);
 
     await loadSectors();
     selectNetwork(networkIds[0]);

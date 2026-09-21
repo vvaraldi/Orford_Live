@@ -269,14 +269,6 @@
     .trail-panel summary { cursor: pointer; font-weight: 600; }
     .trail-bulk { display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap; margin-top: var(--space-md); }
     .trail-bulk .form-select { width: auto; min-width: 14rem; }
-    .migration-preview { margin: var(--space-md) 0; max-height: 26rem; overflow: auto; }
-    .migration-sector { display: flex; align-items: center; gap: 0.75rem; margin: 0.75rem 0 0.25rem; }
-    .migration-sector .form-select { width: auto; }
-    .migration-list { margin: 0; padding-left: 1.25rem; font-size: 0.8125rem; columns: 2 16rem; }
-    .migration-create { color: var(--theme-text); }
-    .migration-link { color: #2563eb; }
-    .migration-skip { color: var(--theme-text-secondary); }
-    .migration-check { color: #b45309; font-weight: 600; }
     .btn[hidden], .form-select[hidden] { display: none; } /* author display rules would otherwise win over [hidden] */
     .trail-row.is-selected { background: rgba(var(--theme-accent-rgb), 0.12); }
     .trail-editor { padding: var(--space-md); margin-bottom: var(--space-md); background: var(--theme-surface-alt); border: 1px solid var(--theme-border); border-radius: var(--radius-md); }
@@ -497,19 +489,6 @@
           </div>
         </details>
 
-        <!-- System admin: one-time migration of the old name lists (temporary) -->
-        <details class="trail-panel" id="migration-panel" hidden>
-          <summary>Migration des anciennes listes de pistes (une seule fois)</summary>
-          <p class="cal-source">
-            Les formulaires d'infractions et de signalisations utilisaient des listes de noms par secteur. Cette étape crée un sentier par nom,
-            dans son secteur, et relie les sentiers déjà existants (la « Randonnée alpine ») au lieu de les dupliquer. Un aperçu s'affiche d'abord :
-            rien n'est écrit avant « Appliquer ». Les numéros et les positions se remplissent ensuite dans la liste ci-dessous.
-          </p>
-          <button type="button" class="btn btn-secondary" id="migration-prepare">Préparer l'aperçu</button>
-          <div id="migration-preview" class="migration-preview"></div>
-          <button type="button" class="btn btn-primary" id="migration-apply" hidden>Appliquer</button>
-        </details>
-
         <!-- System admin: assign a sector to the ticked trails -->
         <div class="trail-bulk" id="trail-bulk" hidden>
           <select class="form-select" id="trail-bulk-sector" aria-label="Secteur à attribuer"></select>
@@ -567,7 +546,7 @@
           <p class="cal-source" id="tr-status"></p>
           <div class="cal-actions">
             <button type="button" class="btn btn-primary" id="tr-save">Enregistrer</button>
-            <button type="button" class="btn btn-primary" id="tr-save-next" title="Enregistre, puis ouvre le prochain sentier sans position, prêt à être placé sur la carte">Enregistrer et suivant sans position</button>
+            <button type="button" class="btn btn-primary" id="tr-save-next" title="Enregistre, puis ouvre le sentier suivant de la liste (prêt à être placé sur la carte s'il n'a pas de position)">Enregistrer et suivant</button>
             <button type="button" class="btn btn-secondary" id="tr-cancel">Annuler</button>
             <button type="button" class="btn btn-secondary" id="tr-archive" hidden title="Le sentier n'existe plus dans le réseau : il disparaît de la carte et des listes, l'historique est conservé">Masquer ce sentier</button>
             <button type="button" class="btn btn-secondary" id="tr-restore" hidden>Restaurer ce sentier</button>
@@ -933,7 +912,6 @@
   <script src="../js/services/map-service.js"></script>
   <script src="../js/admin/map-calibration.js"></script>
   <script src="../js/services/trail-service.js"></script>
-  <script src="../js/admin/trail-migration.js"></script>
   <script src="../js/admin/trail-admin.js"></script>
 
   <!-- Page JS -->
@@ -1875,7 +1853,7 @@ Marie Tremblay,marie.tremblay@example.com,MotDePasse456,admin,,true,true,true,sk
           document.getElementById('export-network').innerHTML =
             (isCurrentUserSystemAdmin ? '<option value="">Toutes les activités</option>' : '') +
             myNetworks().map(id => `<option value="${id}">${APP_CONFIG.networks[id].icon} ${APP_CONFIG.networks[id].name}</option>`).join('');
-          // Trails and sectors of the activities this admin holds; sectors, sector assignment and the migration are system admin only
+          // Trails and sectors of the activities this admin holds; sectors and sector assignment are system admin only
           TrailAdmin.init(currentUser.uid, myNetworks(), { isSystemAdmin: isCurrentUserSystemAdmin });
           // GPS calibration of the maps: system admin only (the Firestore rules enforce it too)
           if (isCurrentUserSystemAdmin) {

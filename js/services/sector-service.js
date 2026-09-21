@@ -9,9 +9,8 @@
  *   network  "ski"                       (an id of APP_CONFIG.networks)
  *   order    2                           (position in the dropdown, per network)
  *   aliases  ["giroux-nord"]             (older ids that records may still carry)
- *   trails   ["Magog", "Familiale", ...] (the ORIGINAL name lists: kept as a fallback for a
- *                                         sector that has no trail records yet, and as the
- *                                         source of the one-time migration; no longer edited)
+ *   trails   ["Magog", "Familiale", ...] (the ORIGINAL name lists, no longer edited: only a fallback
+ *                                         for a sector that has no trail records)
  *
  * The trails of a sector are the `trails` records whose `sector` is this sector's id (or one of
  * its aliases), of the sector's activity, not hidden (archived). Every kind counts (uphill,
