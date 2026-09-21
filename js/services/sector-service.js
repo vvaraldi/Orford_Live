@@ -2,17 +2,25 @@
  * sector-service.js - Sectors and their trails, from Firestore
  * ============================================================
  * One source for the sector -> trail lists used by the infraction and
- * signalisation apps (they used to keep their own hardcoded copies).
+ * signalisation forms.
  *
  * Firestore `sectors/{id}`:
  *   name     "Mont Giroux Nord"
  *   network  "ski"                       (an id of APP_CONFIG.networks)
  *   order    2                           (position in the dropdown, per network)
- *   trails   ["Magog", "Familiale", ...] (piste / trail names)
  *   aliases  ["giroux-nord"]             (older ids that records may still carry)
+ *   trails   ["Magog", "Familiale", ...] (the ORIGINAL name lists: kept as a fallback for a
+ *                                         sector that has no trail records yet, and as the
+ *                                         source of the one-time migration; no longer edited)
  *
- * Records store the sector id and the trail name. Look a sector up with find()
- * so an old alias still resolves to the current sector.
+ * The trails of a sector are the `trails` records whose `sector` is this sector's id (or one of
+ * its aliases), of the sector's activity, not hidden (archived). Every kind counts (uphill,
+ * downhill, lift): the forms are for all skiing together. The sector is set on each trail by a
+ * system admin (Administration > Sentiers).
+ *
+ * A report stores the sector id, the trail name (text) and, when the trail came from a trail
+ * record, its id (trailId). Old reports only have the name: readTrail() / selectTrail() below
+ * handle both, and an old report is never rewritten unless someone edits it.
  *
  * Requires: firebase-loader.js + auth.js (window.db), config.js (APP_CONFIG), network.js.
  * Load it after auth.js.
@@ -20,7 +28,16 @@
 (function (global) {
   'use strict';
 
-  var cache = null; // Promise<Sector[]>, one read per page
+  var cache = null;        // Promise<Sector[]>, one read per page
+  var trailsCache = null;  // Promise<Trail[]>, one read per page
+
+  /** Comparable form of a name: no accents, lower case, one space, straight apostrophes. */
+  function norm(text) {
+    return String(text == null ? '' : text)
+      .normalize('NFD').replace(/[̀-ͯ]/g, '')
+      .replace(/[’‘`]/g, "'")
+      .toLowerCase().replace(/\s+/g, ' ').trim();
+  }
 
   function compare(a, b) {
     return (a.network || '').localeCompare(b.network || '') ||
@@ -52,14 +69,44 @@
     return cache;
   }
 
+  /** Every trail record ({id, ...data}), read once per page. A failed read gives no trails. */
+  function loadTrails(force) {
+    if (!trailsCache || force) {
+      trailsCache = global.db.collection('trails').get().then(function (snapshot) {
+        var list = [];
+        snapshot.forEach(function (doc) { list.push(Object.assign({ id: doc.id }, doc.data())); });
+        return list;
+      }).catch(function (error) {
+        console.error('SectorService: trails could not be read, the name lists are used.', error);
+        trailsCache = null;
+        return [];
+      });
+    }
+    return trailsCache;
+  }
+
+  /** The visible trails of a sector, by name: [{ id, name, number, kind }]. */
+  function itemsOf(sector, trails) {
+    var ids = [sector.id].concat(sector.aliases);
+    return trails
+      .filter(function (t) {
+        return t.archived !== true && t.sector && ids.indexOf(t.sector) !== -1 && Network.of(t) === sector.network;
+      })
+      .map(function (t) { return { id: t.id, name: t.name || t.id, number: t.number, kind: t.kind || (t.network === 'bike' ? 'bike' : 'uphill') }; })
+      .sort(function (a, b) { return a.name.localeCompare(b.name, 'fr'); });
+  }
+
   /**
    * The sectors of one network; by default the current activity's (Network.current()).
+   * Each has `items`: its trail records (see itemsOf). `trails` still holds the old name list.
    */
   async function load(network) {
     // APP_CONFIG / Network are global consts: visible as bare names, not as window.X
     var wanted = network || Network.current() || APP_CONFIG.defaultNetworks[0];
-    var all = await loadAll();
-    return all.filter(function (s) { return s.network === wanted; });
+    var results = await Promise.all([loadAll(), loadTrails()]);
+    return results[0]
+      .filter(function (s) { return s.network === wanted; })
+      .map(function (s) { return Object.assign({}, s, { items: itemsOf(s, results[1]) }); });
   }
 
   /** The sector for an id or one of its aliases, or null. */
@@ -83,12 +130,61 @@
     ));
   }
 
-  /** Fills a <select> with a sector's trails (value = trail name). */
+  /**
+   * Fills a <select> with a sector's trails. From the trail records when the sector has some
+   * (value = trail id, the number is added only when two names would look the same); otherwise
+   * from the old name list (value = name).
+   */
   function fillTrails(select, sector, placeholder) {
-    var names = sector ? sector.trails : [];
-    select.replaceChildren.apply(select, [new Option(placeholder, '')].concat(
-      names.map(function (name) { return new Option(name, name); })
-    ));
+    var options = [new Option(placeholder, '')];
+    var items = sector && sector.items ? sector.items : [];
+    if (items.length) {
+      var seen = {};
+      items.forEach(function (i) { var k = norm(i.name); seen[k] = (seen[k] || 0) + 1; });
+      items.forEach(function (i) {
+        var clash = seen[norm(i.name)] > 1;
+        var label = clash ? i.name + ' (' + (i.number != null && i.number !== '' ? i.number : i.kind) + ')' : i.name;
+        var option = new Option(label, i.id);
+        option.dataset.trailId = i.id;
+        option.dataset.name = i.name;
+        options.push(option);
+      });
+    } else {
+      (sector ? sector.trails : []).forEach(function (name) {
+        var option = new Option(name, name);
+        option.dataset.name = name;
+        options.push(option);
+      });
+    }
+    select.replaceChildren.apply(select, options);
+  }
+
+  /** What is picked in a trail <select>: { id, name }. id is null for a name from the old lists. */
+  function readTrail(select) {
+    var option = select.selectedOptions && select.selectedOptions[0];
+    if (!option || !option.value) return { id: null, name: null };
+    return { id: option.dataset.trailId || null, name: option.dataset.name || option.value };
+  }
+
+  /**
+   * Selects a record's trail: by its trail id when it has one, else by name (accents and case
+   * ignored). A trail that is not in the list any more (renamed, hidden, removed) is kept as an
+   * extra option so editing the record does not silently drop it.
+   */
+  function selectTrail(select, name, trailId) {
+    var options = Array.prototype.slice.call(select.options);
+    var found = null;
+    if (trailId) found = options.filter(function (o) { return o.dataset.trailId === trailId; })[0];
+    if (!found && name) found = options.filter(function (o) { return o.value && norm(o.dataset.name || o.value) === norm(name); })[0];
+    if (found) { select.value = found.value; return; }
+    if (name) {
+      var extra = new Option(name + ' (ancienne piste)', 'legacy:' + name);
+      extra.dataset.name = name;
+      select.appendChild(extra);
+      select.value = extra.value;
+    } else {
+      select.value = '';
+    }
   }
 
   /**
@@ -110,21 +206,16 @@
     return sector;
   }
 
-  /** Same for a trail name in a <select> filled by fillTrails(). */
-  function selectTrail(select, name) {
-    if (name && !Array.prototype.some.call(select.options, function (o) { return o.value === name; })) {
-      select.appendChild(new Option(name, name));
-    }
-    select.value = name || '';
-  }
-
   global.SectorService = {
+    norm: norm,
     loadAll: loadAll,
+    loadTrails: loadTrails,
     load: load,
     find: find,
     nameOf: nameOf,
     fillSectors: fillSectors,
     fillTrails: fillTrails,
+    readTrail: readTrail,
     selectSector: selectSector,
     selectTrail: selectTrail
   };

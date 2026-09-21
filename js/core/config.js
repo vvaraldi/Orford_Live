@@ -130,6 +130,8 @@ const APP_CONFIG = {
   //                 markers and the report locations. Trails of another kind can use another
   //                 map: see trailKinds.<kind>.map
   //   trailKinds    the kinds of trail this activity has (keys of trailKinds below)
+  //   reportMaps    the maps (ids of maps above) the report locations (infractions, signalisations)
+  //                 can be shown on, the default one first; several = a switch between them
   //   inspectionKinds  the kinds that are inspected, and shown on the public status page
   //                 (downhill runs are not inspected for now)
   //   features      what the network has: shelters, snowCondition (ski-only inspection field)
@@ -141,7 +143,8 @@ const APP_CONFIG = {
     ski: {
       id: 'ski', name: 'Ski', icon: '⛷️',
       map: 'ski',
-      trailKinds: ['uphill', 'downhill'],
+      trailKinds: ['uphill', 'downhill', 'lift'],
+      reportMaps: ['ski-downhill', 'ski'],
       inspectionKinds: ['uphill'],
       features: { shelters: true, snowCondition: true },
       publicTitle: 'État des sentiers de randonnée alpine',
@@ -165,6 +168,7 @@ const APP_CONFIG = {
       seasonMonths: [5, 6, 7, 8, 9, 10], // 1 May to 31 October
       map: 'bike',
       trailKinds: ['bike'],
+      reportMaps: ['bike'],
       inspectionKinds: ['bike'],
       features: { shelters: false, snowCondition: false },
       publicTitle: 'État des sentiers de vélo de montagne',
@@ -182,7 +186,8 @@ const APP_CONFIG = {
   // ===== TRAILS =====
   // trails/{id}: name, number (optional, shown on the map markers), kind, network, difficulty,
   // length (km, optional, information only), status ('open' | 'closed'), coordinates
-  // ({left, top}: pixels on the map of its kind), archived (true = hidden: no longer part of the
+  // ({left, top}: pixels on the map of its kind), sector (id of a sector: the area the infraction and
+  // signalisation forms list it under; set by a system admin), archived (true = hidden: no longer part of the
   // network, kept for the history). Uphill and downhill are separate records even when they
   // follow the same path: they have their own number, status and difficulty.
   // A trail saved before `kind` existed is uphill (bike network: bike); one saved with the
@@ -192,7 +197,10 @@ const APP_CONFIG = {
   trailKinds: {
     uphill:   { label: 'Montée',   idPrefix: 'trail', map: 'ski' },
     downhill: { label: 'Descente', idPrefix: 'run',   map: 'ski-downhill' },
-    bike:     { label: 'Vélo',     idPrefix: 'bike',  map: 'bike' }
+    bike:     { label: 'Vélo',     idPrefix: 'bike',  map: 'bike' },
+    // Lifts (Remontées mécaniques): listed so reports can be filed against them; no difficulty,
+    // never inspected (see inspectionKinds)
+    lift:     { label: 'Remontée', idPrefix: 'lift',  map: 'ski-downhill' }
   },
   difficulties: {
     'green':        { label: 'Verte',        icon: '🟢' },
@@ -204,7 +212,8 @@ const APP_CONFIG = {
   difficultyScales: {
     uphill:   ['green', 'blue', 'black'],
     downhill: ['green', 'blue', 'black', 'double-black'],
-    bike:     ['green', 'blue', 'black', 'double-black']
+    bike:     ['green', 'blue', 'black', 'double-black'],
+    lift:     []
   },
 
   // ===== LABELS shared by the apps =====

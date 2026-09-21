@@ -85,12 +85,6 @@
     }
 
     /* Sectors tab */
-    .sector-network { margin: 1.25rem 0 0.5rem; font-size: 1rem; }
-    .sector-card { border: 1px solid var(--theme-border); border-radius: var(--radius-lg); padding: 1rem; margin-bottom: 0.75rem; background: var(--theme-surface); }
-    .sector-card__head { display: flex; gap: 0.75rem; align-items: center; flex-wrap: wrap; margin-bottom: 0.5rem; }
-    .sector-card__head .form-input { flex: 1; min-width: 200px; font-weight: 600; }
-    .sector-card__meta { font-size: 0.75rem; color: var(--theme-text-light); }
-    .sector-card__foot { display: flex; justify-content: flex-end; margin-top: 0.5rem; }
     
     /* Tab styles */
     .admin-tabs {
@@ -265,6 +259,24 @@
     .trail-table th { background: var(--theme-surface-alt); font-size: 0.75rem; text-transform: uppercase; }
     .trail-row:hover { background: var(--theme-surface-alt); }
     .trail-row.is-archived { opacity: 0.55; }
+    .trail-group td { padding: 0.5rem 0.75rem; font-weight: 700; background: var(--theme-surface-alt); border-bottom: 1px solid var(--theme-border); }
+    .trail-group.is-orphan td, .trail-row.is-orphan { background: rgba(245, 158, 11, 0.16); }
+    .trail-group.is-orphan td { color: var(--theme-text); }
+    .trail-number-input { width: 4.5rem; padding: 0.25rem 0.5rem; }
+    .trail-orphans { display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap; margin-top: var(--space-md); padding: 0.75rem 1rem; border-radius: var(--radius-md); background: rgba(245, 158, 11, 0.18); border-left: 4px solid #f59e0b; color: var(--theme-text); }
+    .trail-orphans[hidden], .trail-panel[hidden], .trail-bulk[hidden], th[hidden] { display: none; }
+    .trail-panel { margin-top: var(--space-md); padding: 0.75rem 1rem; border: 1px solid var(--theme-border); border-radius: var(--radius-md); background: var(--theme-surface-alt); }
+    .trail-panel summary { cursor: pointer; font-weight: 600; }
+    .trail-bulk { display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap; margin-top: var(--space-md); }
+    .trail-bulk .form-select { width: auto; min-width: 14rem; }
+    .migration-preview { margin: var(--space-md) 0; max-height: 26rem; overflow: auto; }
+    .migration-sector { display: flex; align-items: center; gap: 0.75rem; margin: 0.75rem 0 0.25rem; }
+    .migration-sector .form-select { width: auto; }
+    .migration-list { margin: 0; padding-left: 1.25rem; font-size: 0.8125rem; columns: 2 16rem; }
+    .migration-create { color: var(--theme-text); }
+    .migration-link { color: #2563eb; }
+    .migration-skip { color: var(--theme-text-secondary); }
+    .migration-check { color: #b45309; font-weight: 600; }
     .btn[hidden], .form-select[hidden] { display: none; } /* author display rules would otherwise win over [hidden] */
     .trail-row.is-selected { background: rgba(var(--theme-accent-rgb), 0.12); }
     .trail-editor { padding: var(--space-md); margin-bottom: var(--space-md); background: var(--theme-surface-alt); border: 1px solid var(--theme-border); border-radius: var(--radius-md); }
@@ -306,9 +318,6 @@
     <div class="admin-tabs">
       <button class="admin-tabs__btn is-active" data-tab="users" onclick="switchTab('users')">
         👥 Utilisateurs
-      </button>
-      <button class="admin-tabs__btn" data-tab="sectors" onclick="switchTab('sectors')">
-        🗺️ Secteurs
       </button>
       <button class="admin-tabs__btn" data-tab="trails" onclick="switchTab('trails')">
         🧭 Sentiers
@@ -430,44 +439,6 @@
       </div>
     </div>
 
-    <!-- TAB: SECTORS AND TRAILS -->
-    <div class="admin-tab-content" id="sectors-tab">
-      <div class="data-export-section">
-        <div class="data-export-section__header">
-          <span>🗺️</span>
-          <h3>Secteurs et pistes</h3>
-        </div>
-        <p class="data-export-section__description">
-          Les secteurs et leurs pistes ou sentiers alimentent les formulaires d'infractions et de signalisations.
-          Une piste par ligne. Renommer ou retirer une piste ne modifie pas les rapports déjà enregistrés.
-        </p>
-
-        <div id="sectors-list"></div>
-
-        <div class="mt-6" style="padding-top: var(--space-lg); border-top: 1px solid var(--theme-border);">
-          <div class="data-export-section__header">
-            <span>➕</span>
-            <h4>Ajouter un secteur</h4>
-          </div>
-          <div class="edit-user-form__row">
-            <div class="form-group">
-              <label class="form-label" for="new-sector-network">Activité</label>
-              <select class="form-select" id="new-sector-network"></select>
-            </div>
-            <div class="form-group">
-              <label class="form-label" for="new-sector-name">Nom du secteur</label>
-              <input type="text" class="form-input" id="new-sector-name">
-            </div>
-          </div>
-          <div class="form-group">
-            <label class="form-label" for="new-sector-trails">Pistes ou sentiers (un par ligne)</label>
-            <textarea class="form-textarea" id="new-sector-trails" rows="5"></textarea>
-          </div>
-          <button class="btn btn-primary" onclick="addSector()">Ajouter le secteur</button>
-        </div>
-      </div>
-    </div>
-
     <!-- TAB: TRAILS -->
     <div class="admin-tab-content" id="trails-tab">
       <div class="data-export-section">
@@ -476,9 +447,10 @@
           <h3>Sentiers <span id="trail-count" style="font-weight: 400; color: var(--theme-text-secondary);"></span></h3>
         </div>
         <p class="data-export-section__description">
-          Les sentiers de chaque activité : nom, numéro (affiché sur les repères de la carte), type, difficulté, longueur et position.
+          Les sentiers de chaque activité : nom, numéro (affiché sur les repères de la carte), secteur, type, difficulté, longueur et position.
           Le statut (ouvert ou fermé) est mis à jour par les inspections. La montée et la descente d'un même tracé sont deux sentiers distincts,
-          chacun avec son numéro, son statut et sa difficulté.
+          chacun avec son numéro, son statut et sa difficulté. Les secteurs regroupent les sentiers dans les formulaires d'infractions et de
+          signalisations : un system admin les gère et attribue le secteur de chaque sentier.
         </p>
 
         <div class="cal-toolbar">
@@ -491,6 +463,10 @@
             <select class="form-select" id="trail-kind-filter"></select>
           </div>
           <div class="form-group">
+            <label class="form-label" for="trail-sector-filter">Secteur</label>
+            <select class="form-select" id="trail-sector-filter"></select>
+          </div>
+          <div class="form-group">
             <label class="form-label" for="trail-view">Afficher</label>
             <select class="form-select" id="trail-view">
               <option value="active">Sentiers actifs</option>
@@ -501,9 +477,49 @@
           <button type="button" class="btn btn-primary" id="trail-new">➕ Nouveau sentier</button>
         </div>
 
+        <div class="trail-orphans" id="trail-orphan-banner" hidden>
+          <span id="trail-orphan-text"></span>
+          <button type="button" class="btn btn-secondary btn-sm" id="trail-orphan-show">Les afficher</button>
+        </div>
+
+        <!-- System admin: sectors -->
+        <details class="trail-panel" id="sector-panel" hidden>
+          <summary>Secteurs de cette activité</summary>
+          <div class="trail-table-wrap">
+            <table class="trail-table">
+              <thead><tr><th>Ordre</th><th>Nom</th><th>Contenu</th><th></th></tr></thead>
+              <tbody id="sector-rows"></tbody>
+            </table>
+          </div>
+          <div class="trail-position" style="margin-top: 0.5rem;">
+            <div class="form-group"><input type="text" class="form-input" id="sector-new-name" placeholder="Nom du nouveau secteur" maxlength="60" aria-label="Nom du nouveau secteur"></div>
+            <button type="button" class="btn btn-secondary btn-sm" id="sector-new-add">Ajouter le secteur</button>
+          </div>
+        </details>
+
+        <!-- System admin: one-time migration of the old name lists (temporary) -->
+        <details class="trail-panel" id="migration-panel" hidden>
+          <summary>Migration des anciennes listes de pistes (une seule fois)</summary>
+          <p class="cal-source">
+            Les formulaires d'infractions et de signalisations utilisaient des listes de noms par secteur. Cette étape crée un sentier par nom,
+            dans son secteur, et relie les sentiers déjà existants (la « Randonnée alpine ») au lieu de les dupliquer. Un aperçu s'affiche d'abord :
+            rien n'est écrit avant « Appliquer ». Les numéros et les positions se remplissent ensuite dans la liste ci-dessous.
+          </p>
+          <button type="button" class="btn btn-secondary" id="migration-prepare">Préparer l'aperçu</button>
+          <div id="migration-preview" class="migration-preview"></div>
+          <button type="button" class="btn btn-primary" id="migration-apply" hidden>Appliquer</button>
+        </details>
+
+        <!-- System admin: assign a sector to the ticked trails -->
+        <div class="trail-bulk" id="trail-bulk" hidden>
+          <select class="form-select" id="trail-bulk-sector" aria-label="Secteur à attribuer"></select>
+          <button type="button" class="btn btn-secondary btn-sm" id="trail-bulk-apply">Attribuer aux sentiers cochés</button>
+          <span id="trail-selected-count" class="cal-source" style="margin: 0;"></span>
+        </div>
+
         <div class="trail-table-wrap" style="margin-top: var(--space-md);">
           <table class="trail-table">
-            <thead><tr><th>N°</th><th>Nom</th><th>Type</th><th>Difficulté</th><th>Longueur</th><th>Statut</th><th>Position</th><th></th></tr></thead>
+            <thead><tr><th id="trail-th-select" hidden><input type="checkbox" id="trail-select-all" aria-label="Tout cocher"></th><th>N°</th><th>Nom</th><th>Secteur</th><th>Type</th><th>Difficulté</th><th>Longueur</th><th>Statut</th><th>Position</th><th></th></tr></thead>
             <tbody id="trail-rows"></tbody>
           </table>
         </div>
@@ -524,6 +540,11 @@
               <select class="form-select" id="tr-kind"></select>
             </div>
             <div class="form-group">
+              <label class="form-label" for="tr-sector">Secteur</label>
+              <select class="form-select" id="tr-sector"></select>
+              <span class="form-hint" id="tr-sector-hint">Attribué par un system admin</span>
+            </div>
+            <div class="form-group" id="tr-difficulty-group">
               <label class="form-label" for="tr-difficulty">Difficulté</label>
               <select class="form-select" id="tr-difficulty"></select>
             </div>
@@ -546,6 +567,7 @@
           <p class="cal-source" id="tr-status"></p>
           <div class="cal-actions">
             <button type="button" class="btn btn-primary" id="tr-save">Enregistrer</button>
+            <button type="button" class="btn btn-primary" id="tr-save-next" title="Enregistre, puis ouvre le prochain sentier sans position, prêt à être placé sur la carte">Enregistrer et suivant sans position</button>
             <button type="button" class="btn btn-secondary" id="tr-cancel">Annuler</button>
             <button type="button" class="btn btn-secondary" id="tr-archive" hidden title="Le sentier n'existe plus dans le réseau : il disparaît de la carte et des listes, l'historique est conservé">Masquer ce sentier</button>
             <button type="button" class="btn btn-secondary" id="tr-restore" hidden>Restaurer ce sentier</button>
@@ -911,6 +933,7 @@
   <script src="../js/services/map-service.js"></script>
   <script src="../js/admin/map-calibration.js"></script>
   <script src="../js/services/trail-service.js"></script>
+  <script src="../js/admin/trail-migration.js"></script>
   <script src="../js/admin/trail-admin.js"></script>
 
   <!-- Page JS -->
@@ -1831,145 +1854,6 @@ Marie Tremblay,marie.tremblay@example.com,MotDePasse456,admin,,true,true,true,sk
     }
 
     // ========================================
-    // SECTORS AND TRAILS
-    // ========================================
-    // Firestore `sectors/{id}`: { name, network, order, trails[], aliases[] }.
-    // The infraction and signalisation forms read them through SectorService.
-
-    let allSectors = [];
-
-    // One trail per line: trimmed, no blanks, no duplicates
-    function trailsFromText(text) {
-      const seen = new Set();
-      return text.split(/\r?\n/).map(line => line.trim()).filter(line => line && !seen.has(line) && seen.add(line));
-    }
-
-    function slugify(text) {
-      return text.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase()
-        .replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
-    }
-
-    async function loadSectorsAdmin(force) {
-      try {
-        allSectors = await SectorService.loadAll(force);
-      } catch (error) {
-        console.error('Error loading sectors:', error);
-        showMessage('Erreur lors du chargement des secteurs.', 'error');
-        allSectors = [];
-      }
-      renderSectors();
-    }
-
-    function sectorMeta(sector) {
-      const aliases = sector.aliases.length ? ` · anciens identifiants : ${sector.aliases.join(', ')}` : '';
-      return `${sector.id}${aliases} · ${sector.trails.length} piste(s)`;
-    }
-
-    function sectorCard(sector) {
-      const card = document.createElement('div');
-      card.className = 'sector-card';
-      card.innerHTML = `
-        <div class="sector-card__head">
-          <input type="text" class="form-input" data-field="name" aria-label="Nom du secteur">
-          <span class="sector-card__meta"></span>
-        </div>
-        <textarea class="form-textarea" rows="6" data-field="trails" aria-label="Pistes du secteur"></textarea>
-        <div class="sector-card__foot">
-          <button type="button" class="btn btn-primary btn-sm">Enregistrer</button>
-        </div>`;
-      // Values are set as properties, never as HTML
-      card.querySelector('[data-field="name"]').value = sector.name || '';
-      card.querySelector('[data-field="trails"]').value = sector.trails.join('\n');
-      card.querySelector('.sector-card__meta').textContent = sectorMeta(sector);
-      card.querySelector('button').addEventListener('click', event => saveSector(sector, card, event.currentTarget));
-      return card;
-    }
-
-    function renderSectors() {
-      const list = document.getElementById('sectors-list');
-      list.replaceChildren();
-
-      // Admins manage the sectors of the activities they hold
-      NETWORK_IDS.filter(id => myNetworks().includes(id)).forEach(id => {
-        const inNetwork = allSectors.filter(sector => sector.network === id);
-        if (!inNetwork.length) return;
-        const heading = document.createElement('h4');
-        heading.className = 'sector-network';
-        heading.textContent = `${APP_CONFIG.networks[id].icon} ${APP_CONFIG.networks[id].name}`;
-        list.append(heading, ...inNetwork.map(sectorCard));
-      });
-    }
-
-    async function saveSector(sector, card, button) {
-      const name = card.querySelector('[data-field="name"]').value.trim();
-      const trails = trailsFromText(card.querySelector('[data-field="trails"]').value);
-      if (!name) {
-        showMessage('Le nom du secteur est requis.', 'warning');
-        return;
-      }
-
-      setButtonLoading(button, true, 'Enregistrement...');
-      try {
-        await db.collection('sectors').doc(sector.id).update({
-          name,
-          trails,
-          modifiedAt: firebase.firestore.FieldValue.serverTimestamp(),
-          modifiedBy: currentUser.uid
-        });
-        Object.assign(sector, { name, trails });
-        card.querySelector('[data-field="trails"]').value = trails.join('\n'); // shows the cleaned list
-        card.querySelector('.sector-card__meta').textContent = sectorMeta(sector);
-        showMessage(`Secteur « ${name} » enregistré.`, 'success');
-      } catch (error) {
-        console.error('Error saving sector:', error);
-        showMessage('Erreur lors de l\'enregistrement du secteur.', 'error');
-      } finally {
-        setButtonLoading(button, false);
-      }
-    }
-
-    async function addSector() {
-      const network = document.getElementById('new-sector-network').value;
-      const name = document.getElementById('new-sector-name').value.trim();
-      const trails = trailsFromText(document.getElementById('new-sector-trails').value);
-
-      if (!network || !myNetworks().includes(network)) {
-        showMessage('Choisissez une activité.', 'warning');
-        return;
-      }
-      if (!name) {
-        showMessage('Le nom du secteur est requis.', 'warning');
-        return;
-      }
-
-      // The id is a readable slug of the name, made unique (ids and aliases are global)
-      const taken = new Set(allSectors.flatMap(sector => [sector.id, ...sector.aliases]));
-      const base = slugify(name) || 'secteur';
-      let id = base;
-      for (let n = 2; taken.has(id); n++) id = `${base}-${n}`;
-      const order = Math.max(0, ...allSectors.filter(sector => sector.network === network).map(sector => sector.order || 0)) + 1;
-
-      try {
-        await db.collection('sectors').doc(id).set({
-          name,
-          network,
-          order,
-          trails,
-          aliases: [],
-          createdAt: firebase.firestore.FieldValue.serverTimestamp(),
-          createdBy: currentUser.uid
-        });
-        document.getElementById('new-sector-name').value = '';
-        document.getElementById('new-sector-trails').value = '';
-        showMessage(`Secteur « ${name} » ajouté.`, 'success');
-        await loadSectorsAdmin(true);
-      } catch (error) {
-        console.error('Error adding sector:', error);
-        showMessage('Erreur lors de l\'ajout du secteur.', 'error');
-      }
-    }
-
-    // ========================================
     // INITIALIZATION
     // ========================================
 
@@ -1987,14 +1871,12 @@ Marie Tremblay,marie.tremblay@example.com,MotDePasse456,admin,,true,true,true,sk
           }
 
           buildNetworkCheckboxes();
-          document.getElementById('new-sector-network').innerHTML = myNetworks().map(id =>
-            `<option value="${id}">${APP_CONFIG.networks[id].icon} ${APP_CONFIG.networks[id].name}</option>`).join('');
           // Data export: an admin exports their own activities; only a system admin can export all at once
           document.getElementById('export-network').innerHTML =
             (isCurrentUserSystemAdmin ? '<option value="">Toutes les activités</option>' : '') +
             myNetworks().map(id => `<option value="${id}">${APP_CONFIG.networks[id].icon} ${APP_CONFIG.networks[id].name}</option>`).join('');
-          loadSectorsAdmin();
-          TrailAdmin.init(currentUser.uid, myNetworks()); // trails of the activities this admin holds
+          // Trails and sectors of the activities this admin holds; sectors, sector assignment and the migration are system admin only
+          TrailAdmin.init(currentUser.uid, myNetworks(), { isSystemAdmin: isCurrentUserSystemAdmin });
           // GPS calibration of the maps: system admin only (the Firestore rules enforce it too)
           if (isCurrentUserSystemAdmin) {
             document.getElementById('maps-tab-btn').style.display = '';

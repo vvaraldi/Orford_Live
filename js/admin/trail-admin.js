@@ -1,23 +1,23 @@
 /**
- * trail-admin.js - Administration > Sentiers (admins)
- * ====================================================
- * Lists, creates and edits the trails of an activity (Firestore trails/{id}):
- * name, number (shown on the map markers), kind (uphill / downhill / bike), difficulty
- * (the scale of that kind), length (optional, information), and the position on the
- * map, pinpointed by clicking on it. The status (open / closed) is set by inspections,
- * not here.
+ * trail-admin.js - Administration > Sentiers (admins) and its sectors (system admins)
+ * ====================================================================================
+ * Lists, creates and edits the trails of an activity (Firestore trails/{id}): name, number
+ * (shown on the map markers), kind (uphill / downhill / lift / bike), sector, difficulty (the
+ * scale of that kind), length (optional, information), and the position on the map, pinpointed
+ * by clicking on it. The status (open / closed) is set by inspections, not here.
  *
- * Each kind of trail has its own map (APP_CONFIG.trailKinds.<kind>.map): the map shown
- * follows the type filter, or the type of the trail being edited.
+ * Sectors (the areas the infraction and signalisation forms group trails under) are managed
+ * here too, by system admins only: they add, rename and order sectors, assign the sector of
+ * trails (one by one or several at once), and run the one-time migration of the old name lists
+ * (trail-migration.js). A trail without a sector is highlighted: the forms cannot offer it.
  *
- * A trail that is no longer part of the network is hidden (archived: true), never
- * deleted: inspections and reports point to it by id and would lose their history. A hidden
- * trail leaves the map, the pickers and the public page, stays in the history, and can be
- * restored. Its number becomes free again.
+ * Each kind of trail has its own map (APP_CONFIG.trailKinds.<kind>.map): the map shown follows
+ * the type filter, or the type of the trail being edited.
  *
- * The vocabulary comes from TrailService / APP_CONFIG (trailKinds, difficulties,
- * difficultyScales). An admin manages the activities they hold (the Firestore rules
- * enforce it too).
+ * A trail that is no longer part of the network is hidden (archived: true), never deleted:
+ * inspections and reports point to it by id and would lose their history. A hidden trail leaves
+ * the map, the pickers and the public page, stays in the history, and can be restored. Its
+ * number becomes free again.
  *
  * Needs the markup of the "trails" tab in pages/user-management.html.
  */
@@ -26,21 +26,30 @@ const TrailAdmin = (function () {
 
   const SVG_NS = 'http://www.w3.org/2000/svg';
   const $ = id => document.getElementById(id);
+  const NO_SECTOR = '__none';
 
   const state = {
     network: null,
     kindFilter: '',
+    sectorFilter: '',  // '' = all, NO_SECTOR = without a sector, else a sector id
     view: 'active',    // 'active' | 'archived' | 'all'
     mapId: null,       // the map currently shown
     trails: [],        // every trail of every activity: { id, ...data }
+    sectors: [],       // every sector of every activity (SectorService.loadAll)
+    selected: new Set(), // trail ids ticked for a bulk sector assignment
     editing: null,     // { id: string|null, trail: object|null } while the editor is open
     placing: false,    // the next click on the map sets the position
-    position: null     // { left, top } of the trail being edited
+    position: null,    // { left, top } of the trail being edited
+    migrationKinds: {} // sector id -> kind chosen in the migration preview
   };
   let userId = null;
+  let isSystemAdmin = false;
+  let allowedNetworks = [];
 
   const kindsOfNetwork = () => APP_CONFIG.networks[state.network].trailKinds;
   const inNetwork = () => state.trails.filter(t => Network.of(t) === state.network);
+  const networkSectors = () => state.sectors.filter(s => s.network === state.network);
+  const sectorOf = trail => (trail && trail.sector ? SectorService.find(networkSectors(), trail.sector) : null);
   const mapConfig = () => APP_CONFIG.maps[state.mapId];
   const el = (tag, className, text) => {
     const node = document.createElement(tag);
@@ -55,7 +64,7 @@ const TrailAdmin = (function () {
     return TrailService.mapIdOf(kind);
   }
 
-  // ---- Load and list -------------------------------------------------------------------------------
+  // ---- Load ---------------------------------------------------------------------------------------------
   async function load() {
     try {
       const snapshot = await window.db.collection('trails').get();
@@ -65,55 +74,206 @@ const TrailAdmin = (function () {
       showMessage('Erreur lors du chargement des sentiers.', 'error');
       state.trails = [];
     }
+    renderAll();
+  }
+
+  async function loadSectors(force) {
+    try {
+      state.sectors = await SectorService.loadAll(force);
+    } catch (error) {
+      console.error('Error loading sectors:', error);
+      showMessage('Erreur lors du chargement des secteurs.', 'error');
+      state.sectors = [];
+    }
+  }
+
+  function renderAll() {
+    renderSectorFilters();
     renderList();
+    renderOrphanBanner();
+    renderSectorPanel();
     drawMarkers();
+  }
+
+  // ---- The list -------------------------------------------------------------------------------------------
+  // Trails without a sector first (highlighted), then by sector order, then by kind, then by number
+  function visibleRows() {
+    const order = new Map(networkSectors().map((s, i) => [s.id, i + 1]));
+    const group = t => { const s = sectorOf(t); return s ? order.get(s.id) : 0; };
+    return inNetwork()
+      .filter(t => !state.kindFilter || TrailService.kindOf(t) === state.kindFilter)
+      .filter(t => state.view === 'all' || (state.view === 'archived') === TrailService.isArchived(t))
+      .filter(t => {
+        if (!state.sectorFilter) return true;
+        const s = sectorOf(t);
+        return state.sectorFilter === NO_SECTOR ? !s : !!s && s.id === state.sectorFilter;
+      })
+      .sort((a, b) => group(a) - group(b) || TrailService.kindOf(a).localeCompare(TrailService.kindOf(b)) || TrailService.compare(a, b));
+  }
+
+  function renderSectorFilters() {
+    const options = [new Option('Tous les secteurs', ''), new Option('Sans secteur', NO_SECTOR),
+      ...networkSectors().map(s => new Option(s.name, s.id))];
+    $('trail-sector-filter').replaceChildren(...options);
+    $('trail-sector-filter').value = state.sectorFilter;
+
+    const bulk = [new Option('Choisir un secteur…', ''), ...networkSectors().map(s => new Option(s.name, s.id)), new Option('— Retirer le secteur —', NO_SECTOR)];
+    $('trail-bulk-sector').replaceChildren(...bulk);
+  }
+
+  function renderOrphanBanner() {
+    const count = inNetwork().filter(t => !TrailService.isArchived(t) && !sectorOf(t)).length;
+    const banner = $('trail-orphan-banner');
+    banner.hidden = count === 0;
+    if (!count) return;
+    $('trail-orphan-text').textContent = `${count} sentier${count > 1 ? 's' : ''} sans secteur : ${count > 1 ? 'ils ne sont pas proposés' : 'il n\'est pas proposé'} dans les formulaires d'infractions et de signalisations.` +
+      (isSystemAdmin ? '' : ' Un system admin doit leur attribuer un secteur.');
   }
 
   function renderList() {
     const body = $('trail-rows');
     body.replaceChildren();
-    const rows = inNetwork()
-      .filter(t => !state.kindFilter || TrailService.kindOf(t) === state.kindFilter)
-      .filter(t => state.view === 'all' || (state.view === 'archived') === TrailService.isArchived(t))
-      .sort((a, b) => TrailService.kindOf(a).localeCompare(TrailService.kindOf(b)) || TrailService.compare(a, b));
+    const rows = visibleRows();
+    const columns = isSystemAdmin ? 10 : 9;
 
     $('trail-count').textContent = `(${rows.length})`;
+    updateSelectedCount();
     if (!rows.length) {
       const row = el('tr');
-      const cell = el('td', '', state.view === 'archived' ? 'Aucun sentier masqué.' : 'Aucun sentier pour cette activité.');
-      cell.colSpan = 8;
+      const cell = el('td', '', state.view === 'archived' ? 'Aucun sentier masqué.' : 'Aucun sentier pour cette sélection.');
+      cell.colSpan = columns;
       cell.style.cssText = 'text-align:center; padding: 1.5rem; color: var(--theme-text-secondary);';
       row.appendChild(cell);
       body.appendChild(row);
       return;
     }
 
+    let currentGroup = null;
     rows.forEach(t => {
+      const sector = sectorOf(t);
+      const groupId = sector ? sector.id : NO_SECTOR;
+      if (groupId !== currentGroup) {
+        currentGroup = groupId;
+        const count = rows.filter(r => (sectorOf(r) ? sectorOf(r).id : NO_SECTOR) === groupId).length;
+        const heading = el('tr', 'trail-group' + (sector ? '' : ' is-orphan'));
+        const cell = el('td', '', sector ? `${sector.name} (${count})` : `⚠ Sans secteur (${count})`);
+        cell.colSpan = columns;
+        heading.appendChild(cell);
+        body.appendChild(heading);
+      }
+
       const archived = TrailService.isArchived(t);
-      const row = el('tr', 'trail-row' + (archived ? ' is-archived' : '') + (state.editing && state.editing.id === t.id ? ' is-selected' : ''));
+      const row = el('tr', 'trail-row' + (archived ? ' is-archived' : '') + (sector ? '' : ' is-orphan') + (state.editing && state.editing.id === t.id ? ' is-selected' : ''));
+      if (isSystemAdmin) {
+        const box = el('td');
+        const check = document.createElement('input');
+        check.type = 'checkbox';
+        check.checked = state.selected.has(t.id);
+        check.setAttribute('aria-label', `Cocher ${t.name || t.id}`);
+        check.addEventListener('change', () => { check.checked ? state.selected.add(t.id) : state.selected.delete(t.id); updateSelectedCount(); });
+        box.appendChild(check);
+        row.appendChild(box);
+      }
+
+      // The number can be typed straight in the list
+      const numberCell = el('td');
+      const numberInput = document.createElement('input');
+      numberInput.type = 'text';
+      numberInput.className = 'form-input trail-number-input';
+      numberInput.maxLength = 6;
+      numberInput.value = t.number != null ? t.number : '';
+      numberInput.disabled = archived;
+      numberInput.setAttribute('aria-label', `Numéro de ${t.name || t.id}`);
+      numberInput.addEventListener('change', () => saveNumber(t, numberInput));
+      numberCell.appendChild(numberInput);
+      row.appendChild(numberCell);
+
       const hasPosition = t.coordinates && t.coordinates.left != null && t.coordinates.top != null;
-      const cells = [
-        t.number != null && t.number !== '' ? String(t.number) : '-',
+      [
         (t.name || t.id) + (archived ? ' (masqué)' : ''),
+        sector ? sector.name : (t.sector ? `${t.sector} (inconnu)` : 'Sans secteur'),
         TrailService.kindLabel(TrailService.kindOf(t)),
         TrailService.difficultyLabel(TrailService.difficultyOf(t), true) || '-',
         t.length != null && t.length !== '' ? `${t.length} km` : '-',
         TrailService.statusText(TrailService.statusOf(t), true),
         hasPosition ? '✓' : '-'
-      ];
-      cells.forEach(text => row.appendChild(el('td', '', text)));
+      ].forEach(text => row.appendChild(el('td', '', text)));
       const action = el('td');
       const button = el('button', 'btn btn-secondary btn-sm', 'Modifier');
       button.type = 'button';
       button.addEventListener('click', () => startEdit(t));
       action.appendChild(button);
       row.appendChild(action);
-      row.addEventListener('dblclick', () => startEdit(t));
+      row.addEventListener('dblclick', event => { if (event.target.tagName !== 'INPUT') startEdit(t); });
       body.appendChild(row);
     });
   }
 
-  // ---- The map ----------------------------------------------------------------------------------------
+  function updateSelectedCount() {
+    $('trail-selected-count').textContent = state.selected.size ? `${state.selected.size} coché(s)` : '';
+  }
+
+  // Number typed in the list: same rule as in the editor (not twice for the same kind of visible trail)
+  async function saveNumber(trail, input) {
+    const number = input.value.trim();
+    const previous = trail.number != null ? String(trail.number) : '';
+    if (number === previous) return;
+    const clash = numberTaken(number, TrailService.kindOf(trail), trail.id);
+    if (clash) {
+      showMessage(`Le numéro ${number} est déjà utilisé par « ${clash.name} ».`, 'warning');
+      input.value = previous;
+      return;
+    }
+    try {
+      await window.db.collection('trails').doc(trail.id).update({
+        number: number === '' ? firebase.firestore.FieldValue.delete() : number,
+        modifiedAt: firebase.firestore.FieldValue.serverTimestamp(), modifiedBy: userId
+      });
+      trail.number = number === '' ? undefined : number;
+      drawMarkers();
+    } catch (error) {
+      console.error('Error saving the number:', error);
+      showMessage(`Numéro non enregistré : ${error.message || 'erreur inconnue'}`, 'error');
+      input.value = previous;
+    }
+  }
+
+  // ---- Bulk sector assignment (system admin) --------------------------------------------------------------
+  async function bulkAssign() {
+    const target = $('trail-bulk-sector').value;
+    if (!target) { showMessage('Choisissez le secteur à attribuer.', 'warning'); return; }
+    const ids = [...state.selected].filter(id => state.trails.some(t => t.id === id));
+    if (!ids.length) { showMessage('Cochez au moins un sentier.', 'warning'); return; }
+    const sectorName = target === NO_SECTOR ? null : (networkSectors().find(s => s.id === target) || {}).name;
+    if (!window.confirm(target === NO_SECTOR ? `Retirer le secteur de ${ids.length} sentier(s) ?` : `Attribuer le secteur « ${sectorName} » à ${ids.length} sentier(s) ?`)) return;
+
+    const button = $('trail-bulk-apply');
+    setButtonLoading(button, true, 'Enregistrement...');
+    try {
+      const value = target === NO_SECTOR ? firebase.firestore.FieldValue.delete() : target;
+      const stamp = firebase.firestore.FieldValue.serverTimestamp();
+      for (let i = 0; i < ids.length; i += 400) {
+        const batch = window.db.batch();
+        ids.slice(i, i + 400).forEach(id => batch.update(window.db.collection('trails').doc(id), { sector: value, modifiedAt: stamp, modifiedBy: userId }));
+        await batch.commit();
+      }
+      state.selected.clear();
+      showMessage(`${ids.length} sentier(s) mis à jour.`, 'success');
+      await load();
+    } catch (error) {
+      console.error('Error assigning the sector:', error);
+      showMessage(`Attribution impossible : ${error.message || 'erreur inconnue'}`, 'error');
+    } finally {
+      setButtonLoading(button, false);
+    }
+  }
+
+  function toggleSelectAll(checked) {
+    visibleRows().forEach(t => (checked ? state.selected.add(t.id) : state.selected.delete(t.id)));
+    renderList();
+  }
+
+  // ---- The map ----------------------------------------------------------------------------------------------
   // Shows the wanted map; loads the image only when the map changes
   function refreshMap() {
     const wanted = wantedMapId();
@@ -206,12 +366,30 @@ const TrailAdmin = (function () {
     $('tr-y').value = state.position ? state.position.top : '';
   }
 
-  // ---- The editor -------------------------------------------------------------------------------------
+  // ---- The editor ---------------------------------------------------------------------------------------------
   function fillDifficulty(kind, selected) {
+    const scale = TrailService.scaleOf(kind);
+    $('tr-difficulty-group').hidden = scale.length === 0; // lifts have no difficulty
     const select = $('tr-difficulty');
     select.replaceChildren(new Option('Non précisée', ''));
-    TrailService.scaleOf(kind).forEach(id => select.appendChild(new Option(TrailService.difficultyLabel(id, true), id)));
-    select.value = TrailService.scaleOf(kind).includes(selected) ? selected : '';
+    scale.forEach(id => select.appendChild(new Option(TrailService.difficultyLabel(id, true), id)));
+    select.value = scale.includes(selected) ? selected : '';
+  }
+
+  function fillSectorSelect(trail) {
+    const select = $('tr-sector');
+    select.replaceChildren(new Option('Sans secteur', ''), ...networkSectors().map(s => new Option(s.name, s.id)));
+    const sector = sectorOf(trail);
+    if (sector) {
+      select.value = sector.id;
+    } else if (trail && trail.sector) {
+      select.appendChild(new Option(`${trail.sector} (secteur inconnu)`, trail.sector));
+      select.value = trail.sector;
+    } else {
+      select.value = '';
+    }
+    select.disabled = !isSystemAdmin;
+    $('tr-sector-hint').hidden = isSystemAdmin;
   }
 
   function statusLine(trail) {
@@ -237,12 +415,15 @@ const TrailAdmin = (function () {
     $('tr-kind').replaceChildren(...kindsOfNetwork().map(k => new Option(TrailService.kindLabel(k), k)));
     $('tr-kind').value = kind;
     fillDifficulty(kind, trail ? TrailService.difficultyOf(trail) : '');
+    fillSectorSelect(trail);
+    if (!trail && state.sectorFilter && state.sectorFilter !== NO_SECTOR && isSystemAdmin) $('tr-sector').value = state.sectorFilter;
     $('tr-length').value = trail && trail.length != null ? trail.length : '';
     $('tr-status').textContent = statusLine(trail);
     // Hide / restore only exist for a saved trail
     const archived = TrailService.isArchived(trail);
     $('tr-archive').hidden = !trail || archived;
     $('tr-restore').hidden = !trail || !archived;
+    $('tr-save-next').hidden = archived;
     syncPosition();
     updatePlacing();
     renderList();
@@ -294,12 +475,15 @@ const TrailAdmin = (function () {
       number !== '' && t.number != null && String(t.number) === number && TrailService.kindOf(t) === kind);
   }
 
-  async function save() {
+  /** Saves the editor. next = true: then open the next trail without a position, ready to be placed. */
+  async function save(next) {
     const name = $('tr-name').value.trim();
     const number = $('tr-number').value.trim();
     const kind = $('tr-kind').value;
-    const difficulty = $('tr-difficulty').value;
+    const hasDifficulty = TrailService.scaleOf(kind).length > 0;
+    const difficulty = hasDifficulty ? $('tr-difficulty').value : '';
     const length = parseLength($('tr-length').value);
+    const sector = $('tr-sector').value;
     const editingId = state.editing.id;
     const archived = TrailService.isArchived(state.editing.trail);
 
@@ -308,33 +492,38 @@ const TrailAdmin = (function () {
     const duplicate = !archived && numberTaken(number, kind, editingId);
     if (duplicate) { showMessage(`Le numéro ${number} est déjà utilisé par « ${duplicate.name} ».`, 'warning'); return; }
 
-    const button = $('tr-save');
+    const button = next ? $('tr-save-next') : $('tr-save');
     setButtonLoading(button, true, 'Enregistrement...');
     try {
       const del = firebase.firestore.FieldValue.delete();
       const stamp = firebase.firestore.FieldValue.serverTimestamp();
+      let savedId = editingId;
       if (editingId) {
         // Cleared fields are removed; kind and difficulty are written in the current vocabulary
-        await window.db.collection('trails').doc(editingId).update({
+        const update = {
           name, kind, network: state.network,
           number: number === '' ? del : number,
           difficulty: difficulty === '' ? del : difficulty,
           length: length === null ? del : length,
           coordinates: state.position ? { left: state.position.left, top: state.position.top } : del,
           modifiedAt: stamp, modifiedBy: userId
-        });
+        };
+        if (isSystemAdmin) update.sector = sector === '' ? del : sector; // only a system admin sets the sector
+        await window.db.collection('trails').doc(editingId).update(update);
       } else {
-        const id = TrailService.nextId(kind, state.trails.map(t => t.id));
+        savedId = TrailService.nextId(kind, state.trails.map(t => t.id));
         const data = { name, kind, network: state.network, createdAt: stamp, createdBy: userId };
         if (number !== '') data.number = number;
         if (difficulty !== '') data.difficulty = difficulty;
         if (length !== null) data.length = length;
+        if (isSystemAdmin && sector !== '') data.sector = sector;
         if (state.position) data.coordinates = { left: state.position.left, top: state.position.top };
-        await window.db.collection('trails').doc(id).set(data);
+        await window.db.collection('trails').doc(savedId).set(data);
       }
       showMessage(`Sentier « ${name} » enregistré.`, 'success');
       closeEditor();
       await load();
+      if (next) openNextWithoutPosition(savedId);
     } catch (error) {
       console.error('Error saving the trail:', error);
       showMessage(`Enregistrement impossible : ${error.message || 'erreur inconnue'}`, 'error');
@@ -343,7 +532,19 @@ const TrailAdmin = (function () {
     }
   }
 
-  // ---- Hide / restore -------------------------------------------------------------------------------------
+  // After a save: the next trail of the list (from the one just saved, wrapping round) that has no position
+  function openNextWithoutPosition(afterId) {
+    const rows = visibleRows().filter(t => !TrailService.isArchived(t) && !(t.coordinates && t.coordinates.left != null));
+    if (!rows.length) { showMessage('Tous les sentiers de cette liste ont une position.', 'info'); return; }
+    const all = visibleRows();
+    const start = all.findIndex(t => t.id === afterId);
+    const following = all.slice(start + 1).concat(all.slice(0, start + 1)).find(t => rows.includes(t));
+    startEdit(following);
+    state.placing = true;   // ready: the next click on the map places it
+    updatePlacing();
+  }
+
+  // ---- Hide / restore ---------------------------------------------------------------------------------------------
   async function archive() {
     const trail = state.editing && state.editing.trail;
     if (!trail) return;
@@ -386,36 +587,226 @@ const TrailAdmin = (function () {
     }
   }
 
-  // ---- Start ----------------------------------------------------------------------------------------------
+  // ---- Sectors (system admin) --------------------------------------------------------------------------------------
+  function slugify(text) {
+    return SectorService.norm(text).replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+  }
+
+  function renderSectorPanel() {
+    const body = $('sector-rows');
+    if (!body) return;
+    body.replaceChildren();
+    networkSectors().forEach(sector => {
+      const count = inNetwork().filter(t => !TrailService.isArchived(t) && sectorOf(t) && sectorOf(t).id === sector.id).length;
+      const row = el('tr');
+
+      const orderCell = el('td');
+      const order = document.createElement('input');
+      order.type = 'number'; order.className = 'form-input'; order.style.width = '5rem';
+      order.value = sector.order != null ? sector.order : '';
+      order.setAttribute('aria-label', `Ordre de ${sector.name}`);
+      orderCell.appendChild(order);
+
+      const nameCell = el('td');
+      const name = document.createElement('input');
+      name.type = 'text'; name.className = 'form-input'; name.value = sector.name || ''; name.maxLength = 60;
+      name.setAttribute('aria-label', 'Nom du secteur');
+      nameCell.appendChild(name);
+
+      const aliases = sector.aliases.length ? `anciens identifiants : ${sector.aliases.join(', ')}` : '';
+      const info = el('td', '', `${count} sentier(s)${aliases ? ' · ' + aliases : ''}`);
+      info.style.cssText = 'font-size: 0.8125rem; color: var(--theme-text-secondary);';
+
+      const actionCell = el('td');
+      const button = el('button', 'btn btn-secondary btn-sm', 'Enregistrer');
+      button.type = 'button';
+      button.addEventListener('click', () => saveSector(sector, name, order, button));
+      actionCell.appendChild(button);
+
+      row.append(orderCell, nameCell, info, actionCell);
+      body.appendChild(row);
+    });
+  }
+
+  async function saveSector(sector, nameInput, orderInput, button) {
+    const name = nameInput.value.trim();
+    if (!name) { showMessage('Le nom du secteur est requis.', 'warning'); return; }
+    const order = orderInput.value === '' ? null : Number(orderInput.value);
+    setButtonLoading(button, true, '...');
+    try {
+      await window.db.collection('sectors').doc(sector.id).update({
+        name, order,
+        modifiedAt: firebase.firestore.FieldValue.serverTimestamp(), modifiedBy: userId
+      });
+      showMessage(`Secteur « ${name} » enregistré.`, 'success');
+      await loadSectors(true);
+      renderAll();
+    } catch (error) {
+      console.error('Error saving the sector:', error);
+      showMessage(`Secteur non enregistré : ${error.message || 'erreur inconnue'}`, 'error');
+    } finally {
+      setButtonLoading(button, false);
+    }
+  }
+
+  async function addSector() {
+    const name = $('sector-new-name').value.trim();
+    if (!name) { showMessage('Le nom du secteur est requis.', 'warning'); return; }
+    // The id is a readable slug of the name, made unique (ids and aliases are global)
+    const taken = new Set(state.sectors.flatMap(s => [s.id, ...s.aliases]));
+    const base = slugify(name) || 'secteur';
+    let id = base;
+    for (let n = 2; taken.has(id); n++) id = `${base}-${n}`;
+    const order = Math.max(0, ...networkSectors().map(s => s.order || 0)) + 1;
+    try {
+      await window.db.collection('sectors').doc(id).set({
+        name, network: state.network, order, trails: [], aliases: [],
+        createdAt: firebase.firestore.FieldValue.serverTimestamp(), createdBy: userId
+      });
+      $('sector-new-name').value = '';
+      showMessage(`Secteur « ${name} » ajouté.`, 'success');
+      await loadSectors(true);
+      renderAll();
+    } catch (error) {
+      console.error('Error adding the sector:', error);
+      showMessage(`Secteur non ajouté : ${error.message || 'erreur inconnue'}`, 'error');
+    }
+  }
+
+  // ---- One-time migration of the old name lists (system admin, temporary) --------------------------------------------
+  const ACTION_TEXT = { create: 'Créer', link: 'Relier', skip: 'Déjà fait', check: 'À vérifier' };
+
+  function migrationPlan() {
+    const sectors = state.sectors.filter(s => allowedNetworks.includes(s.network));
+    return TrailMigration.plan({ sectors, trails: state.trails, kinds: state.migrationKinds });
+  }
+
+  function renderMigration() {
+    const box = $('migration-preview');
+    box.replaceChildren();
+    const plan = migrationPlan();
+    const withNames = [...new Set(plan.rows.map(r => r.sector))];
+    if (!withNames.length) {
+      box.appendChild(el('p', 'cal-source', 'Aucun secteur n\'a de liste de noms à convertir.'));
+      $('migration-apply').hidden = true;
+      return;
+    }
+
+    const summary = el('p', 'cal-status ' + (plan.counts.create + plan.counts.link ? 'info' : 'ok'),
+      `${plan.counts.create} à créer · ${plan.counts.link} à relier à un sentier existant · ${plan.counts.skip} déjà fait · ${plan.counts.check} à vérifier`);
+    box.appendChild(summary);
+
+    withNames.forEach(sector => {
+      const rows = plan.rows.filter(r => r.sector === sector);
+      const head = el('div', 'migration-sector');
+      head.appendChild(el('strong', '', `${sector.name} (${rows.length})`));
+      const select = document.createElement('select');
+      select.className = 'form-select';
+      select.setAttribute('aria-label', `Type des sentiers de ${sector.name}`);
+      APP_CONFIG.networks[sector.network].trailKinds.forEach(k => select.appendChild(new Option(TrailService.kindLabel(k), k)));
+      select.value = rows[0].kind;
+      select.addEventListener('change', () => { state.migrationKinds[sector.id] = select.value; renderMigration(); });
+      head.appendChild(select);
+      box.appendChild(head);
+
+      const list = el('ul', 'migration-list');
+      rows.forEach(r => {
+        const detail = r.action === 'link' ? ` « ${r.trail.name} » (${r.trail.id})` : (r.reason ? ` (${r.reason})` : '');
+        list.appendChild(el('li', `migration-${r.action}`, `${ACTION_TEXT[r.action]} : ${r.name}${detail}`));
+      });
+      box.appendChild(list);
+    });
+
+    if (plan.unmatched.length) {
+      box.appendChild(el('p', 'cal-source', `Sentiers existants sans correspondance (ils restent sans secteur, à attribuer ensuite) : ${plan.unmatched.map(t => t.name || t.id).join(', ')}`));
+    }
+    $('migration-apply').hidden = false;
+    $('migration-apply').disabled = plan.counts.create + plan.counts.link === 0;
+    $('migration-apply').textContent = `Appliquer : ${plan.counts.create} création(s), ${plan.counts.link} liaison(s)`;
+  }
+
+  async function prepareMigration() {
+    await loadSectors(true);
+    try {
+      const snapshot = await window.db.collection('trails').get();
+      state.trails = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    } catch (error) {
+      showMessage('Erreur lors du chargement des sentiers.', 'error');
+      return;
+    }
+    state.migrationKinds = {};
+    renderMigration();
+  }
+
+  async function applyMigration() {
+    const plan = migrationPlan();
+    if (!window.confirm(`Créer ${plan.counts.create} sentier(s) et en relier ${plan.counts.link} à leur secteur ?\n\nRien n'est supprimé ni modifié d'autre.`)) return;
+    const button = $('migration-apply');
+    setButtonLoading(button, true, 'Migration...');
+    try {
+      const result = await TrailMigration.apply(plan, window.db, userId, state.trails.map(t => t.id));
+      showMessage(`Migration terminée : ${result.created} sentier(s) créé(s), ${result.linked} relié(s).`, 'success');
+      await load();
+      renderMigration();
+    } catch (error) {
+      console.error('Migration error:', error);
+      showMessage(`Migration interrompue : ${error.message || 'erreur inconnue'}. Vous pouvez la relancer : ce qui est déjà fait est ignoré.`, 'error');
+    } finally {
+      setButtonLoading(button, false);
+    }
+  }
+
+  // ---- Start ------------------------------------------------------------------------------------------------------------
   function selectNetwork(id) {
     state.network = id;
     state.kindFilter = '';
+    state.sectorFilter = '';
     state.mapId = null;
+    state.selected.clear();
     closeEditor();
     const kinds = kindsOfNetwork();
     $('trail-kind-filter').replaceChildren(new Option('Tous les types', ''), ...kinds.map(k => new Option(TrailService.kindLabel(k), k)));
     $('trail-kind-filter').parentElement.hidden = kinds.length < 2; // no filter needed with a single kind
-    renderList();
+    renderAll();
     refreshMap();
   }
 
-  /** @param networkIds the activities the current admin manages */
-  function init(uid, networkIds) {
+  /**
+   * @param networkIds the activities the current admin manages
+   * @param options    { isSystemAdmin }: sectors, sector assignment and the migration are system admin only
+   */
+  async function init(uid, networkIds, options) {
     userId = uid;
+    isSystemAdmin = !!(options && options.isSystemAdmin);
+    allowedNetworks = networkIds;
+
+    // System admin only: sector column of the editor, bulk bar, sector panel, migration panel
+    ['trail-bulk', 'sector-panel', 'migration-panel', 'trail-th-select'].forEach(id => { $(id).hidden = !isSystemAdmin; });
+
     $('trail-network').innerHTML = networkIds.map(id => `<option value="${id}">${APP_CONFIG.networks[id].icon} ${APP_CONFIG.networks[id].name}</option>`).join('');
     $('trail-network').addEventListener('change', event => selectNetwork(event.target.value));
     $('trail-kind-filter').addEventListener('change', event => { state.kindFilter = event.target.value; renderList(); refreshMap(); });
+    $('trail-sector-filter').addEventListener('change', event => { state.sectorFilter = event.target.value; renderList(); });
     $('trail-view').addEventListener('change', event => { state.view = event.target.value; renderList(); });
+    $('trail-orphan-show').addEventListener('click', () => { state.sectorFilter = NO_SECTOR; state.view = 'active'; $('trail-view').value = 'active'; $('trail-sector-filter').value = NO_SECTOR; renderList(); });
     $('trail-new').addEventListener('click', () => startEdit(null));
     $('tr-kind').addEventListener('change', event => onKindChange(event.target.value));
     $('tr-number').addEventListener('input', drawMarkers);
     $('tr-place').addEventListener('click', () => { state.placing = !state.placing; updatePlacing(); });
     $('tr-clear').addEventListener('click', () => { state.position = null; state.placing = false; syncPosition(); updatePlacing(); drawMarkers(); });
     $('tr-cancel').addEventListener('click', closeEditor);
-    $('tr-save').addEventListener('click', save);
+    $('tr-save').addEventListener('click', () => save(false));
+    $('tr-save-next').addEventListener('click', () => save(true));
     $('tr-archive').addEventListener('click', archive);
     $('tr-restore').addEventListener('click', restore);
     $('trail-map').addEventListener('click', onMapClick);
+    $('trail-select-all').addEventListener('change', event => toggleSelectAll(event.target.checked));
+    $('trail-bulk-apply').addEventListener('click', bulkAssign);
+    $('sector-new-add').addEventListener('click', addSector);
+    $('migration-prepare').addEventListener('click', prepareMigration);
+    $('migration-apply').addEventListener('click', applyMigration);
+
+    await loadSectors();
     selectNetwork(networkIds[0]);
     load();
   }

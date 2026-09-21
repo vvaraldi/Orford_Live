@@ -14,6 +14,8 @@
     .map-header { display: flex; align-items: center; justify-content: space-between; padding: 1rem; border-bottom: 1px solid var(--theme-border); }
     .map-header__title { font-size: 1.125rem; font-weight: 600; display: flex; align-items: center; gap: 0.5rem; }
     .map-header__count { font-size: 0.875rem; color: var(--theme-text-secondary); }
+    .map-switch { display: flex; gap: 0.5rem; flex-wrap: wrap; }
+    .map-switch[hidden] { display: none; }
 
     /* Map container */
     .map-container { position: relative; width: 100%; overflow: auto; background: var(--theme-surface-alt); max-height: 700px; }
@@ -85,6 +87,7 @@
     <section class="map-section">
       <div class="map-header">
         <h2 class="map-header__title">🗺️ Carte des signalisations</h2>
+        <div class="map-switch" id="map-switch" hidden></div>
         <span class="map-header__count" id="map-count">0 rapport(s) avec localisation</span>
       </div>
       <div class="map-container" id="map-container">
@@ -151,6 +154,7 @@
   <script src="../js/core/auth.js"></script>
   <script src="../js/services/photo-service.js"></script>
   <script src="../js/services/map-service.js"></script>
+  <script src="../js/services/photo-map-modal.js"></script>
   <script src="../js/services/sector-service.js"></script>
 
   <script>
@@ -179,9 +183,10 @@
     // If the sectors cannot be loaded the page still shows the name stored on each report
     const sectorNameOf = r => SectorService.nameOf(sectors, r.sector, r.sectorDisplayName);
 
-    // GPS to pixel conversion (same as inspection-dashboard)
-    // GPS -> pixel on the current network's map (null when that map has no calibration)
-    const gpsToPixel = (lat, lon) => MapService.gpsToPixel(lat, lon);
+    // The map shown (ski: the downhill or the touring map, switchable). GPS -> pixel on that map;
+    // null when the map has no calibration.
+    let resumeMap = null;
+    const gpsToPixel = (lat, lon) => MapService.gpsToPixel(lat, lon, resumeMap);
 
     // escapeHtml is now provided by utils.js
 
@@ -200,8 +205,10 @@
           } catch (e) {
             console.error('Error loading sectors:', e);
           }
-          MapService.showImage(document.getElementById('map-image')); // the current activity's map
-          await MapService.load(); // its GPS calibration (markers below need it)
+          await MapService.load(); // the GPS calibrations (markers below need them)
+          resumeMap = MapService.reportMaps().default;
+          buildMapSwitch();
+          MapService.showImage(document.getElementById('map-image'), resumeMap);
           loadReports();
         }
       });
@@ -245,17 +252,41 @@
       }
     }
 
+    // One button per map of the activity (only when there are several)
+    function buildMapSwitch() {
+      const { all } = MapService.reportMaps();
+      const box = document.getElementById('map-switch');
+      box.replaceChildren();
+      box.hidden = all.length < 2;
+      all.forEach(id => {
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.className = 'btn btn-sm ' + (id === resumeMap ? 'btn-primary' : 'btn-secondary');
+        button.textContent = `${APP_CONFIG.maps[id].icon} ${APP_CONFIG.maps[id].name}`;
+        button.title = MapService.canLocate(id) ? '' : 'Carte non calibrée (Administration > Cartes) : aucune position ne peut y être placée';
+        button.addEventListener('click', () => {
+          resumeMap = id;
+          buildMapSwitch();
+          MapService.showImage(document.getElementById('map-image'), resumeMap);
+          renderMapMarkers();
+        });
+        box.appendChild(button);
+      });
+    }
+
     function renderMapMarkers() {
       const wrapper = document.getElementById('map-wrapper');
       // Remove existing markers
       wrapper.querySelectorAll('.map-marker').forEach(m => m.remove());
       
       // Reports with GPS coordinates, if this activity's map can place them
-      const reportsWithGps = MapService.canLocate()
+      const reportsWithGps = MapService.canLocate(resumeMap)
         ? reportsData.filter(r => r.coordinates && r.coordinates.latitude && r.coordinates.longitude &&
             gpsToPixel(r.coordinates.latitude, r.coordinates.longitude))
         : [];
-      document.getElementById('map-count').textContent = `${reportsWithGps.length} rapport(s) avec localisation`;
+      document.getElementById('map-count').textContent = MapService.canLocate(resumeMap)
+        ? `${reportsWithGps.length} rapport(s) avec localisation`
+        : 'Carte non calibrée : positions non affichées';
       
       // Add markers
       reportsWithGps.forEach((report, index) => {
@@ -377,49 +408,7 @@
       currentReportId = null;
     }
 
-    // PhotoMapModal for GPS location display
-    const PhotoMapModal = (function() {
-      function open(lat, lon) {
-        // This activity's map cannot place GPS positions (no calibration): open Google Maps instead
-        if (!MapService.gpsToPixel(lat, lon)) { window.open(`https://www.google.com/maps?q=${lat},${lon}`, '_blank', 'noopener'); return; }
-        let modal = document.getElementById('photo-map-modal');
-        if (!modal) {
-          document.body.insertAdjacentHTML('beforeend', `
-            <div class="detail-modal" id="photo-map-modal">
-              <div class="detail-modal__content" style="max-width:900px;">
-                <div class="detail-modal__header"><h3 class="detail-modal__title">📍 Localisation de la photo</h3><button class="detail-modal__close" onclick="PhotoMapModal.close()">×</button></div>
-                <div class="detail-modal__body" style="padding:0;">
-                  <div style="overflow:auto;max-height:60vh;"><div id="photo-map-wrap" style="position:relative;display:inline-block;"><img src="${MapService.imageUrl()}" style="display:block;width:auto;height:auto;max-width:none;"><div id="photo-marker" style="position:absolute;width:20px;height:20px;background:red;border:3px solid white;border-radius:50%;transform:translate(-50%,-50%);box-shadow:0 2px 8px rgba(0,0,0,0.4);"></div></div></div>
-                  <div id="photo-coords" style="padding:1rem;background:var(--theme-surface-alt);border-top:1px solid var(--theme-border);"></div>
-                </div>
-                <div class="detail-modal__footer"><a id="photo-google-link" href="#" target="_blank" rel="noopener noreferrer" class="btn btn-primary">🗺️ Google Maps</a><button class="btn btn-secondary" onclick="PhotoMapModal.close()">Fermer</button></div>
-              </div>
-            </div>
-          `);
-          modal = document.getElementById('photo-map-modal');
-          modal.addEventListener('click', e => { if (e.target.id === 'photo-map-modal') PhotoMapModal.close(); });
-        }
-        const pixel = gpsToPixel(lat, lon);
-        document.getElementById('photo-marker').style.left = pixel.x + 'px';
-        document.getElementById('photo-marker').style.top = pixel.y + 'px';
-        document.getElementById('photo-coords').innerHTML = `<strong>GPS:</strong> ${lat.toFixed(6)}°, ${lon.toFixed(6)}°`;
-        document.getElementById('photo-google-link').href = `https://www.google.com/maps?q=${lat},${lon}`;
-        modal.classList.add('show');
-        const wrap = document.getElementById('photo-map-wrap').parentElement;
-        wrap.scrollLeft = Math.max(0, pixel.x - wrap.clientWidth/2);
-        wrap.scrollTop = Math.max(0, pixel.y - wrap.clientHeight/2);
-      }
-      
-      function close() {
-        const modal = document.getElementById('photo-map-modal');
-        if (modal) { modal.classList.remove('show'); }
-      }
-      
-      return { open, close };
-    })();
-    
-    window.openPhotoLocationModal = PhotoMapModal.open;
-    window.PhotoMapModal = PhotoMapModal;
+    // PhotoMapModal (the location pop-up, with its map switch) lives in js/services/photo-map-modal.js
 
     onFirebaseReady( initSignalisationResume);
   </script>

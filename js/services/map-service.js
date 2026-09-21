@@ -243,7 +243,7 @@ const MapService = (function () {
    * is shown; markers are hidden by the .map-wrapper.is-missing rule (helpers.css).
    * The image must sit inside its .map-wrapper.
    */
-  function showImage(image) {
+  function showImage(image, mapId) {
     const wrapper = image.parentElement;
     image.onerror = () => {
       image.style.display = 'none';
@@ -262,14 +262,26 @@ const MapService = (function () {
       const notice = wrapper.querySelector('.map-missing');
       if (notice) notice.remove();
     };
-    const network = APP_CONFIG.networks[Network.current()];
-    image.alt = `Carte ${network ? network.name : ''}`.trim();
-    image.src = imageUrl();
+    const map = mapOf(mapId);
+    image.alt = `Carte ${map ? map.name : ''}`.trim();
+    image.src = imageUrl(mapId);
+  }
+
+  /**
+   * The maps the report locations (infractions, signalisations) can be shown on for an activity,
+   * the default one first. The default is the first that is calibrated (a map that cannot place
+   * GPS positions is only worth showing when none can).
+   */
+  function reportMaps(networkId) {
+    const network = APP_CONFIG.networks[networkId || Network.current()];
+    const ids = (network && network.reportMaps) || (network ? [network.map] : []);
+    const usable = ids.filter(id => canLocate(id));
+    return { all: ids, default: usable[0] || ids[0] || null };
   }
 
   // The calibrations are read as soon as the user (and so Firestore) is ready
   if (typeof document !== 'undefined') document.addEventListener('networkReady', () => load());
 
-  return { MODES, keyOf, mapOf, fit, apply, unapply, definition, load, save, canLocate, gpsToPixel, pixelToGps, imageUrl, showImage };
+  return { MODES, keyOf, mapOf, fit, apply, unapply, definition, load, save, canLocate, gpsToPixel, pixelToGps, imageUrl, showImage, reportMaps };
 })();
 window.MapService = MapService;

@@ -315,7 +315,8 @@
       // The record may carry an older sector id (alias): it resolves to the current sector
       SectorService.selectSector(sectorSelect, sectors, report.sector);
       populateTrails();
-      SectorService.selectTrail(trailSelect, report.trail);
+      // By trail id when the report has one, else by name (reports saved before trail records existed)
+      SectorService.selectTrail(trailSelect, report.trail, report.trailId);
       commentsInput.value = report.comments || '';
       
       // Handle photos - retrocompat: support both old photoUrl and new photos array
@@ -424,6 +425,7 @@
           timestamp: p.timestamp ? firebase.firestore.Timestamp.fromDate(p.timestamp) : null
         }));
         
+        const chosenTrail = SectorService.readTrail(trailSelect); // { id, name }: id is null for a name from the old lists
         const reportData = {
           network: Network.current(),
           inspectorId: currentUser.uid,
@@ -435,7 +437,8 @@
           coordinates: photos.length > 0 && photos[0].coordinates ? photos[0].coordinates : null,
           sector: sectorSelect.value,
           sectorDisplayName: SectorService.nameOf(sectors, sectorSelect.value),
-          trail: trailSelect.value,
+          trail: chosenTrail.name || '',
+          trailId: chosenTrail.id,
           comments: commentsInput.value.trim() || null,
           resolved: false,
           archived: false,
@@ -482,6 +485,7 @@
           timestamp: p.timestamp ? firebase.firestore.Timestamp.fromDate(p.timestamp) : null
         }));
         
+        const chosenTrail = SectorService.readTrail(trailSelect); // { id, name }
         const updateData = {
           status: statusSelect.value || null,
           statusDisplayName: statusSelect.value ? STATUS_LABELS[statusSelect.value] : null,
@@ -489,7 +493,8 @@
           coordinates: photos.length > 0 && photos[0].coordinates ? photos[0].coordinates : null,
           sector: sectorSelect.value,
           sectorDisplayName: SectorService.nameOf(sectors, sectorSelect.value),
-          trail: trailSelect.value,
+          trail: chosenTrail.name || '',
+          trailId: chosenTrail.id,
           comments: commentsInput.value.trim() || null,
           modifiedAt: firebase.firestore.FieldValue.serverTimestamp()
         };

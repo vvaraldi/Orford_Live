@@ -67,13 +67,20 @@ service cloud.firestore {
     // PUBLIC ACCESS - For status page
     // Trails: an inspector's inspection only changes the status fields; everything else
     // (name, number, kind, difficulty, length, position) is edited by admins (Administration > Sentiers).
+    // The `sector` of a trail (the area the infraction and signalisation forms group it under)
+    // is set by a system_admin only.
+    function sectorUnchanged() {
+      return !request.resource.data.diff(resource.data).affectedKeys().hasAny(['sector']);
+    }
+
     match /trails/{document} {
       allow read: if true;
       allow update: if canWorkIn(recordNetwork(resource.data)) && sameNetwork() &&
-                       (isAdmin() ||
+                       ((isAdmin() && (isSystemAdmin() || sectorUnchanged())) ||
                         request.resource.data.diff(resource.data).affectedKeys()
                           .hasOnly(['status', 'lastUpdated', 'lastInspectionId']));
-      allow create: if isAdmin() && canWorkIn(recordNetwork(request.resource.data));
+      allow create: if isAdmin() && canWorkIn(recordNetwork(request.resource.data)) &&
+                       (isSystemAdmin() || !('sector' in request.resource.data));
       allow delete: if isAdmin() && canWorkIn(recordNetwork(resource.data));
     }
 
@@ -128,18 +135,14 @@ service cloud.firestore {
       allow delete: if isSystemAdmin();
     }
     
-    // SECTORS: the sector -> trail lists behind the infraction and signalisation forms.
-    // Admins manage the sectors of the activities they hold; a system_admin manages all.
+    // SECTORS: the areas the infraction and signalisation forms group trails under
+    // (a trail's `sector` field holds a sector id). Only a system_admin manages sectors.
     // Sectors are never deleted from the app (records refer to their id).
     match /sectors/{sectorId} {
       allow read: if request.auth != null;
-      allow create: if isAdmin() &&
-                    (isSystemAdmin() ||
-                     request.resource.data.network in networksOf(request.auth.uid));
-      allow update: if isAdmin() &&
-                    request.resource.data.network == resource.data.network &&
-                    (isSystemAdmin() ||
-                     resource.data.network in networksOf(request.auth.uid));
+      allow create: if isSystemAdmin();
+      allow update: if isSystemAdmin() &&
+                    request.resource.data.network == resource.data.network;
       allow delete: if isSystemAdmin();
     }
 
