@@ -243,6 +243,7 @@
   <script src="../js/core/firebase-loader.js"></script>
   <script src="../js/core/auth.js"></script>
   <script src="../js/services/photo-service.js"></script>
+  <script src="../js/services/trail-service.js"></script>
   <script src="../js/services/map-service.js"></script>
 
   <script>
@@ -340,7 +341,7 @@
       try {
         // Load trails (this activity's only)
         const trailsSnap = await db.collection('trails').get();
-        trailsSnap.forEach(doc => { if (Network.matches(doc.data())) trails.set(doc.id, doc.data()); });
+        trailsSnap.forEach(doc => { if (Network.matches(doc.data()) && TrailService.isInspected(doc.data())) trails.set(doc.id, doc.data()); });
 
         // Load shelters (only activities that have shelters)
         if (Network.feature('shelters')) {
@@ -599,12 +600,8 @@
     }
 
     function getConditionBadge(condition) {
-      const map = {
-        good: '<span class="badge badge-success">✅ Bon</span>',
-        warning: '<span class="badge badge-warning">⚠️ Attention</span>',
-        critical: '<span class="badge badge-danger">❌ Critique</span>'
-      };
-      return map[condition] || '<span class="badge badge-secondary">❓ Inconnu</span>';
+      const badge = { good: 'badge-success', warning: 'badge-warning', critical: 'badge-danger' };
+      return `<span class="badge ${badge[condition] || 'badge-secondary'}">${TrailService.conditionText(condition, true)}</span>`;
     }
 
     function updatePagination() {

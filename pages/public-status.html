@@ -88,25 +88,18 @@
   <script src="../js/core/config.js"></script>
   <script src="../js/core/network.js"></script>
   <script src="../js/services/map-service.js"></script>
+  <script src="../js/services/trail-service.js"></script>
   <script src="../js/core/utils.js"></script>
   <script src="../js/core/theme.js"></script>
 
   <script>
-    const STATUS_LABELS = { open: 'Ouvert', closed: 'Fermé', unknown: 'Inconnu' };
-
     let trails = [];
     let mapSize = null; // natural size of the map image; marker coordinates are pixels on it
 
     const el = id => document.getElementById(id);
 
-    function statusOf(trail) {
-      return trail.status === 'open' || trail.status === 'closed' ? trail.status : 'unknown';
-    }
-
-    // Marker label: the trail's `number` if it has one, else its id without the prefix (trail_3, bike_3 -> 3)
-    function numberOf(trail) {
-      return trail.number != null ? String(trail.number) : trail.id.replace(/^[a-z]+_/, '');
-    }
+    const statusOf = TrailService.statusOf;
+    const numberOf = TrailService.markerLabel; // the trail's number, else its id without the prefix (trail_3, bike_3 -> 3)
 
     function render() {
       const sorted = [...trails].sort((a, b) => a.id.localeCompare(b.id, 'fr', { numeric: true }));
@@ -132,7 +125,7 @@
         marker.textContent = numberOf(trail);
         marker.style.left = `${(pos.left / mapSize.width) * 100}%`;
         marker.style.top = `${(pos.top / mapSize.height) * 100}%`;
-        marker.title = `${trail.name || numberOf(trail)} - ${STATUS_LABELS[status]}`;
+        marker.title = `${trail.name || numberOf(trail)} - ${TrailService.statusText(status)}`;
         marker.setAttribute('aria-label', marker.title);
         marker.addEventListener('click', () => showTip(marker));
         wrapper.appendChild(marker);
@@ -203,7 +196,7 @@
           return;
         }
         // The season's activity only (trails saved before the network field count as ski)
-        trails = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })).filter(t => Network.matches(t));
+        trails = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })).filter(t => Network.matches(t) && TrailService.isInspected(t));
         el('loading').hidden = true;
         el('error').hidden = true;
         render();

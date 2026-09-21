@@ -151,6 +151,7 @@
   <script src="../js/core/auth.js"></script>
   <script src="../js/utils/photo-picker.js"></script>
   <script src="../js/services/photo-service.js"></script>
+  <script src="../js/services/trail-service.js"></script>
 
   <script>
     let selectedFiles = [], currentTrailStatus = null, storage = null;
@@ -234,18 +235,20 @@
 
     async function loadTrails() {
       try {
-        const snapshot = await db.collection('trails').orderBy('name').get();
+        const snapshot = await db.collection('trails').get();
         trailSelect.innerHTML = '<option value="">Sélectionner un sentier</option>';
-        snapshot.forEach(doc => {
-          const t = doc.data();
-          if (!Network.matches(t)) return; // this activity's trails only
-          const diffMap = {'easy':'Facile','medium':'Intermédiaire','hard':'Difficile'};
-          const opt = document.createElement('option');
-          opt.value = doc.id;
-          opt.textContent = `${t.name} (${t.length} km - ${diffMap[t.difficulty] || t.difficulty || 'Non spécifié'})`;
-          opt.dataset.status = t.status || 'unknown';
-          trailSelect.appendChild(opt);
-        });
+        snapshot.docs
+          .map(doc => ({ id: doc.id, ...doc.data() }))
+          .filter(t => Network.matches(t) && TrailService.isInspected(t)) // this activity's inspected trails only
+          .sort((a, b) => String(a.name).localeCompare(String(b.name), 'fr'))
+          .forEach(t => {
+            const opt = document.createElement('option');
+            opt.value = t.id;
+            opt.textContent = TrailService.describe(t); // name (difficulty · length), the last two only when known
+            opt.dataset.name = t.name;
+            opt.dataset.status = t.status || 'unknown';
+            trailSelect.appendChild(opt);
+          });
       } catch (e) { console.error('Error loading trails:', e); showError('Erreur lors du chargement des sentiers'); }
     }
 
@@ -348,7 +351,7 @@
         batch.set(inspRef, formData);
         batch.update(db.collection('trails').doc(formData.trail_id), { status: formData.trail_status, lastUpdated: firebase.firestore.FieldValue.serverTimestamp(), lastInspectionId: inspRef.id });
         await batch.commit();
-        const trailName = trailSelect.options[trailSelect.selectedIndex].text.split(' (')[0];
+        const trailName = trailSelect.options[trailSelect.selectedIndex].dataset.name;
         showSuccess(`Inspection enregistrée! ${trailName} est maintenant ${formData.trail_status === 'open' ? 'ouvert' : 'fermé'}.`);
         // Save inspector info before reset
         const savedInspectorName = inspectorName.value;

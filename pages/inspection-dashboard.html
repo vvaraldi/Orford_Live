@@ -210,6 +210,7 @@
   <script src="../js/core/firebase-loader.js"></script>
   <script src="../js/core/auth.js"></script>
   <script src="../js/services/photo-service.js"></script>
+  <script src="../js/services/trail-service.js"></script>
   <script src="../js/services/map-service.js"></script>
 
   <script>
@@ -254,7 +255,7 @@
         allTrails = [];
         trailsSnap.forEach(doc => {
           const trail = { id: doc.id, ...doc.data() };
-          if (Network.matches(trail)) allTrails.push(trail);
+          if (Network.matches(trail) && TrailService.isInspected(trail)) allTrails.push(trail);
         });
 
         // Load shelters (only for activities that have shelters)
@@ -326,7 +327,7 @@
         if (!trail.coordinates) return;
         const marker = document.createElement('div');
         // Label: the trail's `number` if it has one, else its id without the prefix (trail_3, bike_3 -> 3)
-        const num = trail.number != null ? String(trail.number) : trail.id.replace(/^[a-z]+_/, '');
+        const num = TrailService.markerLabel(trail);
         marker.className = 'map-marker';
         marker.textContent = num;
         marker.style.left = trail.coordinates.left + 'px';
@@ -381,18 +382,11 @@
     function updateLegend() {
       const legend = document.getElementById('map-legend');
       if (currentView === 'inspection') {
-        legend.innerHTML = `
-          <div class="legend-item"><span class="legend-dot legend-dot--good"></span><span>Bon état</span></div>
-          <div class="legend-item"><span class="legend-dot legend-dot--warning"></span><span>Attention</span></div>
-          <div class="legend-item"><span class="legend-dot legend-dot--critical"></span><span>Critique</span></div>
-          <div class="legend-item"><span class="legend-dot legend-dot--not-inspected"></span><span>Non inspecté</span></div>
-        `;
+        legend.innerHTML = ['good', 'warning', 'critical', 'not-inspected'].map(c =>
+          `<div class="legend-item"><span class="legend-dot legend-dot--${c}"></span><span>${TrailService.conditionText(c)}</span></div>`).join('');
       } else {
-        legend.innerHTML = `
-          <div class="legend-item"><span class="legend-dot legend-dot--open"></span><span>Ouvert</span></div>
-          <div class="legend-item"><span class="legend-dot legend-dot--closed"></span><span>Fermé</span></div>
-          <div class="legend-item"><span class="legend-dot legend-dot--unknown"></span><span>Inconnu</span></div>
-        `;
+        legend.innerHTML = ['open', 'closed', 'unknown'].map(s =>
+          `<div class="legend-item"><span class="legend-dot legend-dot--${s}"></span><span>${TrailService.statusText(s)}</span></div>`).join('');
       }
     }
 
@@ -564,8 +558,8 @@
         let html = `
           <div class="detail-row"><span class="detail-row__label">Date d'inspection</span><span>${formattedDate}</span></div>
           <div class="detail-row"><span class="detail-row__label">Inspecteur</span><span>${escapeHtml(inspector)}</span></div>
-          <div class="detail-row"><span class="detail-row__label">État général</span><span class="status-badge status-badge--${cond}">${cond === 'good' ? '✅ Bon' : cond === 'warning' ? '⚠️ Attention' : cond === 'critical' ? '❌ Critique' : '❓ Inconnu'}</span></div>
-          <div class="detail-row"><span class="detail-row__label">Statut du sentier</span><span class="status-badge status-badge--${status}">${status === 'open' ? '🟢 Ouvert' : status === 'closed' ? '🔴 Fermé' : '❓ Inconnu'}</span></div>
+          <div class="detail-row"><span class="detail-row__label">État général</span><span class="status-badge status-badge--${cond}">${TrailService.conditionText(cond, true)}</span></div>
+          <div class="detail-row"><span class="detail-row__label">Statut du sentier</span><span class="status-badge status-badge--${status}">${TrailService.statusText(status, true)}</span></div>
         `;
         
         if (insp.issues && insp.issues.length > 0) {
@@ -596,11 +590,11 @@
         const formattedDate = date.toLocaleDateString('fr-CA', { year: 'numeric', month: 'long', day: 'numeric' });
         const inspector = insp.inspector_name || inspectorsMap.get(insp.inspector_id) || 'Non spécifié';
         const cond = insp.condition || 'unknown';
-        
+
         let html = `
           <div class="detail-row"><span class="detail-row__label">Date d'inspection</span><span>${formattedDate}</span></div>
           <div class="detail-row"><span class="detail-row__label">Inspecteur</span><span>${escapeHtml(inspector)}</span></div>
-          <div class="detail-row"><span class="detail-row__label">État général</span><span class="status-badge status-badge--${cond}">${cond === 'good' ? '✅ Bon' : cond === 'warning' ? '⚠️ Attention' : cond === 'critical' ? '❌ Critique' : '❓ Inconnu'}</span></div>
+          <div class="detail-row"><span class="detail-row__label">État général</span><span class="status-badge status-badge--${cond}">${TrailService.conditionText(cond, true)}</span></div>
         `;
         if (insp.issues && insp.issues.length > 0) {
           html += `<div class="detail-section"><div class="detail-section__title">⚠️ Problèmes identifiés</div><div class="issues-list">${insp.issues.map(i => `<span class="issue-tag">${escapeHtml(i)}</span>`).join('')}</div></div>`;
@@ -711,7 +705,7 @@
             <div class="inspection-row__name">${icon} ${escapeHtml(i.name)}</div>
             <div class="inspection-row__type">${i.type === 'trail' ? 'Sentier' : 'Abri'}</div>
             <div class="inspection-row__date">${formatted}</div>
-            <span class="status-badge status-badge--${cond}">${cond === 'good' ? '✅' : cond === 'warning' ? '⚠️' : cond === 'critical' ? '❌' : '❓'}</span>
+            <span class="status-badge status-badge--${cond}">${TrailService.conditionIcon(cond)}</span>
           </div>`;
         }).join('');
       } catch (e) { console.error('Error:', e); container.innerHTML = '<div style="padding:2rem;text-align:center;color:var(--theme-text-secondary);">Erreur de chargement.</div>'; }

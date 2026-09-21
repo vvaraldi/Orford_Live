@@ -65,9 +65,14 @@ service cloud.firestore {
     }
 
     // PUBLIC ACCESS - For status page
+    // Trails: an inspector's inspection only changes the status fields; everything else
+    // (name, number, kind, difficulty, length, position) is edited by admins (Administration > Sentiers).
     match /trails/{document} {
       allow read: if true;
-      allow update: if canWorkIn(recordNetwork(resource.data)) && sameNetwork();
+      allow update: if canWorkIn(recordNetwork(resource.data)) && sameNetwork() &&
+                       (isAdmin() ||
+                        request.resource.data.diff(resource.data).affectedKeys()
+                          .hasOnly(['status', 'lastUpdated', 'lastInspectionId']));
       allow create: if isAdmin() && canWorkIn(recordNetwork(request.resource.data));
       allow delete: if isAdmin() && canWorkIn(recordNetwork(resource.data));
     }

@@ -116,6 +116,9 @@ const APP_CONFIG = {
   //                 not here: it is saved by the system admin in Administration > Cartes
   //                 (Firestore maps/{network}). No calibration = GPS positions cannot be drawn
   //                 on that map (Google Maps links still work).
+  //   trailKinds    the kinds of trail this activity has (keys of trailKinds below)
+  //   inspectionKinds  the kinds that are inspected, and shown on the public status page
+  //                 (downhill runs are not inspected for now)
   //   features      what the network has: shelters, snowCondition (ski-only inspection field)
   //   infractions   the fault types and practices offered on the infraction form (id -> label)
   //   publicTitle   what the public status page calls this activity's trails
@@ -125,6 +128,8 @@ const APP_CONFIG = {
     ski: {
       id: 'ski', name: 'Ski', icon: '⛷️',
       map: { image: 'assets/map/Ski-Touring_Map.png', width: 800, height: 700 },
+      trailKinds: ['uphill', 'downhill'],
+      inspectionKinds: ['uphill'],
       features: { shelters: true, snowCondition: true },
       publicTitle: 'État des sentiers de randonnée alpine',
       statsSince: { month: 9, day: 1 }, // 1 September
@@ -147,6 +152,8 @@ const APP_CONFIG = {
       seasonMonths: [5, 6, 7, 8, 9, 10], // 1 May to 31 October
       // The illustrated map (Bike_Map.jpg, not to scale) resized to 1600 px wide: trail coordinates are pixels on THIS image.
       map: { image: 'assets/map/Bike_Map_web.jpg', width: 1600, height: 919 },
+      trailKinds: ['bike'],
+      inspectionKinds: ['bike'],
       features: { shelters: false, snowCondition: false },
       publicTitle: 'État des sentiers de vélo de montagne',
       statsSince: { month: 5, day: 1 }, // 1 May
@@ -159,6 +166,49 @@ const APP_CONFIG = {
     }
   },
   defaultNetworks: ['ski'],
+
+  // ===== TRAILS =====
+  // trails/{id}: name, number (optional, shown on the map markers), kind, network, difficulty,
+  // length (km, optional, information only), status ('open' | 'closed'), coordinates
+  // ({left, top}: pixels on the network's map). Uphill and downhill are separate records even
+  // when they follow the same path: they have their own number, status and difficulty.
+  // A trail saved before `kind` existed is uphill (bike network: bike); one saved with the
+  // old difficulty easy / medium / hard is green / blue / black (see js/services/trail-service.js).
+  // idPrefix: new trails are numbered trail_12, run_1, bike_3...
+  trailKinds: {
+    uphill:   { label: 'Montée',   idPrefix: 'trail' },
+    downhill: { label: 'Descente', idPrefix: 'run' },
+    bike:     { label: 'Vélo',     idPrefix: 'bike' }
+  },
+  difficulties: {
+    'green':        { label: 'Verte',        icon: '🟢' },
+    'blue':         { label: 'Bleue',        icon: '🔵' },
+    'black':        { label: 'Noire',        icon: '⚫' },
+    'double-black': { label: 'Double noire', icon: '⚫⚫' }
+  },
+  // The difficulties each kind of trail can have, easiest first
+  difficultyScales: {
+    uphill:   ['green', 'blue', 'black'],
+    downhill: ['green', 'blue', 'black', 'double-black'],
+    bike:     ['green', 'blue', 'black', 'double-black']
+  },
+
+  // ===== LABELS shared by the apps =====
+  // trail status (what is open or closed) and inspection condition (what state it is in)
+  labels: {
+    trailStatus: {
+      open:    { label: 'Ouvert',  icon: '🟢' },
+      closed:  { label: 'Fermé',   icon: '🔴' },
+      unknown: { label: 'Inconnu', icon: '❓' }
+    },
+    condition: {
+      'good':          { label: 'Bon état',          icon: '✅' },
+      'warning':       { label: 'Attention requise', icon: '⚠️' },
+      'critical':      { label: 'État critique',     icon: '❌' },
+      'not-inspected': { label: 'Non inspecté',      icon: '⚪' },
+      'unknown':       { label: 'Inconnu',           icon: '❓' }
+    }
+  },
 
   // ===== NAVIGATION (rendered by js/core/layout.js) =====
   // One set per module, chosen with <body data-nav="...">. The current page is
@@ -232,6 +282,10 @@ Object.freeze(APP_CONFIG.modules);
 Object.freeze(APP_CONFIG.nav);
 Object.freeze(APP_CONFIG.networks);
 Object.freeze(APP_CONFIG.defaultNetworks);
+Object.freeze(APP_CONFIG.trailKinds);
+Object.freeze(APP_CONFIG.difficulties);
+Object.freeze(APP_CONFIG.difficultyScales);
+Object.freeze(APP_CONFIG.labels);
 Object.freeze(APP_CONFIG.defaults);
 
 // ===== Apply the branding to the page (browser only) =====

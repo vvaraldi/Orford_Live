@@ -257,7 +257,25 @@
     .cal-map.is-placing { cursor: crosshair; }
     .cal-map img { display: block; width: auto; height: auto; max-width: none; }
     .cal-map svg { position: absolute; left: 0; top: 0; pointer-events: none; }
-  </style>
+
+    /* Sentiers tab: the trail list, the editor and the markers on the map */
+    .trail-table-wrap { overflow-x: auto; margin-bottom: var(--space-md); }
+    .trail-table { width: 100%; border-collapse: collapse; }
+    .trail-table th, .trail-table td { padding: 0.5rem 0.75rem; text-align: left; border-bottom: 1px solid var(--theme-border); white-space: nowrap; }
+    .trail-table th { background: var(--theme-surface-alt); font-size: 0.75rem; text-transform: uppercase; }
+    .trail-row:hover { background: var(--theme-surface-alt); }
+    .trail-row.is-selected { background: rgba(var(--theme-accent-rgb), 0.12); }
+    .trail-editor { padding: var(--space-md); margin-bottom: var(--space-md); background: var(--theme-surface-alt); border: 1px solid var(--theme-border); border-radius: var(--radius-md); }
+    .trail-editor h4 { margin: 0 0 var(--space-md); }
+    .trail-form { display: grid; grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr)); gap: var(--space-md); }
+    .trail-form .form-group { margin-bottom: 0; }
+    .trail-position { display: flex; gap: 0.5rem; align-items: flex-end; flex-wrap: wrap; }
+    .trail-position .form-group { flex: 1 1 5rem; min-width: 5rem; }
+    .cal-map svg .trail-marker { pointer-events: all; cursor: pointer; }
+    .trail-marker circle { fill: #64748b; stroke: #fff; stroke-width: 3; }
+    .trail-marker text { fill: #fff; font-size: 13px; font-weight: 700; pointer-events: none; }
+    .trail-marker--current circle { fill: #dc2626; }
+    .cal-map.is-placing .trail-marker { cursor: crosshair; }  </style>
 </head>
 <body data-theme="light" data-module="admin" data-nav="admin" data-page="user-management">
   <script src="../js/core/config.js"></script>
@@ -289,6 +307,9 @@
       </button>
       <button class="admin-tabs__btn" data-tab="sectors" onclick="switchTab('sectors')">
         🗺️ Secteurs
+      </button>
+      <button class="admin-tabs__btn" data-tab="trails" onclick="switchTab('trails')">
+        🧭 Sentiers
       </button>
       <button class="admin-tabs__btn" data-tab="maps" id="maps-tab-btn" onclick="switchTab('maps')" style="display: none;">
         📍 Cartes
@@ -441,6 +462,91 @@
             <textarea class="form-textarea" id="new-sector-trails" rows="5"></textarea>
           </div>
           <button class="btn btn-primary" onclick="addSector()">Ajouter le secteur</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- TAB: TRAILS -->
+    <div class="admin-tab-content" id="trails-tab">
+      <div class="data-export-section">
+        <div class="data-export-section__header">
+          <span>🧭</span>
+          <h3>Sentiers <span id="trail-count" style="font-weight: 400; color: var(--theme-text-secondary);"></span></h3>
+        </div>
+        <p class="data-export-section__description">
+          Les sentiers de chaque activité : nom, numéro (affiché sur les repères de la carte), type, difficulté, longueur et position.
+          Le statut (ouvert ou fermé) est mis à jour par les inspections. La montée et la descente d'un même tracé sont deux sentiers distincts,
+          chacun avec son numéro, son statut et sa difficulté.
+        </p>
+
+        <div class="cal-toolbar">
+          <div class="form-group">
+            <label class="form-label" for="trail-network">Activité</label>
+            <select class="form-select" id="trail-network"></select>
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="trail-kind-filter">Type</label>
+            <select class="form-select" id="trail-kind-filter"></select>
+          </div>
+          <button type="button" class="btn btn-primary" id="trail-new">➕ Nouveau sentier</button>
+        </div>
+
+        <div class="trail-table-wrap" style="margin-top: var(--space-md);">
+          <table class="trail-table">
+            <thead><tr><th>N°</th><th>Nom</th><th>Type</th><th>Difficulté</th><th>Longueur</th><th>Statut</th><th>Position</th><th></th></tr></thead>
+            <tbody id="trail-rows"></tbody>
+          </table>
+        </div>
+
+        <div class="trail-editor" id="trail-editor" hidden>
+          <h4 id="trail-editor-title"></h4>
+          <div class="trail-form">
+            <div class="form-group">
+              <label class="form-label" for="tr-name">Nom <span class="form-required">*</span></label>
+              <input type="text" class="form-input" id="tr-name" maxlength="80">
+            </div>
+            <div class="form-group">
+              <label class="form-label" for="tr-number">Numéro <span class="form-hint">(repère de la carte)</span></label>
+              <input type="text" class="form-input" id="tr-number" maxlength="6">
+            </div>
+            <div class="form-group">
+              <label class="form-label" for="tr-kind">Type</label>
+              <select class="form-select" id="tr-kind"></select>
+            </div>
+            <div class="form-group">
+              <label class="form-label" for="tr-difficulty">Difficulté</label>
+              <select class="form-select" id="tr-difficulty"></select>
+            </div>
+            <div class="form-group">
+              <label class="form-label" for="tr-length">Longueur (km) <span class="form-hint">(information)</span></label>
+              <input type="text" inputmode="decimal" class="form-input" id="tr-length">
+            </div>
+            <div class="form-group">
+              <label class="form-label">Position sur la carte</label>
+              <div class="trail-position">
+                <div class="form-group"><input type="text" class="form-input" id="tr-x" placeholder="x" readonly aria-label="Position x"></div>
+                <div class="form-group"><input type="text" class="form-input" id="tr-y" placeholder="y" readonly aria-label="Position y"></div>
+              </div>
+              <div class="trail-position" style="margin-top: 0.5rem;">
+                <button type="button" class="btn btn-secondary btn-sm" id="tr-place">📍 Placer sur la carte</button>
+                <button type="button" class="btn btn-secondary btn-sm" id="tr-clear">Retirer la position</button>
+              </div>
+            </div>
+          </div>
+          <p class="cal-source" id="tr-status"></p>
+          <div class="cal-actions">
+            <button type="button" class="btn btn-primary" id="tr-save">Enregistrer</button>
+            <button type="button" class="btn btn-secondary" id="tr-cancel">Annuler</button>
+          </div>
+        </div>
+
+        <div class="cal-warning" id="trail-size-warning" hidden></div>
+        <p class="cal-hint" id="trail-hint"></p>
+        <div class="cal-scroll" id="trail-scroll">
+          <div class="cal-map" id="trail-map">
+            <img id="trail-image" alt="Carte des sentiers">
+            <svg id="trail-overlay" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"></svg>
+          </div>
         </div>
       </div>
     </div>
@@ -791,6 +897,8 @@
   <script src="../js/services/sector-service.js"></script>
   <script src="../js/services/map-service.js"></script>
   <script src="../js/admin/map-calibration.js"></script>
+  <script src="../js/services/trail-service.js"></script>
+  <script src="../js/admin/trail-admin.js"></script>
 
   <!-- Page JS -->
   <script>
@@ -1873,6 +1981,7 @@ Marie Tremblay,marie.tremblay@example.com,MotDePasse456,admin,,true,true,true,sk
             (isCurrentUserSystemAdmin ? '<option value="">Toutes les activités</option>' : '') +
             myNetworks().map(id => `<option value="${id}">${APP_CONFIG.networks[id].icon} ${APP_CONFIG.networks[id].name}</option>`).join('');
           loadSectorsAdmin();
+          TrailAdmin.init(currentUser.uid, myNetworks()); // trails of the activities this admin holds
           // GPS calibration of the maps: system admin only (the Firestore rules enforce it too)
           if (isCurrentUserSystemAdmin) {
             document.getElementById('maps-tab-btn').style.display = '';
