@@ -1,7 +1,7 @@
 /**
  * map-calibration.js - Administration > Cartes (system admin)
  * ============================================================
- * Calibrates the GPS <-> pixel conversion of each activity's map, with 3 points
+ * Calibrates the GPS <-> pixel conversion of each map (ski, ski-downhill, bike), with 3 points
  * (flat map, "affine") or 4 points (map in perspective). A control point is a spot
  * you click on the map plus its GPS position (long-press it in Google Maps).
  *
@@ -34,7 +34,8 @@ const MapCalibration = (function () {
   let userId = null;
   let transform = null; // the live fit (or { error })
 
-  const mapConfig = () => APP_CONFIG.networks[state.network].map;
+  // state.network holds the id of a map (APP_CONFIG.maps): 'ski', 'ski-downhill', 'bike'
+  const mapConfig = () => APP_CONFIG.maps[state.network];
   const usedPoints = () => state.points.slice(0, MapService.MODES[state.mode]);
   const fmt = (n, digits) => (typeof n === 'number' && isFinite(n) ? n.toFixed(digits) : '');
 
@@ -305,7 +306,7 @@ const MapCalibration = (function () {
       await MapService.save(state.network, state.mode, usedPoints(), userId);
       state.dirty = false;
       renderSource(MapService.definition(state.network));
-      showMessage(`Calibration de la carte « ${APP_CONFIG.networks[state.network].name} » enregistrée.`, 'success');
+      showMessage(`Calibration de la carte « ${APP_CONFIG.maps[state.network].name} » enregistrée.`, 'success');
     } catch (error) {
       console.error('Error saving the calibration:', error);
       showMessage(`Enregistrement impossible : ${error.message || 'erreur inconnue'}`, 'error');
@@ -324,8 +325,8 @@ const MapCalibration = (function () {
   // ---- Start ----------------------------------------------------------------------------------------
   function init(uid) {
     userId = uid;
-    const ids = Object.keys(APP_CONFIG.networks);
-    $('cal-network').innerHTML = ids.map(id => `<option value="${id}">${APP_CONFIG.networks[id].icon} ${APP_CONFIG.networks[id].name}</option>`).join('');
+    const ids = Object.keys(APP_CONFIG.maps);
+    $('cal-network').innerHTML = ids.map(id => `<option value="${id}">${APP_CONFIG.maps[id].icon} ${APP_CONFIG.maps[id].name}</option>`).join('');
 
     $('cal-network').addEventListener('change', event => {
       if (state.dirty && !window.confirm('Abandonner les modifications non enregistrées ?')) { event.target.value = state.network; return; }

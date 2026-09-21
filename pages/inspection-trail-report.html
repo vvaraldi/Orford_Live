@@ -239,7 +239,7 @@
         trailSelect.innerHTML = '<option value="">Sélectionner un sentier</option>';
         snapshot.docs
           .map(doc => ({ id: doc.id, ...doc.data() }))
-          .filter(t => Network.matches(t) && TrailService.isInspected(t)) // this activity's inspected trails only
+          .filter(t => Network.matches(t) && TrailService.isActive(t)) // this activity's inspected trails, not hidden
           .sort((a, b) => String(a.name).localeCompare(String(b.name), 'fr'))
           .forEach(t => {
             const opt = document.createElement('option');

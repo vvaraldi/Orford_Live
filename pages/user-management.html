@@ -264,6 +264,8 @@
     .trail-table th, .trail-table td { padding: 0.5rem 0.75rem; text-align: left; border-bottom: 1px solid var(--theme-border); white-space: nowrap; }
     .trail-table th { background: var(--theme-surface-alt); font-size: 0.75rem; text-transform: uppercase; }
     .trail-row:hover { background: var(--theme-surface-alt); }
+    .trail-row.is-archived { opacity: 0.55; }
+    .btn[hidden], .form-select[hidden] { display: none; } /* author display rules would otherwise win over [hidden] */
     .trail-row.is-selected { background: rgba(var(--theme-accent-rgb), 0.12); }
     .trail-editor { padding: var(--space-md); margin-bottom: var(--space-md); background: var(--theme-surface-alt); border: 1px solid var(--theme-border); border-radius: var(--radius-md); }
     .trail-editor h4 { margin: 0 0 var(--space-md); }
@@ -488,6 +490,14 @@
             <label class="form-label" for="trail-kind-filter">Type</label>
             <select class="form-select" id="trail-kind-filter"></select>
           </div>
+          <div class="form-group">
+            <label class="form-label" for="trail-view">Afficher</label>
+            <select class="form-select" id="trail-view">
+              <option value="active">Sentiers actifs</option>
+              <option value="archived">Sentiers masqués</option>
+              <option value="all">Tous</option>
+            </select>
+          </div>
           <button type="button" class="btn btn-primary" id="trail-new">➕ Nouveau sentier</button>
         </div>
 
@@ -537,10 +547,13 @@
           <div class="cal-actions">
             <button type="button" class="btn btn-primary" id="tr-save">Enregistrer</button>
             <button type="button" class="btn btn-secondary" id="tr-cancel">Annuler</button>
+            <button type="button" class="btn btn-secondary" id="tr-archive" hidden title="Le sentier n'existe plus dans le réseau : il disparaît de la carte et des listes, l'historique est conservé">Masquer ce sentier</button>
+            <button type="button" class="btn btn-secondary" id="tr-restore" hidden>Restaurer ce sentier</button>
           </div>
         </div>
 
         <div class="cal-warning" id="trail-size-warning" hidden></div>
+        <p class="cal-source" id="trail-map-title" style="margin-bottom: 0.25rem;"></p>
         <p class="cal-hint" id="trail-hint"></p>
         <div class="cal-scroll" id="trail-scroll">
           <div class="cal-map" id="trail-map">
@@ -559,7 +572,7 @@
           <h3>Calibration GPS des cartes</h3>
         </div>
         <p class="data-export-section__description">
-          Relie les positions GPS (photos des rapports) aux pixels de la carte de chaque activité.
+          Relie les positions GPS (photos des rapports) aux pixels de chaque carte (une par activité, et une carte de descente pour le ski).
           Choisissez <strong>3 points</strong> pour une carte plate et à l'échelle, ou <strong>4 points</strong> pour une carte dessinée en perspective.
           Prenez des points éloignés les uns des autres, sur des repères précis (croisement de sentiers, bâtiment), et cherchez leur position GPS
           en appuyant longuement sur ce lieu dans Google Maps. Avec 4 points, faites le tour du secteur sans croiser les lignes.
@@ -567,7 +580,7 @@
 
         <div class="cal-toolbar">
           <div class="form-group">
-            <label class="form-label" for="cal-network">Activité</label>
+            <label class="form-label" for="cal-network">Carte</label>
             <select class="form-select" id="cal-network"></select>
           </div>
           <div class="form-group">

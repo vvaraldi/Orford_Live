@@ -52,6 +52,25 @@ const TrailService = (function () {
     return !!network && network.inspectionKinds.includes(kindOf(trail));
   }
 
+  /** Hidden trail: no longer part of the network, kept for the history. */
+  function isArchived(trail) {
+    return !!trail && trail.archived === true;
+  }
+
+  /**
+   * A trail that is part of the network today and is inspected: what the inspection apps and
+   * the public status page show. (Inspection history keeps archived trails: use isInspected.)
+   */
+  function isActive(trail, networkId) {
+    return !isArchived(trail) && isInspected(trail, networkId);
+  }
+
+  /** The id of the map (APP_CONFIG.maps) that a kind of trail, or a trail, is placed on. */
+  function mapIdOf(kindOrTrail) {
+    const kind = typeof kindOrTrail === 'string' ? kindOrTrail : kindOf(kindOrTrail);
+    return (APP_CONFIG.trailKinds[kind] || {}).map || null;
+  }
+
   /** 'open' | 'closed' | 'unknown' */
   function statusOf(trail) {
     return trail && (trail.status === 'open' || trail.status === 'closed') ? trail.status : 'unknown';
@@ -106,6 +125,6 @@ const TrailService = (function () {
     return `${prefix}_${Math.max(0, ...used) + 1}`;
   }
 
-  return { kindOf, kindLabel, scaleOf, difficultyOf, difficultyLabel, isInspected, statusOf, statusText, conditionText, conditionIcon, markerLabel, describe, compare, nextId };
+  return { kindOf, kindLabel, scaleOf, difficultyOf, difficultyLabel, isInspected, isArchived, isActive, mapIdOf, statusOf, statusText, conditionText, conditionIcon, markerLabel, describe, compare, nextId };
 })();
 window.TrailService = TrailService;

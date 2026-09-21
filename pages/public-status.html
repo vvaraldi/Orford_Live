@@ -196,7 +196,7 @@
           return;
         }
         // The season's activity only (trails saved before the network field count as ski)
-        trails = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })).filter(t => Network.matches(t) && TrailService.isInspected(t));
+        trails = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })).filter(t => Network.matches(t) && TrailService.isActive(t));
         el('loading').hidden = true;
         el('error').hidden = true;
         render();

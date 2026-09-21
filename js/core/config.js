@@ -103,6 +103,21 @@ const APP_CONFIG = {
     }
   },
 
+  // ===== MAPS =====
+  // Each map: image (path from the site root) and its size in pixels. Trail coordinates are
+  // pixels on that image, so keep its size once trails are placed on it. The GPS calibration
+  // is not here: the system admin saves it in Administration > Cartes (Firestore maps/{id}).
+  // No calibration = GPS positions cannot be drawn on that map (Google Maps links still work).
+  // The ids 'ski' and 'bike' are also the ids of the calibrations saved before there were
+  // several maps: do not rename them.
+  //   Ski-Downhill_Map_web.jpg is Ski-Downhill_Map.png (same 1670 x 736 px) as a lighter JPG.
+  maps: {
+    'ski':          { name: 'Ski - Montée',   icon: '⛷️', image: 'assets/map/Ski-Touring_Map.png',      width: 800,  height: 700 },
+    'ski-downhill': { name: 'Ski - Descente', icon: '🎿', image: 'assets/map/Ski-Downhill_Map_web.jpg', width: 1670, height: 736 },
+    // The illustrated map (Bike_Map.jpg, not to scale) resized to 1600 px wide
+    'bike':         { name: 'Vélo',           icon: '🚵', image: 'assets/map/Bike_Map_web.jpg',         width: 1600, height: 919 }
+  },
+
   // ===== NETWORKS (activities) =====
   // A user's access is the list of these ids in inspectors/{uid}.networks.
   // defaultNetworks[0] is the network of records saved before the network field existed,
@@ -111,11 +126,9 @@ const APP_CONFIG = {
   // Per network:
   //   seasonMonths  months (1-12) when this network is the default one; the network with no
   //                 seasonMonths is the default the rest of the year (see js/core/network.js)
-  //   map           image (path from the site root) shown behind trail / report markers, and its
-  //                 size in pixels (trail coordinates are pixels on it). The GPS calibration is
-  //                 not here: it is saved by the system admin in Administration > Cartes
-  //                 (Firestore maps/{network}). No calibration = GPS positions cannot be drawn
-  //                 on that map (Google Maps links still work).
+  //   map           id of the network's main map (in maps above), the one behind the inspection
+  //                 markers and the report locations. Trails of another kind can use another
+  //                 map: see trailKinds.<kind>.map
   //   trailKinds    the kinds of trail this activity has (keys of trailKinds below)
   //   inspectionKinds  the kinds that are inspected, and shown on the public status page
   //                 (downhill runs are not inspected for now)
@@ -127,7 +140,7 @@ const APP_CONFIG = {
   networks: {
     ski: {
       id: 'ski', name: 'Ski', icon: '⛷️',
-      map: { image: 'assets/map/Ski-Touring_Map.png', width: 800, height: 700 },
+      map: 'ski',
       trailKinds: ['uphill', 'downhill'],
       inspectionKinds: ['uphill'],
       features: { shelters: true, snowCondition: true },
@@ -150,8 +163,7 @@ const APP_CONFIG = {
     bike: {
       id: 'bike', name: 'Vélo', icon: '🚵',
       seasonMonths: [5, 6, 7, 8, 9, 10], // 1 May to 31 October
-      // The illustrated map (Bike_Map.jpg, not to scale) resized to 1600 px wide: trail coordinates are pixels on THIS image.
-      map: { image: 'assets/map/Bike_Map_web.jpg', width: 1600, height: 919 },
+      map: 'bike',
       trailKinds: ['bike'],
       inspectionKinds: ['bike'],
       features: { shelters: false, snowCondition: false },
@@ -170,15 +182,17 @@ const APP_CONFIG = {
   // ===== TRAILS =====
   // trails/{id}: name, number (optional, shown on the map markers), kind, network, difficulty,
   // length (km, optional, information only), status ('open' | 'closed'), coordinates
-  // ({left, top}: pixels on the network's map). Uphill and downhill are separate records even
-  // when they follow the same path: they have their own number, status and difficulty.
+  // ({left, top}: pixels on the map of its kind), archived (true = hidden: no longer part of the
+  // network, kept for the history). Uphill and downhill are separate records even when they
+  // follow the same path: they have their own number, status and difficulty.
   // A trail saved before `kind` existed is uphill (bike network: bike); one saved with the
   // old difficulty easy / medium / hard is green / blue / black (see js/services/trail-service.js).
   // idPrefix: new trails are numbered trail_12, run_1, bike_3...
+  // map: the map (in maps above) the trails of this kind are placed on.
   trailKinds: {
-    uphill:   { label: 'Montée',   idPrefix: 'trail' },
-    downhill: { label: 'Descente', idPrefix: 'run' },
-    bike:     { label: 'Vélo',     idPrefix: 'bike' }
+    uphill:   { label: 'Montée',   idPrefix: 'trail', map: 'ski' },
+    downhill: { label: 'Descente', idPrefix: 'run',   map: 'ski-downhill' },
+    bike:     { label: 'Vélo',     idPrefix: 'bike',  map: 'bike' }
   },
   difficulties: {
     'green':        { label: 'Verte',        icon: '🟢' },
@@ -280,6 +294,7 @@ Object.freeze(APP_CONFIG.firebase);
 Object.freeze(APP_CONFIG.routes);
 Object.freeze(APP_CONFIG.modules);
 Object.freeze(APP_CONFIG.nav);
+Object.freeze(APP_CONFIG.maps);
 Object.freeze(APP_CONFIG.networks);
 Object.freeze(APP_CONFIG.defaultNetworks);
 Object.freeze(APP_CONFIG.trailKinds);

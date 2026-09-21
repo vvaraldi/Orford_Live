@@ -1,16 +1,17 @@
 /**
- * map-service.js - The map image and GPS positions of the current activity
- * ========================================================================
- * Each activity (APP_CONFIG.networks[id].map) has its own map image and a GPS
+ * map-service.js - The map images and GPS positions
+ * ==================================================
+ * Each map (APP_CONFIG.maps: ski, ski-downhill, bike) has its own image and a GPS
  * calibration: 3 or 4 control points (a pixel on the image + the GPS position of
  * that spot). From them this converts a GPS position to a pixel on the image and
- * back.
+ * back. An activity's own map is APP_CONFIG.networks[id].map; the functions below
+ * take a map id, an activity id (its main map), or nothing (the current activity's).
  *
  * Two methods, chosen by the system admin (Administration > Cartes):
  *   'affine'       3 points. For a flat map drawn to scale (ski map).
  *   'perspective'  4 points. For a map drawn in perspective (a projective transform).
  *
- * The calibration of an activity is Firestore maps/{network}:
+ * The calibration of a map is Firestore maps/{map id}:
  *   { mode, points: [{x, y, lat, lon}], width, height }
  * written by the Cartes page, and used only if width/height still match the map in
  * config.js. Without one, canLocate() is false and gpsToPixel() returns null; callers then
@@ -25,8 +26,8 @@ const MapService = (function () {
   'use strict';
 
   const MODES = { affine: 3, perspective: 4 }; // mode -> number of control points
-  const transforms = {};                        // network id -> transform or null
-  const stored = {};                            // network id -> Firestore document data
+  const transforms = {};                        // map id -> transform or null
+  const stored = {};                            // map id -> Firestore document data
   let loading = null;
 
   // ---- Maths ---------------------------------------------------------------------------
@@ -138,18 +139,25 @@ const MapService = (function () {
 
   // ---- The calibration of each activity ---------------------------------------------------
 
-  function mapOf(networkId) {
-    const network = APP_CONFIG.networks[networkId || Network.current()];
-    return network ? network.map : null;
+  // Every function below takes a map id ('ski', 'ski-downhill', 'bike'), or an activity id
+  // (that activity's main map), or nothing (the current activity's main map).
+  function keyOf(id) {
+    const key = id || Network.current();
+    const network = APP_CONFIG.networks[key];
+    return network ? network.map : key;
+  }
+
+  function mapOf(id) {
+    return APP_CONFIG.maps[keyOf(id)] || null;
   }
 
   /**
-   * The calibration in force for an activity: { mode, points, updatedAt } or null.
+   * The calibration in force for a map: { mode, points, updatedAt } or null.
    * A calibration saved for another image size is ignored: { stale: true } is returned
    * instead (the map has to be calibrated again).
    */
-  function definition(networkId) {
-    const id = networkId || Network.current();
+  function definition(mapId) {
+    const id = keyOf(mapId);
     const map = mapOf(id);
     const doc = stored[id];
     if (!doc || !MODES[doc.mode] || !Array.isArray(doc.points)) return null;
@@ -159,8 +167,8 @@ const MapService = (function () {
     return { mode: null, points: null, stale: true };
   }
 
-  function transformFor(networkId) {
-    const id = networkId || Network.current();
+  function transformFor(mapId) {
+    const id = keyOf(mapId);
     if (id in transforms) return transforms[id];
     const def = definition(id);
     const t = def && def.points ? fit(def.points, def.mode) : null;
@@ -185,8 +193,9 @@ const MapService = (function () {
   }
 
   /** Saves a calibration (system admin; see the Firestore rules). Returns the fitted transform. */
-  async function save(networkId, mode, points, userId) {
-    const map = mapOf(networkId);
+  async function save(mapId, mode, points, userId) {
+    const key = keyOf(mapId);
+    const map = mapOf(key);
     if (!map || !map.width || !map.height) throw new Error('Cette carte n\'a pas de taille définie dans la configuration.');
     const clean = (points || []).slice(0, MODES[mode] || 0).map(p => ({ x: Math.round(p.x), y: Math.round(p.y), lat: p.lat, lon: p.lon }));
     const t = fit(clean, mode);
@@ -195,9 +204,9 @@ const MapService = (function () {
       mode, points: clean, width: map.width, height: map.height,
       updatedAt: firebase.firestore.FieldValue.serverTimestamp(), updatedBy: userId || null
     };
-    await window.db.collection('maps').doc(networkId).set(data);
-    stored[networkId] = { ...data, updatedAt: new Date() };
-    delete transforms[networkId];
+    await window.db.collection('maps').doc(key).set(data);
+    stored[key] = { ...data, updatedAt: new Date() };
+    delete transforms[key];
     return t;
   }
 
@@ -261,6 +270,6 @@ const MapService = (function () {
   // The calibrations are read as soon as the user (and so Firestore) is ready
   if (typeof document !== 'undefined') document.addEventListener('networkReady', () => load());
 
-  return { MODES, fit, apply, unapply, definition, load, save, canLocate, gpsToPixel, pixelToGps, imageUrl, showImage };
+  return { MODES, keyOf, mapOf, fit, apply, unapply, definition, load, save, canLocate, gpsToPixel, pixelToGps, imageUrl, showImage };
 })();
 window.MapService = MapService;

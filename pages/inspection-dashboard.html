@@ -255,7 +255,7 @@
         allTrails = [];
         trailsSnap.forEach(doc => {
           const trail = { id: doc.id, ...doc.data() };
-          if (Network.matches(trail) && TrailService.isInspected(trail)) allTrails.push(trail);
+          if (Network.matches(trail) && TrailService.isActive(trail)) allTrails.push(trail); // inspected, not hidden
         });
 
         // Load shelters (only for activities that have shelters)
