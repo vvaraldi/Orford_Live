@@ -184,6 +184,13 @@ const APP_CONFIG = {
   },
   defaultNetworks: ['ski'],
 
+  // The earliest season the admin Statistiques tab's season navigator can go back to, for every
+  // activity (winter 2025-2026: when the app went live - nothing meaningful exists before it).
+  // A season (see pages/inspection-admin.html, 12 months anchored on a network's statsSince) is
+  // reachable only if it STARTS on or after this date; "Previous" disables itself once going back
+  // one more season would start earlier than this.
+  earliestSeasonStart: { year: 2025, month: 9, day: 1 },
+
   // ===== TRAILS =====
   // trails/{id}: name, number (optional, shown on the map markers), kind, network, difficulty,
   // length (km, optional, information only), status ('open' | 'closed'), coordinates

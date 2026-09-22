@@ -308,7 +308,8 @@
     // Statistics cover one "season" at a time: a 12-month window anchored on the activity's
     // statsSince (config: month/day, e.g. ski 1 Sept, bike 1 May). Season 0 is the current,
     // still-running one (statsSince to today); season 1 is the one before it (a full year,
-    // statsSince to the day before the next statsSince), season 2 the one before that, etc.
+    // statsSince to the day before the next statsSince), season 2 the one before that, etc. -
+    // down to config.js's earliestSeasonStart, before which nothing is reachable.
     // The far-photo check uses that activity's map centre, which does not depend on the season.
     let seasonStart = null, seasonEnd = null, seasonOffset = 0;
     let MAP_CENTER = null;
@@ -341,6 +342,13 @@
       return { start, end, isCurrent };
     }
 
+    // The earliest season any activity can navigate back to (config.js: winter 2025-2026, when
+    // the app went live). A season is reachable only if it STARTS on or after this date.
+    function earliestSeasonStart() {
+      const e = APP_CONFIG.earliestSeasonStart;
+      return new Date(e.year, e.month - 1, e.day);
+    }
+
     function seasonLabel(bounds) {
       const fmt = d => d.toLocaleDateString('fr-CA', { day: 'numeric', month: 'short', year: 'numeric' });
       if (bounds.isCurrent) return `Saison en cours (depuis le ${fmt(bounds.start)})`;
@@ -351,18 +359,20 @@
     }
 
     // Applies seasonOffset to seasonStart/seasonEnd, updates the navigator's label and buttons.
-    // "Next" is capped at the current season (no future data exists); "Previous" has no limit -
-    // it just queries an earlier window each time, which shows zeros once there is no more data.
+    // "Next" is capped at the current season (no future data exists); "Previous" is capped at
+    // earliestSeasonStart() - going one season further back would start before it.
     function applySeason() {
       const bounds = seasonBounds(seasonOffset);
       seasonStart = bounds.start;
       seasonEnd = bounds.end;
       document.getElementById('season-label').textContent = seasonLabel(bounds);
       document.getElementById('season-next').disabled = bounds.isCurrent;
+      document.getElementById('season-prev').disabled = seasonBounds(seasonOffset + 1).start < earliestSeasonStart();
     }
 
     async function changeSeason(offset) {
       if (offset === seasonOffset || offset < 0) return;
+      if (seasonBounds(offset).start < earliestSeasonStart()) return; // before the earliest reachable season
       seasonOffset = offset;
       applySeason();
       // Disabled while loading, so a second click can't overlap the in-flight reads
@@ -371,8 +381,7 @@
       await loadAllData();
       renderStatistics();
       renderCharts();
-      document.getElementById('season-prev').disabled = false;
-      applySeason(); // restores season-next's correct disabled state (current season only)
+      applySeason(); // restores both buttons' correct disabled state
     }
 
     // Spells out exactly what each tool in "Gestion des données" reaches, so nobody assumes a
