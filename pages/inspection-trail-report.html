@@ -61,6 +61,7 @@
 <body data-theme="light" data-module="inspection-rando" data-nav="inspection" data-page="inspection-trail-report">
   <script src="../js/core/config.js"></script>
   <script src="../js/core/network.js"></script>
+  <script src="../js/core/kind.js"></script>
   <script src="../js/core/layout.js"></script>
   <div id="loading" class="page-loading"><div class="loading-spinner"></div><p class="loading-text">Chargement du formulaire...</p></div>
   <div class="form-loading-overlay" id="form-loading"><div class="form-loading-content"><div class="loading-spinner"></div><p class="loading-text" id="loading-text">Enregistrement en cours...</p></div></div>
@@ -236,7 +237,8 @@
         trailSelect.innerHTML = '<option value="">Sélectionner un sentier</option>';
         snapshot.docs
           .map(doc => ({ id: doc.id, ...doc.data() }))
-          .filter(t => Network.matches(t) && TrailService.isActive(t)) // this activity's inspected trails, not hidden
+          // this activity's inspected trails, not hidden, of the kind shown (kind.js + header switcher)
+          .filter(t => Network.matches(t) && TrailService.isActive(t) && TrailService.kindOf(t) === Kind.current())
           .sort((a, b) => String(a.name).localeCompare(String(b.name), 'fr'))
           .forEach(t => {
             const opt = document.createElement('option');

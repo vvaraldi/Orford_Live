@@ -85,6 +85,7 @@
 <body data-theme="light" data-module="inspection-rando" data-nav="inspection" data-page="inspection-admin">
   <script src="../js/core/config.js"></script>
   <script src="../js/core/network.js"></script>
+  <script src="../js/core/kind.js"></script>
   <script src="../js/core/layout.js"></script>
   <div id="loading" class="page-loading"><div class="loading-spinner"></div><p class="loading-text">Chargement...</p></div>
   
@@ -209,7 +210,7 @@
       <!-- Database Stats -->
       <div class="management-section">
         <div class="management-section__title">📊 État de la base de données</div>
-        <div class="management-section__desc">Aperçu des données stockées</div>
+        <div class="management-section__desc" id="db-desc">Aperçu des données stockées</div>
         <div class="db-stats" id="db-stats">
           <div class="db-stat">
             <div class="db-stat__value" id="db-trail-inspections">-</div>
@@ -241,7 +242,7 @@
       <!-- Delete Old Inspections -->
       <div class="management-section management-section--danger">
         <div class="management-section__title">🗑️ Supprimer les anciennes inspections</div>
-        <div class="management-section__desc">Supprime toutes les inspections et leurs photos avant la date spécifiée. Un fichier de sauvegarde sera téléchargé automatiquement avant la suppression.</div>
+        <div class="management-section__desc" id="delete-desc">Supprime toutes les inspections et leurs photos avant la date spécifiée. Un fichier de sauvegarde sera téléchargé automatiquement avant la suppression.</div>
         <div class="form-row">
           <div class="form-group">
             <label class="form-label" for="delete-before-date">Supprimer avant le</label>
@@ -267,7 +268,7 @@
       <!-- Orphan Cleanup -->
       <div class="management-section management-section--danger">
         <div class="management-section__title">🧹 Nettoyage des fichiers orphelins</div>
-        <div class="management-section__desc">Recherche et supprime les photos stockées qui ne sont liées à aucune inspection (fichiers orphelins).</div>
+        <div class="management-section__desc" id="orphan-desc">Recherche et supprime les photos stockées qui ne sont liées à aucune inspection (fichiers orphelins).</div>
         <div class="form-row">
           <div class="form-group" style="flex: 0 0 auto;">
             <button class="btn btn-secondary" id="btn-scan-orphans">Analyser</button>
@@ -304,6 +305,22 @@
       MAP_CENTER = mapCenter;
     }
 
+    // Spells out exactly what each tool in "Gestion des données" reaches, so nobody assumes a
+    // delete is limited to whatever kind (Montée/Descente) happens to be selected in the header
+    // when it is not. "Supprimer les anciennes inspections" is scoped to the CURRENT ACTIVITY
+    // (network) but covers every kind within it; the other two tools are not scoped at all -
+    // they read/act on the whole database, every activity together.
+    function updateManagementText() {
+      const kinds = Network.config().inspectionKinds || [];
+      const kindNote = kinds.length > 1 ? ` (${kinds.map(k => TrailService.kindLabel(k)).join(' et ')} ensemble, quelle que soit la vue sélectionnée dans l'en-tête)` : '';
+      document.getElementById('delete-desc').textContent =
+        `Supprime les inspections et leurs photos avant la date spécifiée, pour l'activité « ${Network.config().name} » uniquement${kindNote}. Un fichier de sauvegarde sera téléchargé automatiquement avant la suppression.`;
+      document.getElementById('orphan-desc').textContent =
+        `Recherche et supprime les photos stockées qui ne sont liées à aucune inspection (fichiers orphelins). Analyse TOUTES les activités (Ski et Vélo), pas seulement « ${Network.config().name} ».`;
+      document.getElementById('db-desc').textContent =
+        `Aperçu de TOUTES les données stockées, tous réseaux confondus (Ski et Vélo) - pas seulement l'activité actuelle.`;
+    }
+
     // Data
     let trailInspections = [];
     let shelterInspections = [];
@@ -329,6 +346,7 @@
           }
 
           setActivitySettings();
+          updateManagementText();
           // No shelters for this activity: no shelter statistics
           if (!Network.feature('shelters')) {
             document.getElementById('stat-shelter-inspections').closest('.stat-card').style.display = 'none';
@@ -384,11 +402,16 @@
         const inspSnap = await db.collection('inspectors').get();
         inspSnap.forEach(doc => inspectors.set(doc.id, doc.data().name));
 
-        // Load trail inspections (since season start)
+        // Load trail inspections (since season start). Statistics are scoped to the kind
+        // currently shown (kind.js + header switcher); "trails" itself stays unfiltered by kind -
+        // it is also used by the Gestion des données tab below, which must cover every kind.
         const trailInspSnap = await db.collection('trail_inspections')
           .where('date', '>=', firebase.firestore.Timestamp.fromDate(seasonStart))
           .get();
-        trailInspections = trailInspSnap.docs.filter(doc => trails.has(doc.data().trail_id)).map(doc => { // this activity's trails only
+        trailInspections = trailInspSnap.docs.filter(doc => {
+          const t = trails.get(doc.data().trail_id);
+          return t && TrailService.kindOf(t) === Kind.current();
+        }).map(doc => { // this activity's trails of the shown kind only
           const d = doc.data();
           return {
             id: doc.id,
@@ -833,9 +856,11 @@
       const beforeDate = new Date(dateStr);
       beforeDate.setHours(23, 59, 59, 999);
       
+      const kinds = Network.config().inspectionKinds || [];
+      const kindNote = kinds.length > 1 ? ` (${kinds.map(k => TrailService.kindLabel(k)).join(' et ')} ensemble)` : '';
       const typeLabel = (type === 'all' ? 'toutes les inspections' : type === 'trail' ? 'les inspections de sentiers' : 'les inspections d\'abris')
-        + ` de l'activité « ${Network.config().name} »`; // deletion never touches another activity
-      
+        + ` de l'activité « ${Network.config().name} »${kindNote}`; // deletion never touches another activity, but every kind of this one
+
       if (!confirm(`Êtes-vous sûr de vouloir supprimer ${typeLabel} avant le ${beforeDate.toLocaleDateString('fr-CA')}?\n\nUn fichier de sauvegarde sera téléchargé automatiquement.\n\nCette action est IRRÉVERSIBLE.`)) return;
       
       try {

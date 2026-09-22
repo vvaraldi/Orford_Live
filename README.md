@@ -19,3 +19,7 @@ Step 5
 Step 6: Migration Support
 will need to migrate database and potentially all the site to another host and account... to be validated
 6.1 Firebase rules updateIf needed for new structure
+
+
+
+- Add/update the estimated time to the log. I go to sleep !

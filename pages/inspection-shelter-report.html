@@ -61,6 +61,7 @@
 <body data-theme="light" data-module="inspection-rando" data-nav="inspection" data-page="inspection-shelter-report">
   <script src="../js/core/config.js"></script>
   <script src="../js/core/network.js"></script>
+  <script src="../js/core/kind.js"></script>
   <script src="../js/core/layout.js"></script>
   <div id="loading" class="page-loading"><div class="loading-spinner"></div><p class="loading-text">Chargement du formulaire...</p></div>
   <div class="form-loading-overlay" id="form-loading"><div class="form-loading-content"><div class="loading-spinner"></div><p class="loading-text" id="loading-text">Enregistrement en cours...</p></div></div>
@@ -170,6 +171,7 @@
   <script src="../js/core/auth.js"></script>
   <script src="../js/utils/photo-picker.js"></script>
   <script src="../js/services/photo-service.js"></script>
+  <script src="../js/services/trail-service.js"></script>
 
   <script>
     let selectedFiles = [], storage = null;
@@ -209,13 +211,19 @@
           if (userData.role === 'admin' || userData.role === 'system_admin') {
             document.querySelectorAll('.nav__link--admin, .mobile-nav__link--admin').forEach(el => el.style.display = '');
           }
-          // Not every activity has shelters (bike does not): replace the form with a notice
-          if (!Network.feature('shelters')) {
+          // Not every activity has shelters (bike does not), and where they exist they are on
+          // the activity's own main map only (ski: the touring/uphill one, not downhill): replace
+          // the form with a notice in either case.
+          const kindOk = !Kind.current() || TrailService.mapIdOf(Kind.current()) === Network.config().map;
+          if (!Network.feature('shelters') || !kindOk) {
             form.style.display = 'none';
             const notice = document.createElement('div');
             notice.className = 'section-card';
             notice.style.cssText = 'padding: 2rem; text-align: center;';
-            notice.innerHTML = `<p style="font-size:1.1rem;margin-bottom:1rem;">Il n'y a pas d'abris pour l'activité « ${Network.config().name} ».</p>
+            const message = !Network.feature('shelters')
+              ? `Il n'y a pas d'abris pour l'activité « ${Network.config().name} ».`
+              : `Il n'y a pas d'abris en vue « ${TrailService.kindLabel(Kind.current())} ».`;
+            notice.innerHTML = `<p style="font-size:1.1rem;margin-bottom:1rem;">${message}</p>
               <a class="btn btn-primary" href="inspection-dashboard.html">Retour au tableau de bord</a>`;
             form.after(notice);
             return;

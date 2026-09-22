@@ -116,6 +116,7 @@
 <body data-theme="light" data-module="inspection-rando" data-nav="inspection" data-page="inspection-history">
   <script src="../js/core/config.js"></script>
   <script src="../js/core/network.js"></script>
+  <script src="../js/core/kind.js"></script>
   <script src="../js/core/layout.js"></script>
   <div id="loading" class="page-loading"><div class="loading-spinner"></div><p class="loading-text">Chargement de l'historique...</p></div>
   
@@ -320,9 +321,12 @@
 
     async function loadAllData() {
       try {
-        // Load trails (this activity's only)
+        // Load trails (this activity's only, of the kind currently shown - kind.js + header switcher)
         const trailsSnap = await db.collection('trails').get();
-        trailsSnap.forEach(doc => { if (Network.matches(doc.data()) && TrailService.isInspected(doc.data())) trails.set(doc.id, doc.data()); });
+        trailsSnap.forEach(doc => {
+          const t = doc.data();
+          if (Network.matches(t) && TrailService.isInspected(t) && TrailService.kindOf(t) === Kind.current()) trails.set(doc.id, t);
+        });
 
         // Load shelters (only activities that have shelters)
         if (Network.feature('shelters')) {
@@ -789,12 +793,14 @@
 
     // Photo location modal - using affine transformation from original app
     const PhotoMapModal = (function() {
-      // GPS -> pixel on the current network's map (null when that map has no calibration)
-      const gpsToPixel = (lat, lon) => MapService.gpsToPixel(lat, lon);
-      
+      // GPS -> pixel on the map of the kind currently shown (null when that map has no calibration).
+      // Every listed inspection is already of that kind (see loadAllData), so this is always right.
+      const mapId = () => TrailService.mapIdOf(Kind.current());
+      const gpsToPixel = (lat, lon) => MapService.gpsToPixel(lat, lon, mapId());
+
       function open(lat, lon) {
         // This activity's map cannot place GPS positions (no calibration): open Google Maps instead
-        if (!MapService.gpsToPixel(lat, lon)) { window.open(`https://www.google.com/maps?q=${lat},${lon}`, '_blank', 'noopener'); return; }
+        if (!gpsToPixel(lat, lon)) { window.open(`https://www.google.com/maps?q=${lat},${lon}`, '_blank', 'noopener'); return; }
         let modal = document.getElementById('photo-map-modal');
         if (!modal) {
           document.body.insertAdjacentHTML('beforeend', `
@@ -802,7 +808,7 @@
               <div class="detail-modal__content" style="max-width:900px;">
                 <div class="detail-modal__header"><h3 class="detail-modal__title">📍 Localisation de la photo</h3><button class="detail-modal__close" onclick="PhotoMapModal.close()">×</button></div>
                 <div class="detail-modal__body" style="padding:0;">
-                  <div style="overflow:auto;max-height:60vh;"><div id="photo-map-wrap" style="position:relative;display:inline-block;"><img src="${MapService.imageUrl()}" style="display:block;width:auto;height:auto;max-width:none;"><div id="photo-marker" style="position:absolute;width:20px;height:20px;background:red;border:3px solid white;border-radius:50%;transform:translate(-50%,-50%);box-shadow:0 2px 8px rgba(0,0,0,0.4);"></div></div></div>
+                  <div style="overflow:auto;max-height:60vh;"><div id="photo-map-wrap" style="position:relative;display:inline-block;"><img src="${MapService.imageUrl(mapId())}" style="display:block;width:auto;height:auto;max-width:none;"><div id="photo-marker" style="position:absolute;width:20px;height:20px;background:red;border:3px solid white;border-radius:50%;transform:translate(-50%,-50%);box-shadow:0 2px 8px rgba(0,0,0,0.4);"></div></div></div>
                   <div id="photo-coords" style="padding:1rem;background:var(--theme-surface-alt);border-top:1px solid var(--theme-border);"></div>
                 </div>
                 <div class="detail-modal__footer"><a id="photo-google-link" href="#" target="_blank" rel="noopener noreferrer" class="btn btn-primary">🗺️ Google Maps</a><button class="btn btn-secondary" onclick="PhotoMapModal.close()">Fermer</button></div>

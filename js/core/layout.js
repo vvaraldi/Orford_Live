@@ -93,6 +93,7 @@
         ${desktopLinks.join('\n        ')}
         <div class="nav__divider"></div>
         <button type="button" class="network-switch" id="network-switch" hidden></button>
+        <button type="button" class="network-switch" id="kind-switch" hidden></button>
         <button class="theme-toggle" onclick="window.themeManager.toggle()" aria-label="Changer le thème" title="Changer le thème">
           ${moonIcon}
           ${sunIcon}
@@ -131,6 +132,10 @@
 
       <div class="mobile-nav__section" id="mobile-network" hidden>
         <div class="mobile-nav__section-title">Activité</div>
+      </div>
+
+      <div class="mobile-nav__section" id="mobile-kind" hidden>
+        <div class="mobile-nav__section-title">Vue</div>
       </div>
 
       <div class="mobile-nav__section">
@@ -187,6 +192,40 @@
       link.className = `mobile-nav__link${id === current ? ' mobile-nav__link--active' : ''}`;
       link.innerHTML = `<span class="mobile-nav__link-icon">${networks[id].icon}</span><span>${networks[id].name}</span>`;
       link.onclick = e => { e.preventDefault(); Network.set(id); };
+      section.appendChild(link);
+    });
+    section.hidden = false;
+  });
+
+  // ---- Kind switcher (uphill/downhill for ski) ---------------------------------------------
+  // Only on inspection pages, and only when the activity inspects more than one kind (kind.js
+  // fires "kindReady" once network.js knows the activity). Switching reloads the page, like the
+  // activity switch above, so every inspection page (dashboard, trail/shelter report, history,
+  // admin) picks it up the same way without each one needing its own toggle.
+  document.addEventListener('kindReady', event => {
+    const { current, ids } = event.detail;
+    if (nav !== APP_CONFIG.nav.inspection || ids.length < 2) return;
+
+    const label = id => TrailService.kindLabel(id);
+    const icon = id => { const m = APP_CONFIG.maps[TrailService.mapIdOf(id)]; return m ? m.icon : ''; };
+
+    // Desktop: one button showing the current kind; a click goes to the next one
+    const button = document.getElementById('kind-switch');
+    const next = ids[(ids.indexOf(current) + 1) % ids.length];
+    button.innerHTML = `<span>${icon(current)}</span><span>${label(current)}</span>`;
+    button.title = `Vue : ${label(current)}. Passer à ${label(next)}`;
+    button.setAttribute('aria-label', button.title);
+    button.onclick = () => Kind.set(next);
+    button.hidden = false;
+
+    // Mobile: one link per kind
+    const section = document.getElementById('mobile-kind');
+    ids.forEach(id => {
+      const link = document.createElement('a');
+      link.href = '#';
+      link.className = `mobile-nav__link${id === current ? ' mobile-nav__link--active' : ''}`;
+      link.innerHTML = `<span class="mobile-nav__link-icon">${icon(id)}</span><span>${label(id)}</span>`;
+      link.onclick = e => { e.preventDefault(); Kind.set(id); };
       section.appendChild(link);
     });
     section.hidden = false;
