@@ -9,3 +9,8 @@ Step 5
 Step 6: Migration Support
 will need to migrate database and potentially all the site to another host and account... to be validated
 6.1 Firebase rules updateIf needed for new structure
+
+
+Bike content	Fault types and practices for infractions, the bike inspection checklist, bike sectors (probably the same as ski), and bike trails with numbers and positions. The trail tools are ready for this.
+Season preview	Nothing. A ?date= option so you can see the public page and the default activity as they will be on 1 November, before the switch. I'd suggest doing this one first.
+Cleanup	Your go-ahead. Remove the "missing activity = ski" fallbacks and the old sector name lists, since all your data has been migrated.

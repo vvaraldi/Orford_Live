@@ -19,7 +19,7 @@ const BRANDING = {
   logo: '🏔️',                     // emoji, used when there is no logoImage
   logoImage: 'assets/Logo_Mont-Orford transparent.png', // path from the site root (far left of the header; needs a transparent background), or null for the emoji
   tagline: 'Patrouille Mont Orford',
-  footerText: '© 2025 Patrouille Mont Orford'
+  footerText: '© 2026 Regis for Mont Orford'
 };
 
 const APP_CONFIG = {
