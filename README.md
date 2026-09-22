@@ -1,10 +1,6 @@
 # REGIS
 
 
-Step 0
-- Please keep in readme.md the estimated number of time I spent (not you) on this project...
-- in Sinpections app, top left is showing "REGIS  -  INSPECTION"... you should add an S at the end to do INSPECTIONS
-
 Step 1
 - Manage inspection for ski touring, velo and downhill
 

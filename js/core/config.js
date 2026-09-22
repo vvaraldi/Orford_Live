@@ -243,8 +243,8 @@ const APP_CONFIG = {
   // ===== NAVIGATION (rendered by js/core/layout.js) =====
   // One set per module, chosen with <body data-nav="...">. The current page is
   // <body data-page="...">. Paths are relative to the site root.
-  // The header always shows the portal logo and name (BRANDING); title: 'Inspection' adds
-  // "  -  Inspection" after the name (no title on the portal and profile pages).
+  // The header always shows the portal logo and name (BRANDING); title: 'Inspections' adds
+  // "  -  Inspections" after the name (no title on the portal and profile pages).
   // admin: true = only shown to admins (unless it is the current page).
   // desktopIcons: false = the desktop bar shows labels only (mobile always has icons).
   // requires: 'shelters' = only shown when the current network has that feature.
@@ -256,7 +256,7 @@ const APP_CONFIG = {
       items: []
     },
     inspection: {
-      title: 'Inspection',
+      title: 'Inspections',
       desktopIcons: false,
       items: [
         { id: 'inspection-dashboard', label: 'Tableau de bord', icon: '📊', href: 'pages/inspection-dashboard.html' },
