@@ -120,8 +120,8 @@ const APP_CONFIG = {
 
   // ===== NETWORKS (activities) =====
   // A user's access is the list of these ids in inspectors/{uid}.networks.
-  // defaultNetworks[0] is the network of records saved before the network field existed,
-  // and what a CSV import gives users when its networks column is empty.
+  // defaultNetworks[0] is what a CSV import gives users when its networks column is empty,
+  // and the network used when no activity is in season (see js/core/network.js ofSeason).
   //
   // Per network:
   //   seasonMonths  months (1-12) when this network is the default one; the network with no

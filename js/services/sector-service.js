@@ -9,8 +9,6 @@
  *   network  "ski"                       (an id of APP_CONFIG.networks)
  *   order    2                           (position in the dropdown, per network)
  *   aliases  ["giroux-nord"]             (older ids that records may still carry)
- *   trails   ["Magog", "Familiale", ...] (the ORIGINAL name lists, no longer edited: only a fallback
- *                                         for a sector that has no trail records)
  *
  * The trails of a sector are the `trails` records whose `sector` is this sector's id (or one of
  * its aliases), of the sector's activity, not hidden (archived). Every kind counts (uphill,
@@ -56,7 +54,6 @@
           var data = doc.data();
           list.push(Object.assign({}, data, {
             id: doc.id,
-            trails: data.trails || [],
             aliases: data.aliases || []
           }));
         });
@@ -97,7 +94,7 @@
 
   /**
    * The sectors of one network; by default the current activity's (Network.current()).
-   * Each has `items`: its trail records (see itemsOf). `trails` still holds the old name list.
+   * Each has `items`: its trail records (see itemsOf).
    */
   async function load(network) {
     // APP_CONFIG / Network are global consts: visible as bare names, not as window.X
@@ -130,35 +127,26 @@
   }
 
   /**
-   * Fills a <select> with a sector's trails. From the trail records when the sector has some
-   * (value = trail id, the number is added only when two names would look the same); otherwise
-   * from the old name list (value = name).
+   * Fills a <select> with a sector's trails (value = trail id, the number is added only when two
+   * names would look the same).
    */
   function fillTrails(select, sector, placeholder) {
     var options = [new Option(placeholder, '')];
     var items = sector && sector.items ? sector.items : [];
-    if (items.length) {
-      var seen = {};
-      items.forEach(function (i) { var k = norm(i.name); seen[k] = (seen[k] || 0) + 1; });
-      items.forEach(function (i) {
-        var clash = seen[norm(i.name)] > 1;
-        var label = clash ? i.name + ' (' + (i.number != null && i.number !== '' ? i.number : i.kind) + ')' : i.name;
-        var option = new Option(label, i.id);
-        option.dataset.trailId = i.id;
-        option.dataset.name = i.name;
-        options.push(option);
-      });
-    } else {
-      (sector ? sector.trails : []).forEach(function (name) {
-        var option = new Option(name, name);
-        option.dataset.name = name;
-        options.push(option);
-      });
-    }
+    var seen = {};
+    items.forEach(function (i) { var k = norm(i.name); seen[k] = (seen[k] || 0) + 1; });
+    items.forEach(function (i) {
+      var clash = seen[norm(i.name)] > 1;
+      var label = clash ? i.name + ' (' + (i.number != null && i.number !== '' ? i.number : i.kind) + ')' : i.name;
+      var option = new Option(label, i.id);
+      option.dataset.trailId = i.id;
+      option.dataset.name = i.name;
+      options.push(option);
+    });
     select.replaceChildren.apply(select, options);
   }
 
-  /** What is picked in a trail <select>: { id, name }. id is null for a name from the old lists. */
+  /** What is picked in a trail <select>: { id, name }. id is null for a name-only (old) report. */
   function readTrail(select) {
     var option = select.selectedOptions && select.selectedOptions[0];
     if (!option || !option.value) return { id: null, name: null };

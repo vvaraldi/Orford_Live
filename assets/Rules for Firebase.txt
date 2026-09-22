@@ -46,11 +46,8 @@ service cloud.firestore {
     // activity, and a record's activity never changes. Reads are not restricted by activity:
     // the pages filter what they show (restricting reads would need every query to filter by
     // network, plus indexes).
-    // Records saved before the network field existed count as ski: `get('network', 'ski')` below
-    // is that fallback. Every record has a network since the one-time data initialisation, so it
-    // is now only a safety net (it can be removed: a record without a network would then be refused).
     function recordNetwork(data) {
-      return data.get('network', 'ski');
+      return data.network;
     }
 
     // May the signed-in user work in this activity? (a system_admin can in every one)

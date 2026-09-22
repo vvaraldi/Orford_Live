@@ -16,8 +16,6 @@
  *   2. the season's activity (APP_CONFIG.networks[id].seasonMonths), if allowed;
  *   3. the first activity the user has.
  * A user's activities are inspectors/{uid}.networks (a system_admin has all).
- *
- * Records saved before the network field existed count as the default network.
  */
 const Network = (function () {
   'use strict';
@@ -93,8 +91,8 @@ const Network = (function () {
     return !!(c && c.features && c.features[name]);
   }
 
-  /** The network of a record: records saved before the network field existed are ski. */
-  const of = doc => (doc && doc.network) || APP_CONFIG.defaultNetworks[0];
+  /** The network of a record. */
+  const of = doc => doc && doc.network;
   const matches = doc => of(doc) === currentId;
   const filter = docs => docs.filter(matches);
 

@@ -655,7 +655,7 @@
         const [hours, minutes] = offenceTime.value.split(':');
         const offenceTimestamp = new Date(year, month - 1, day, hours, minutes);
         
-        const chosenTrail = SectorService.readTrail(trailSelect); // { id, name }: id is null for a name from the old lists
+        const chosenTrail = SectorService.readTrail(trailSelect); // { id, name }: id is null for a name-only (old) report
         const infractionData = {
           network: Network.current(),
           patrolId: currentUser.uid,

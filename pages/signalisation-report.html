@@ -425,7 +425,7 @@
           timestamp: p.timestamp ? firebase.firestore.Timestamp.fromDate(p.timestamp) : null
         }));
         
-        const chosenTrail = SectorService.readTrail(trailSelect); // { id, name }: id is null for a name from the old lists
+        const chosenTrail = SectorService.readTrail(trailSelect); // { id, name }: id is null for a name-only (old) report
         const reportData = {
           network: Network.current(),
           inspectorId: currentUser.uid,
