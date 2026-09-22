@@ -48,7 +48,12 @@
 
     .ps-message { padding: 1rem; text-align: center; color: var(--theme-text-light); }
     .ps-message--error { color: #dc2626; }
-    .ps-footer { text-align: center; font-size: 0.75rem; color: var(--theme-text-light); padding: 0 1rem 1.5rem; }
+    .ps-footer { text-align: center; font-size: 0.75rem; color: var(--theme-text-light); padding: 0 1rem 0.4rem; }
+
+    /* Small, unobtrusive: lets you preview the other activity's page without waiting for the season to change */
+    .ps-season-toggle { display: flex; justify-content: center; align-items: center; gap: 0.4rem; flex-wrap: wrap; font-size: 0.75rem; color: var(--theme-text-light); padding: 0 1rem 1.5rem; }
+    .ps-season-toggle button { background: none; border: 1px solid var(--theme-border); border-radius: 999px; color: inherit; cursor: pointer; font-size: 0.75rem; padding: 0.2rem 0.65rem; }
+    .ps-season-toggle button.is-active { background: var(--color-logo-blue); border-color: transparent; color: #fff; font-weight: 600; }
 
     @media (max-width: 640px) {
       .ps-header { padding: 0.9rem 1rem; }
@@ -83,6 +88,9 @@
   </main>
 
   <p class="ps-footer" id="footer"></p>
+  <!-- Preview: switch the activity shown regardless of today's date. The page still opens on the
+       season's own activity every time (no choice is remembered): this is only a look-around tool. -->
+  <div class="ps-season-toggle" id="season-toggle"></div>
 
   <!-- Shared JS (no login needed on this page) -->
   <script src="../js/core/config.js"></script>
@@ -154,6 +162,35 @@
       el('map-wrapper').appendChild(tip);
     }
 
+    // Small toggle at the bottom: preview another activity's page without waiting for the season to
+    // change. It only changes what THIS load of the page shows (via ?network=); nothing is remembered,
+    // so the page still opens on the season's own activity every time, for everyone else.
+    function renderSeasonToggle() {
+      const ids = Network.ids;
+      const params = new URLSearchParams(window.location.search);
+      const forced = ids.includes(params.get('network')) ? params.get('network') : null;
+      const auto = Network.ofSeason();
+
+      const urlFor = id => {
+        const p = new URLSearchParams(window.location.search);
+        if (id) p.set('network', id); else p.delete('network');
+        const qs = p.toString();
+        return window.location.pathname + (qs ? '?' + qs : '');
+      };
+
+      const buttons = [{ id: null, label: `Auto (${APP_CONFIG.networks[auto].name})` }]
+        .concat(ids.map(id => ({ id, label: `${APP_CONFIG.networks[id].icon} ${APP_CONFIG.networks[id].name}` })));
+
+      el('season-toggle').replaceChildren(...buttons.map(b => {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.textContent = b.label;
+        if (b.id ? forced === b.id : !forced) btn.classList.add('is-active');
+        btn.addEventListener('click', () => { window.location.href = urlFor(b.id); });
+        return btn;
+      }));
+    }
+
     function showError(message) {
       el('loading').hidden = true;
       el('error').textContent = message;
@@ -195,7 +232,7 @@
           el('loading').textContent = 'Connexion en cours...';
           return;
         }
-        // The season's activity only (trails saved before the network field count as ski)
+        // The season's activity only
         trails = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })).filter(t => Network.matches(t) && TrailService.isActive(t));
         el('loading').hidden = true;
         el('error').hidden = true;
@@ -215,6 +252,7 @@
       el('page-title').textContent = `${brand.logoImage ? '' : brand.logo + ' '}Mont Orford - ${network.publicTitle}`;
       document.title = `Mont Orford - ${network.publicTitle}`;
       MapService.showImage(el('map-image'));
+      renderSeasonToggle();
 
       const themeBtn = el('theme-btn');
       const syncThemeBtn = () => { themeBtn.textContent = window.themeManager.isDark() ? '☀️' : '🌙'; };
