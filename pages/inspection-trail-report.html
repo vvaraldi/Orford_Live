@@ -112,13 +112,8 @@
         <div class="form-section-header"><h2 class="form-section-title">⚠️ Problèmes identifiés</h2></div>
         <div class="form-section-body">
           <div class="form-group">
-            <div class="checkbox-group">
-              <div class="checkbox-item"><input type="checkbox" id="issue-icy" value="Glace sur le sentier" class="form-checkbox"><label for="issue-icy" class="checkbox-label"><span class="checkbox-indicator"></span>Glace sur le sentier</label></div>
-              <div class="checkbox-item"><input type="checkbox" id="issue-erosion" value="Érosion du sentier" class="form-checkbox"><label for="issue-erosion" class="checkbox-label"><span class="checkbox-indicator"></span>Érosion du sentier</label></div>
-              <div class="checkbox-item"><input type="checkbox" id="issue-fallen" value="Arbres/branches tombés" class="form-checkbox"><label for="issue-fallen" class="checkbox-label"><span class="checkbox-indicator"></span>Arbres/branches tombés</label></div>
-              <div class="checkbox-item"><input type="checkbox" id="issue-obstacles" value="Obstacles sur le sentier" class="form-checkbox"><label for="issue-obstacles" class="checkbox-label"><span class="checkbox-indicator"></span>Obstacles sur le sentier</label></div>
-              <div class="checkbox-item"><input type="checkbox" id="issue-signage" value="Signalisation manquante/endommagée" class="form-checkbox"><label for="issue-signage" class="checkbox-label"><span class="checkbox-indicator"></span>Signalisation manquante/endommagée</label></div>
-            </div>
+            <p class="form-label-optional" id="issues-hint">Sélectionnez un sentier ci-dessus pour voir la liste des problèmes courants.</p>
+            <div class="checkbox-group" id="issues-group" hidden></div>
           </div>
           <div class="form-group" style="margin-top: 1rem;"><label class="form-label" for="other-issues">Autres problèmes</label><textarea class="form-textarea" id="other-issues" rows="3" placeholder="Décrivez tout autre problème non listé ci-dessus..."></textarea></div>
         </div>
@@ -167,6 +162,8 @@
     const previewContainer = document.getElementById('preview-container');
     const comments = document.getElementById('comments');
     const otherIssues = document.getElementById('other-issues');
+    const issuesHint = document.getElementById('issues-hint');
+    const issuesGroup = document.getElementById('issues-group');
     const submitBtn = document.getElementById('submit-btn');
     const successMessage = document.getElementById('success-message');
     const errorMessage = document.getElementById('error-message');
@@ -259,11 +256,14 @@
         setStatusLabels('🟢 À ouvrir', '🔴 À fermer');
         statusLabel.innerHTML = 'Statut du sentier post inspection';
         currentTrailStatus = null;
+        renderIssues(null);
         return;
       }
       try {
         const trailDoc = await db.collection('trails').doc(trailId).get();
-        currentTrailStatus = trailDoc.exists ? (trailDoc.data().status || 'unknown') : 'unknown';
+        const trail = trailDoc.exists ? trailDoc.data() : null;
+        currentTrailStatus = trail ? (trail.status || 'unknown') : 'unknown';
+        renderIssues(trail);
         if (currentTrailStatus === 'open') {
           statusLabel.innerHTML = 'Statut du sentier post inspection <span style="font-weight:normal;color:#10b981;">(actuellement ouvert)</span>';
           setStatusLabels('🟢 Laisser ouvert', '🔴 À fermer');
@@ -276,12 +276,27 @@
           statusLabel.innerHTML = 'Statut du sentier post inspection <span style="font-weight:normal;color:#6b7280;">(statut inconnu)</span>';
           setStatusLabels('🟢 À ouvrir', '🔴 À fermer');
         }
-      } catch (e) { console.error('Error:', e); statusLabel.innerHTML = 'Statut du sentier post inspection'; setStatusLabels('🟢 À ouvrir', '🔴 À fermer'); }
+      } catch (e) { console.error('Error:', e); statusLabel.innerHTML = 'Statut du sentier post inspection'; setStatusLabels('🟢 À ouvrir', '🔴 À fermer'); renderIssues(null); }
     }
 
     function setStatusLabels(o, c) {
       document.getElementById('status-open-text').textContent = o;
       document.getElementById('status-closed-text').textContent = c;
+    }
+
+    // The checklist depends on the trail's kind (uphill/downhill/bike issues differ)
+    function renderIssues(trail) {
+      issuesGroup.innerHTML = '';
+      if (!trail) { issuesHint.hidden = false; issuesGroup.hidden = true; return; }
+      issuesHint.hidden = true; issuesGroup.hidden = false;
+      TrailService.issuesOf(trail).forEach((issue, i) => {
+        const item = document.createElement('div'); item.className = 'checkbox-item';
+        const id = `issue-${i}`;
+        item.innerHTML = `<input type="checkbox" id="${id}" class="form-checkbox"><label for="${id}" class="checkbox-label"><span class="checkbox-indicator"></span></label>`;
+        item.querySelector('input').value = issue;
+        item.querySelector('label').append(issue);
+        issuesGroup.appendChild(item);
+      });
     }
 
     function processFiles(files) {
@@ -366,8 +381,9 @@
           currentTrailStatus = null; 
           setCurrentDateTime(); 
           hideMessages(); 
-          document.getElementById('status-label').innerHTML = 'Statut du sentier post inspection'; 
-          setStatusLabels('🟢 À ouvrir', '🔴 À fermer'); 
+          document.getElementById('status-label').innerHTML = 'Statut du sentier post inspection';
+          setStatusLabels('🟢 À ouvrir', '🔴 À fermer');
+          renderIssues(null);
         }, 2000);
       } catch (e) { console.error('Error:', e); showError('Erreur: ' + e.message); }
       finally { setFormLoading(false); }

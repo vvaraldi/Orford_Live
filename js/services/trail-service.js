@@ -71,6 +71,12 @@ const TrailService = (function () {
     return (APP_CONFIG.trailKinds[kind] || {}).map || null;
   }
 
+  /** The checklist of common issues (APP_CONFIG.trailKinds.<kind>.issues) for a kind of trail, or a trail. */
+  function issuesOf(kindOrTrail) {
+    const kind = typeof kindOrTrail === 'string' ? kindOrTrail : kindOf(kindOrTrail);
+    return ((APP_CONFIG.trailKinds[kind] || {}).issues || []).slice();
+  }
+
   /** 'open' | 'closed' | 'unknown' */
   function statusOf(trail) {
     return trail && (trail.status === 'open' || trail.status === 'closed') ? trail.status : 'unknown';
@@ -125,6 +131,6 @@ const TrailService = (function () {
     return `${prefix}_${Math.max(0, ...used) + 1}`;
   }
 
-  return { kindOf, kindLabel, scaleOf, difficultyOf, difficultyLabel, isInspected, isArchived, isActive, mapIdOf, statusOf, statusText, conditionText, conditionIcon, markerLabel, describe, compare, nextId };
+  return { kindOf, kindLabel, scaleOf, difficultyOf, difficultyLabel, isInspected, isArchived, isActive, mapIdOf, issuesOf, statusOf, statusText, conditionText, conditionIcon, markerLabel, describe, compare, nextId };
 })();
 window.TrailService = TrailService;

@@ -91,6 +91,8 @@
   <!-- Preview: switch the activity shown regardless of today's date. The page still opens on the
        season's own activity every time (no choice is remembered): this is only a look-around tool. -->
   <div class="ps-season-toggle" id="season-toggle"></div>
+  <!-- Which kind of trail to show (only when the activity has more than one, e.g. ski uphill/downhill) -->
+  <div class="ps-season-toggle" id="kind-toggle" hidden></div>
 
   <!-- Shared JS (no login needed on this page) -->
   <script src="../js/core/config.js"></script>
@@ -101,7 +103,9 @@
   <script src="../js/core/theme.js"></script>
 
   <script>
-    let trails = [];
+    let rawTrails = []; // this activity's inspected trails, every kind together
+    let trails = [];    // rawTrails filtered to currentKind: what is actually drawn
+    let currentKind = null; // which inspectionKind the map shows (null = the activity has only one)
     let mapSize = null; // natural size of the map image; marker coordinates are pixels on it
 
     const el = id => document.getElementById(id);
@@ -110,6 +114,7 @@
     const numberOf = TrailService.markerLabel; // the trail's number, else its id without the prefix (trail_3, bike_3 -> 3)
 
     function render() {
+      trails = currentKind ? rawTrails.filter(t => TrailService.kindOf(t) === currentKind) : rawTrails;
       const sorted = [...trails].sort((a, b) => a.id.localeCompare(b.id, 'fr', { numeric: true }));
 
       renderMarkers(sorted);
@@ -191,6 +196,45 @@
       }));
     }
 
+    // Kind toggle: shown only when the current activity inspects more than one kind (ski:
+    // uphill/downhill). Each kind has its own map, so switching also swaps the map image;
+    // no page reload needed since the trails are already loaded (just refiltered).
+    function renderKindToggle() {
+      const kinds = APP_CONFIG.networks[Network.current()].inspectionKinds || [];
+      const box = el('kind-toggle');
+      if (kinds.length < 2) { box.hidden = true; return; }
+      box.hidden = false;
+      box.replaceChildren(...kinds.map(k => {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.textContent = TrailService.kindLabel(k);
+        if (k === currentKind) btn.classList.add('is-active');
+        btn.addEventListener('click', () => switchKind(k));
+        return btn;
+      }));
+    }
+
+    function switchKind(kind) {
+      if (kind === currentKind) return;
+      currentKind = kind;
+      renderKindToggle();
+      updateTitle();
+      mapSize = null;
+      MapService.showImage(el('map-image'), TrailService.mapIdOf(currentKind));
+      render();
+    }
+
+    // "Mont Orford - <network's publicTitle>", plus the kind's label when there is more than one
+    // (ski: "... — Descente" so the title matches whichever map/markers are currently shown)
+    function updateTitle() {
+      const network = APP_CONFIG.networks[Network.current()];
+      const brand = APP_CONFIG.branding;
+      const kindSuffix = currentKind && (network.inspectionKinds || []).length > 1 ? ` — ${TrailService.kindLabel(currentKind)}` : '';
+      const title = `Mont Orford - ${network.publicTitle}${kindSuffix}`;
+      el('page-title').textContent = `${brand.logoImage ? '' : brand.logo + ' '}${title}`;
+      document.title = title;
+    }
+
     function showError(message) {
       el('loading').hidden = true;
       el('error').textContent = message;
@@ -232,8 +276,8 @@
           el('loading').textContent = 'Connexion en cours...';
           return;
         }
-        // The season's activity only
-        trails = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })).filter(t => Network.matches(t) && TrailService.isActive(t));
+        // The season's activity only, every inspected kind together (render() then keeps currentKind's)
+        rawTrails = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })).filter(t => Network.matches(t) && TrailService.isActive(t));
         el('loading').hidden = true;
         el('error').hidden = true;
         render();
@@ -248,11 +292,11 @@
 
       // Which activity to show: the season's (bike May-Oct, ski otherwise), or ?network=bike|ski
       const network = APP_CONFIG.networks[Network.usePublic()];
-      const brand = APP_CONFIG.branding;
-      el('page-title').textContent = `${brand.logoImage ? '' : brand.logo + ' '}Mont Orford - ${network.publicTitle}`;
-      document.title = `Mont Orford - ${network.publicTitle}`;
-      MapService.showImage(el('map-image'));
+      currentKind = (network.inspectionKinds || [])[0] || null;
+      updateTitle();
+      MapService.showImage(el('map-image'), TrailService.mapIdOf(currentKind));
       renderSeasonToggle();
+      renderKindToggle();
 
       const themeBtn = el('theme-btn');
       const syncThemeBtn = () => { themeBtn.textContent = window.themeManager.isDark() ? '☀️' : '🌙'; };

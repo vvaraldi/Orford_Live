@@ -132,8 +132,9 @@ const APP_CONFIG = {
   //   trailKinds    the kinds of trail this activity has (keys of trailKinds below)
   //   reportMaps    the maps (ids of maps above) the report locations (infractions, signalisations)
   //                 can be shown on, the default one first; several = a switch between them
-  //   inspectionKinds  the kinds that are inspected, and shown on the public status page
-  //                 (downhill runs are not inspected for now)
+  //   inspectionKinds  the kinds that are inspected, and shown on the public status page and the
+  //                 inspection dashboard. More than one (ski: uphill + downhill) means a kind
+  //                 toggle is shown there, since each kind has its own map.
   //   features      what the network has: shelters, snowCondition (ski-only inspection field)
   //   infractions   the fault types and practices offered on the infraction form (id -> label)
   //   publicTitle   what the public status page calls this activity's trails
@@ -145,7 +146,7 @@ const APP_CONFIG = {
       map: 'ski',
       trailKinds: ['uphill', 'downhill', 'lift'],
       reportMaps: ['ski-downhill', 'ski'],
-      inspectionKinds: ['uphill'],
+      inspectionKinds: ['uphill', 'downhill'],
       features: { shelters: true, snowCondition: true },
       publicTitle: 'État des sentiers de randonnée alpine',
       statsSince: { month: 9, day: 1 }, // 1 September
@@ -194,10 +195,16 @@ const APP_CONFIG = {
   // old difficulty easy / medium / hard is green / blue / black (see js/services/trail-service.js).
   // idPrefix: new trails are numbered trail_12, run_1, bike_3...
   // map: the map (in maps above) the trails of this kind are placed on.
+  // issues: the checklist offered by the inspection form's "Problèmes identifiés" section (an
+  // inspector can also type a free-text "other" issue on top of it). No entry = no checklist
+  // (lift: never inspected, see inspectionKinds).
   trailKinds: {
-    uphill:   { label: 'Montée',   idPrefix: 'trail', map: 'ski' },
-    downhill: { label: 'Descente', idPrefix: 'run',   map: 'ski-downhill' },
-    bike:     { label: 'Vélo',     idPrefix: 'bike',  map: 'bike' },
+    uphill:   { label: 'Montée',   idPrefix: 'trail', map: 'ski',
+      issues: ['Glace sur le sentier', 'Érosion du sentier', 'Arbres/branches tombés', 'Obstacles sur le sentier', 'Signalisation manquante/endommagée'] },
+    downhill: { label: 'Descente', idPrefix: 'run',   map: 'ski-downhill',
+      issues: ['Plaques de glace / verglas', 'Manque de neige / roches exposées', 'Arbres/branches tombés sur la piste', 'Filet de sécurité endommagé', 'Balisage de piste manquant/endommagé'] },
+    bike:     { label: 'Vélo',     idPrefix: 'bike',  map: 'bike',
+      issues: ['Ornières / érosion importante', 'Arbres/branches tombés sur le sentier', 'Pont/passerelle endommagé', 'Obstacle technique endommagé (saut, module, virage relevé)', 'Signalisation manquante/endommagée', 'Boue excessive / sentier détrempé'] },
     // Lifts (Remontées mécaniques): listed so reports can be filed against them; no difficulty,
     // never inspected (see inspectionKinds)
     lift:     { label: 'Remontée', idPrefix: 'lift',  map: 'ski-downhill' }

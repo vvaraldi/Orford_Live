@@ -26,6 +26,12 @@
     .toggle-switch input:checked + .toggle-switch__slider { background: var(--theme-accent); }
     .toggle-switch input:checked + .toggle-switch__slider::before { transform: translateX(24px); }
 
+    /* Which kind of trail the map/stats show (only when the activity has more than one, e.g. ski
+       uphill vs downhill: each has its own map, so trails of the other kind must not be mixed in) */
+    .kind-toggle { display: flex; align-items: center; gap: 0.4rem; }
+    .kind-toggle button { background: var(--theme-surface); border: 1px solid var(--theme-border); border-radius: 999px; color: var(--theme-text-secondary); cursor: pointer; font-size: 0.8rem; padding: 0.35rem 0.8rem; }
+    .kind-toggle button.is-active { background: var(--theme-accent); border-color: transparent; color: #fff; font-weight: 600; }
+
     /* Map container - scrollable with natural image size for correct marker positioning */
     .map-container { position: relative; width: 100%; overflow: auto; background: var(--theme-surface-alt); max-height: 700px; }
     .map-wrapper { position: relative; display: inline-block; }
@@ -141,6 +147,7 @@
       <div class="map-header">
         <h2 class="map-header__title">🗺️ Carte des sentiers</h2>
         <div class="map-controls">
+          <div class="kind-toggle" id="kind-toggle" hidden></div>
           <div class="bulk-actions" id="bulk-actions">
             <button class="btn btn-sm btn-success" onclick="bulkSetStatus('open')">Tout ouvrir</button>
             <button class="btn btn-sm btn-danger" onclick="bulkSetStatus('closed')">Tout fermer</button>
@@ -221,6 +228,7 @@
     let shelterInspections = {};
     let inspectorsMap = new Map();
     let currentView = 'inspection'; // 'inspection' or 'status'
+    let currentKind = null; // which inspectionKind the map/stats show (null = the activity has only one)
     let contextTrailId = null;
     let isAdmin = false;
 
@@ -235,7 +243,9 @@
           if (isAdmin) {
             document.querySelectorAll('.nav__link--admin, .mobile-nav__link--admin').forEach(el => el.style.display = '');
           }
-          MapService.showImage(document.getElementById('map-image')); // the current activity's map
+          currentKind = (Network.config().inspectionKinds || [])[0] || null;
+          renderKindToggle();
+          MapService.showImage(document.getElementById('map-image'), TrailService.mapIdOf(currentKind));
           await loadDashboardData();
         }
       });
@@ -302,15 +312,18 @@
     }
 
     function updateStatistics() {
-      document.getElementById('stat-total').textContent = allTrails.length;
-      const open = allTrails.filter(t => t.status === 'open').length;
-      const closed = allTrails.filter(t => t.status === 'closed').length;
+      const trails = visibleTrails();
+      document.getElementById('stat-total').textContent = trails.length;
+      const open = trails.filter(t => t.status === 'open').length;
+      const closed = trails.filter(t => t.status === 'closed').length;
       document.getElementById('stat-open').textContent = open;
       document.getElementById('stat-closed').textContent = closed;
-      
+
       const today = new Date(); today.setHours(0,0,0,0);
+      const ids = new Set(trails.map(t => t.id));
       let inspectedToday = 0;
-      Object.values(trailInspections).forEach(i => {
+      Object.entries(trailInspections).forEach(([trailId, i]) => {
+        if (!ids.has(trailId)) return;
         const d = i.date?.toDate ? i.date.toDate() : new Date(i.date);
         if (d >= today) inspectedToday++;
       });
@@ -321,9 +334,9 @@
       const wrapper = document.getElementById('map-wrapper');
       // Remove existing markers
       wrapper.querySelectorAll('.map-marker').forEach(m => m.remove());
-      
-      // Trail markers
-      allTrails.forEach(trail => {
+
+      // Trail markers (only the kind currently shown: the other kind's coordinates are for another map)
+      visibleTrails().forEach(trail => {
         if (!trail.coordinates) return;
         const marker = document.createElement('div');
         // Label: the trail's `number` if it has one, else its id without the prefix (trail_3, bike_3 -> 3)
@@ -349,8 +362,9 @@
         wrapper.appendChild(marker);
       });
 
-      // Shelter markers (only in inspection view)
-      if (currentView === 'inspection') {
+      // Shelter markers (only in inspection view, and only on the network's own main map: shelters
+      // are not placed per kind, and their coordinates are pixels on that map specifically)
+      if (currentView === 'inspection' && TrailService.mapIdOf(currentKind) === Network.config().map) {
         allShelters.forEach(shelter => {
           if (!shelter.coordinates) return;
           const marker = document.createElement('div');
@@ -375,6 +389,38 @@
       document.getElementById('label-inspection').classList.toggle('is-active', currentView === 'inspection');
       document.getElementById('label-status').classList.toggle('is-active', currentView === 'status');
       document.getElementById('bulk-actions').classList.toggle('show', currentView === 'status' && isAdmin);
+      renderMapMarkers();
+      updateLegend();
+    }
+
+    // Only the trails of the kind currently shown (the map and pixel coordinates are per kind)
+    function visibleTrails() {
+      return currentKind ? allTrails.filter(t => TrailService.kindOf(t) === currentKind) : allTrails;
+    }
+
+    // The kind toggle: shown only when the activity has more than one inspected kind (ski:
+    // uphill/downhill). Each kind has its own map, so switching reloads the map image too.
+    function renderKindToggle() {
+      const kinds = Network.config().inspectionKinds || [];
+      const box = document.getElementById('kind-toggle');
+      if (kinds.length < 2) { box.hidden = true; return; }
+      box.hidden = false;
+      box.replaceChildren(...kinds.map(k => {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.textContent = TrailService.kindLabel(k);
+        if (k === currentKind) btn.classList.add('is-active');
+        btn.addEventListener('click', () => switchKind(k));
+        return btn;
+      }));
+    }
+
+    function switchKind(kind) {
+      if (kind === currentKind) return;
+      currentKind = kind;
+      renderKindToggle();
+      MapService.showImage(document.getElementById('map-image'), TrailService.mapIdOf(currentKind));
+      updateStatistics();
       renderMapMarkers();
       updateLegend();
     }
@@ -449,20 +495,22 @@
     }
 
     async function bulkSetStatus(status) {
+      const trails = visibleTrails();
       const action = status === 'open' ? 'ouvrir' : 'fermer';
-      if (!confirm(`Êtes-vous sûr de vouloir ${action} tous les ${allTrails.length} sentiers?\n\nCette action créera une inspection pour chaque sentier.`)) return;
-      
+      const kindNote = currentKind ? ` (${TrailService.kindLabel(currentKind)})` : '';
+      if (!confirm(`Êtes-vous sûr de vouloir ${action} tous les ${trails.length} sentiers${kindNote}?\n\nCette action créera une inspection pour chaque sentier.`)) return;
+
       try {
         const now = new Date();
-        const comment = status === 'open' 
+        const comment = status === 'open'
           ? 'Ouverture de toutes les pistes en une seule fois pour réinitialiser la montagne'
           : 'Fermeture de toutes les pistes en une seule fois pour réinitialiser la montagne';
-        
+
         // Firebase batch limit is 500 operations, we do 2 per trail
         const BATCH_SIZE = 200;
         const chunks = [];
-        for (let i = 0; i < allTrails.length; i += BATCH_SIZE) {
-          chunks.push(allTrails.slice(i, i + BATCH_SIZE));
+        for (let i = 0; i < trails.length; i += BATCH_SIZE) {
+          chunks.push(trails.slice(i, i + BATCH_SIZE));
         }
         
         for (const chunk of chunks) {
@@ -508,7 +556,7 @@
         renderMapMarkers();
         updateLegend();
         loadRecentInspections();
-        alert(`✅ ${allTrails.length} sentiers ${status === 'open' ? 'ouverts' : 'fermés'} avec succès!\n\n${allTrails.length} inspections créées.`);
+        alert(`✅ ${trails.length} sentiers ${status === 'open' ? 'ouverts' : 'fermés'} avec succès!\n\n${trails.length} inspections créées.`);
       } catch (e) { 
         console.error('Error:', e); 
         alert('Erreur: ' + e.message); 
