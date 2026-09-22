@@ -18,6 +18,13 @@
     .tab-content { display: none; }
     .tab-content.active { display: block; }
 
+    /* Season navigator (Statistiques tab only - Gestion des données keeps its own date range) */
+    .season-nav { display: flex; align-items: center; justify-content: center; gap: 0.75rem; margin-bottom: 1.25rem; }
+    .season-nav__btn { min-width: 36px; height: 36px; display: flex; align-items: center; justify-content: center; border: 1px solid var(--theme-border); border-radius: var(--radius-md); background: var(--theme-surface); color: var(--theme-text); cursor: pointer; font-size: 1rem; transition: all 0.15s; }
+    .season-nav__btn:hover:not(:disabled) { border-color: var(--theme-accent); color: var(--theme-accent); }
+    .season-nav__btn:disabled { opacity: 0.4; cursor: not-allowed; }
+    .season-nav__label { font-weight: 600; font-size: 0.95rem; text-align: center; min-width: 260px; }
+
     /* Stats Grid */
     .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; margin-bottom: 1.5rem; }
     .stat-card { background: var(--theme-surface); border: 1px solid var(--theme-border); border-radius: var(--radius-lg); padding: 1.25rem; }
@@ -103,6 +110,12 @@
 
     <!-- Statistics Tab -->
     <div class="tab-content active" id="tab-statistics">
+      <!-- Season navigator: every stat/chart/ranking below is for this one season only -->
+      <div class="season-nav" id="season-nav">
+        <button type="button" class="season-nav__btn" id="season-prev" aria-label="Saison précédente" title="Saison précédente">◀</button>
+        <span class="season-nav__label" id="season-label">-</span>
+        <button type="button" class="season-nav__btn" id="season-next" aria-label="Saison suivante" title="Saison suivante" disabled>▶</button>
+      </div>
       <!-- General Stats -->
       <div class="stats-grid">
         <div class="stat-card stat-card--highlight">
@@ -148,7 +161,7 @@
         <!-- Most Common Issues -->
         <div class="chart-section">
           <div class="chart-section__title">⚠️ Problèmes les plus fréquents</div>
-          <div class="chart-container"><canvas id="chart-issues"></canvas></div>
+          <div class="chart-container" id="chart-issues-container"><canvas id="chart-issues"></canvas></div>
         </div>
       </div>
 
@@ -292,17 +305,74 @@
   <script src="../js/services/trail-service.js"></script>
 
   <script>
-    // Statistics count from the start of the current activity's season (config: statsSince),
-    // and the far-photo check uses that activity's map centre; both are set once it is known
-    let seasonStart = null;
+    // Statistics cover one "season" at a time: a 12-month window anchored on the activity's
+    // statsSince (config: month/day, e.g. ski 1 Sept, bike 1 May). Season 0 is the current,
+    // still-running one (statsSince to today); season 1 is the one before it (a full year,
+    // statsSince to the day before the next statsSince), season 2 the one before that, etc.
+    // The far-photo check uses that activity's map centre, which does not depend on the season.
+    let seasonStart = null, seasonEnd = null, seasonOffset = 0;
     let MAP_CENTER = null;
 
     function setActivitySettings() {
-      const { statsSince, mapCenter } = Network.config();
+      MAP_CENTER = Network.config().mapCenter;
+    }
+
+    // The start of the CURRENT (offset 0) season: this year's statsSince if already reached,
+    // else last year's.
+    function currentSeasonStart() {
+      const { statsSince } = Network.config();
       const now = new Date();
       const thisYear = new Date(now.getFullYear(), statsSince.month - 1, statsSince.day);
-      seasonStart = thisYear <= now ? thisYear : new Date(now.getFullYear() - 1, statsSince.month - 1, statsSince.day);
-      MAP_CENTER = mapCenter;
+      return thisYear <= now ? thisYear : new Date(now.getFullYear() - 1, statsSince.month - 1, statsSince.day);
+    }
+
+    function seasonBounds(offset) {
+      const anchor = currentSeasonStart();
+      const start = new Date(anchor.getFullYear() - offset, anchor.getMonth(), anchor.getDate());
+      const isCurrent = offset === 0;
+      let end;
+      if (isCurrent) {
+        end = new Date();
+      } else {
+        end = new Date(start.getFullYear() + 1, start.getMonth(), start.getDate());
+        end.setDate(end.getDate() - 1);
+      }
+      end.setHours(23, 59, 59, 999);
+      return { start, end, isCurrent };
+    }
+
+    function seasonLabel(bounds) {
+      const fmt = d => d.toLocaleDateString('fr-CA', { day: 'numeric', month: 'short', year: 'numeric' });
+      if (bounds.isCurrent) return `Saison en cours (depuis le ${fmt(bounds.start)})`;
+      const years = bounds.start.getFullYear() === bounds.end.getFullYear()
+        ? String(bounds.start.getFullYear())
+        : `${bounds.start.getFullYear()}-${bounds.end.getFullYear()}`;
+      return `Saison ${years} (${fmt(bounds.start)} – ${fmt(bounds.end)})`;
+    }
+
+    // Applies seasonOffset to seasonStart/seasonEnd, updates the navigator's label and buttons.
+    // "Next" is capped at the current season (no future data exists); "Previous" has no limit -
+    // it just queries an earlier window each time, which shows zeros once there is no more data.
+    function applySeason() {
+      const bounds = seasonBounds(seasonOffset);
+      seasonStart = bounds.start;
+      seasonEnd = bounds.end;
+      document.getElementById('season-label').textContent = seasonLabel(bounds);
+      document.getElementById('season-next').disabled = bounds.isCurrent;
+    }
+
+    async function changeSeason(offset) {
+      if (offset === seasonOffset || offset < 0) return;
+      seasonOffset = offset;
+      applySeason();
+      // Disabled while loading, so a second click can't overlap the in-flight reads
+      document.getElementById('season-prev').disabled = true;
+      document.getElementById('season-next').disabled = true;
+      await loadAllData();
+      renderStatistics();
+      renderCharts();
+      document.getElementById('season-prev').disabled = false;
+      applySeason(); // restores season-next's correct disabled state (current season only)
     }
 
     // Spells out exactly what each tool in "Gestion des données" reaches, so nobody assumes a
@@ -346,6 +416,7 @@
           }
 
           setActivitySettings();
+          applySeason();
           updateManagementText();
           // No shelters for this activity: no shelter statistics
           if (!Network.feature('shelters')) {
@@ -374,6 +445,10 @@
     }
 
     function bindEvents() {
+      // Season navigator (Statistiques tab)
+      document.getElementById('season-prev').addEventListener('click', () => changeSeason(seasonOffset + 1));
+      document.getElementById('season-next').addEventListener('click', () => changeSeason(seasonOffset - 1));
+
       // Delete old inspections
       document.getElementById('delete-before-date').addEventListener('change', previewDelete);
       document.getElementById('delete-type').addEventListener('change', previewDelete);
@@ -402,11 +477,12 @@
         const inspSnap = await db.collection('inspectors').get();
         inspSnap.forEach(doc => inspectors.set(doc.id, doc.data().name));
 
-        // Load trail inspections (since season start). Statistics are scoped to the kind
+        // Load trail inspections (within the shown season). Statistics are scoped to the kind
         // currently shown (kind.js + header switcher); "trails" itself stays unfiltered by kind -
         // it is also used by the Gestion des données tab below, which must cover every kind.
         const trailInspSnap = await db.collection('trail_inspections')
           .where('date', '>=', firebase.firestore.Timestamp.fromDate(seasonStart))
+          .where('date', '<=', firebase.firestore.Timestamp.fromDate(seasonEnd))
           .get();
         trailInspections = trailInspSnap.docs.filter(doc => {
           const t = trails.get(doc.data().trail_id);
@@ -424,9 +500,12 @@
           };
         });
 
-        // Load shelter inspections (since season start)
+        // Load shelter inspections (within the shown season)
         const shelterInspDocs = shelters.size
-          ? (await db.collection('shelter_inspections').where('date', '>=', firebase.firestore.Timestamp.fromDate(seasonStart)).get()).docs
+          ? (await db.collection('shelter_inspections')
+              .where('date', '>=', firebase.firestore.Timestamp.fromDate(seasonStart))
+              .where('date', '<=', firebase.firestore.Timestamp.fromDate(seasonEnd))
+              .get()).docs
           : [];
         shelterInspections = shelterInspDocs.filter(doc => shelters.has(doc.data().shelter_id)).map(doc => { // this activity's shelters only
           const d = doc.data();
@@ -714,12 +793,16 @@
         .sort((a, b) => b[1] - a[1])
         .slice(0, 5);
       
+      const container = document.getElementById('chart-issues-container');
       if (sorted.length === 0) {
-        document.getElementById('chart-issues').parentElement.innerHTML = 
-          '<p style="text-align: center; color: var(--theme-text-secondary); padding: 2rem;">Aucun problème signalé</p>';
+        if (chartIssues) { chartIssues.destroy(); chartIssues = null; }
+        container.innerHTML = '<p style="text-align: center; color: var(--theme-text-secondary); padding: 2rem;">Aucun problème signalé</p>';
         return;
       }
-      
+
+      // A previous render may have replaced the canvas with the "no issues" message above
+      // (this one is re-run on every season change, not just once): put it back if needed.
+      if (!document.getElementById('chart-issues')) container.innerHTML = '<canvas id="chart-issues"></canvas>';
       const ctx = document.getElementById('chart-issues').getContext('2d');
       if (chartIssues) chartIssues.destroy();
       chartIssues = new Chart(ctx, {

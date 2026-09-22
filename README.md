@@ -3,6 +3,7 @@
 
 Step 1
 - Manage inspection for ski touring, velo and downhill
+- add a sectors selector in the inspection tab to help go faster as there is a lot of trails.
 
 Step 2
 - Manage Infraction with different fault type for ski touring, velo and downhill
