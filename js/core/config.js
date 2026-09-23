@@ -139,7 +139,8 @@ const APP_CONFIG = {
   //   infractions   the fault types and practices offered on the infraction form (id -> label)
   //   publicTitle   what the public status page calls this activity's trails
   //   statsSince    month/day the inspection statistics start counting each year
-  //   mapCenter     GPS centre of the activity's map (distance-from-centre photo check); none = skipped
+  //   mapCenter     GPS centre of the activity's map (distance-from-centre photo check); none = skipped.
+  //                 Ski and bike use the same point: both maps cover Mont Orford.
   networks: {
     ski: {
       id: 'ski', name: 'Ski', icon: '⛷️',
@@ -174,7 +175,7 @@ const APP_CONFIG = {
       features: { shelters: false, snowCondition: false },
       publicTitle: 'État des sentiers de vélo de montagne',
       statsSince: { month: 5, day: 1 }, // 1 May
-      mapCenter: null, // TO PROVIDE with the bike map
+      mapCenter: { lat: 45.310, lon: -72.230 }, // same point as ski: both maps cover Mont Orford
       // TO COMPLETE: the bike fault types and practices (placeholders for now)
       infractions: {
         faults: { 'autres': 'Autres (voir commentaire)' },
