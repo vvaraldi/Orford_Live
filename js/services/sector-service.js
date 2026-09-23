@@ -128,11 +128,14 @@
 
   /**
    * Fills a <select> with a sector's trails (value = trail id, the number is added only when two
-   * names would look the same).
+   * names would look the same). kind (optional): only that kind's trails - the inspection app
+   * uses this to offer only the kind currently shown (Kind.current()); infractions/signalisations
+   * leave it out, since those are for every kind of the sector together.
    */
-  function fillTrails(select, sector, placeholder) {
+  function fillTrails(select, sector, placeholder, kind) {
     var options = [new Option(placeholder, '')];
     var items = sector && sector.items ? sector.items : [];
+    if (kind) items = items.filter(function (i) { return i.kind === kind; });
     var seen = {};
     items.forEach(function (i) { var k = norm(i.name); seen[k] = (seen[k] || 0) + 1; });
     items.forEach(function (i) {

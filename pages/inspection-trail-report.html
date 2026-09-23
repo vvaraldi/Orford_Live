@@ -74,7 +74,8 @@
         <div class="form-section-header"><h2 class="form-section-title">📍 Informations générales</h2></div>
         <div class="form-section-body">
           <div class="form-grid">
-            <div class="form-group"><label class="form-label form-label-required" for="trail-select">Sentier</label><select class="form-select" id="trail-select" required><option value="">Sélectionner un sentier</option></select></div>
+            <div class="form-group"><label class="form-label form-label-required" for="sector-select">Secteur</label><select class="form-select" id="sector-select" required><option value="">Sélectionner un secteur</option></select></div>
+            <div class="form-group"><label class="form-label form-label-required" for="trail-select">Sentier</label><select class="form-select" id="trail-select" required><option value="">Sélectionner d'abord un secteur</option></select></div>
             <div class="form-group"><label class="form-label" for="inspector-name">Inspecteur</label><input type="text" class="form-input" id="inspector-name" readonly><input type="hidden" id="inspector-id"></div>
             <div class="form-group"><label class="form-label form-label-required" for="inspection-date">Date d'inspection</label><input type="date" class="form-input" id="inspection-date" required></div>
             <div class="form-group"><label class="form-label form-label-required" for="inspection-time">Heure d'inspection</label><input type="time" class="form-input" id="inspection-time" required></div>
@@ -148,12 +149,15 @@
   <script src="../js/utils/photo-picker.js"></script>
   <script src="../js/services/photo-service.js"></script>
   <script src="../js/services/trail-service.js"></script>
+  <script src="../js/services/sector-service.js"></script>
 
   <script>
     let selectedFiles = [], currentTrailStatus = null, storage = null;
     let photoPicker = null;
     const form = document.getElementById('trail-inspection-form');
+    const sectorSelect = document.getElementById('sector-select');
     const trailSelect = document.getElementById('trail-select');
+    let sectors = []; // sectors and their trails, from Firestore (SectorService)
     const inspectorName = document.getElementById('inspector-name');
     const inspectorId = document.getElementById('inspector-id');
     const inspectionDate = document.getElementById('inspection-date');
@@ -189,7 +193,7 @@
           }
           // Snow conditions only exist for activities that have them (ski)
           document.getElementById('snow-condition-group').style.display = Network.feature('snowCondition') ? '' : 'none';
-          await loadTrails();
+          await loadSectors();
         }
       });
     }
@@ -205,6 +209,7 @@
       document.getElementById('cancel-action').addEventListener('click', () => {
         if (confirm('Êtes-vous sûr de vouloir annuler?')) window.location.href = 'inspection-dashboard.html';
       });
+      sectorSelect.addEventListener('change', populateTrails);
       trailSelect.addEventListener('change', updateStatusOptionsForTrail);
       
       // Initialize PhotoPicker for smart platform detection (Android bottom sheet, iOS/Desktop direct)
@@ -231,24 +236,24 @@
       fileInput.addEventListener('change', e => { processFiles(Array.from(e.target.files)); fileInput.value = ''; });
     }
 
-    async function loadTrails() {
+    // Sector first, then trail (like the infraction/signalisation forms): SectorService.load()
+    // reads every trail once and groups them by sector; the trail list only ever offers the
+    // kind currently shown (Kind.current() - kind.js + header switcher). A trail with no sector
+    // is not reachable here, same limitation as those other forms.
+    async function loadSectors() {
       try {
-        const snapshot = await db.collection('trails').get();
-        trailSelect.innerHTML = '<option value="">Sélectionner un sentier</option>';
-        snapshot.docs
-          .map(doc => ({ id: doc.id, ...doc.data() }))
-          // this activity's inspected trails, not hidden, of the kind shown (kind.js + header switcher)
-          .filter(t => Network.matches(t) && TrailService.isActive(t) && TrailService.kindOf(t) === Kind.current())
-          .sort((a, b) => String(a.name).localeCompare(String(b.name), 'fr'))
-          .forEach(t => {
-            const opt = document.createElement('option');
-            opt.value = t.id;
-            opt.textContent = TrailService.describe(t); // name (difficulty · length), the last two only when known
-            opt.dataset.name = t.name;
-            opt.dataset.status = t.status || 'unknown';
-            trailSelect.appendChild(opt);
-          });
-      } catch (e) { console.error('Error loading trails:', e); showError('Erreur lors du chargement des sentiers'); }
+        sectors = await SectorService.load();
+      } catch (e) {
+        console.error('Error loading sectors:', e);
+        showError('Impossible de charger les secteurs. Rechargez la page.');
+      }
+      SectorService.fillSectors(sectorSelect, sectors, 'Sélectionner un secteur');
+    }
+
+    function populateTrails() {
+      const sector = SectorService.find(sectors, sectorSelect.value);
+      SectorService.fillTrails(trailSelect, sector, 'Sélectionner un sentier', Kind.current());
+      updateStatusOptionsForTrail();
     }
 
     async function updateStatusOptionsForTrail() {
@@ -373,16 +378,20 @@
         // Save inspector info before reset
         const savedInspectorName = inspectorName.value;
         const savedInspectorId = inspectorId.value;
-        setTimeout(() => { 
-          form.reset(); 
+        setTimeout(() => {
+          form.reset();
           // Restore inspector info
           inspectorName.value = savedInspectorName;
           inspectorId.value = savedInspectorId;
-          selectedFiles = []; 
-          previewContainer.innerHTML = ''; 
-          currentTrailStatus = null; 
-          setCurrentDateTime(); 
-          hideMessages(); 
+          // form.reset() alone would leave the trail list showing whichever sector was last
+          // picked (its options were swapped in by fillTrails, not the original placeholder)
+          SectorService.fillSectors(sectorSelect, sectors, 'Sélectionner un secteur');
+          trailSelect.innerHTML = '<option value="">Sélectionner d\'abord un secteur</option>';
+          selectedFiles = [];
+          previewContainer.innerHTML = '';
+          currentTrailStatus = null;
+          setCurrentDateTime();
+          hideMessages();
           document.getElementById('status-label').innerHTML = 'Statut du sentier post inspection';
           setStatusLabels('🟢 À ouvrir', '🔴 À fermer');
           renderIssues(null);

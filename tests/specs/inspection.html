@@ -89,12 +89,15 @@
   }
 
   if (PAGE === 'inspection-trail-report' && !downhill) {
-    ok('trail list = this activity\'s inspected trails of the shown kind only (ski defaults to Montée: downhill runs not offered)', J(opts(trailSelect)) === J(bike ? ['', 'bike_2', 'bike_1'] : ['', 'trail_2', 'trail_1']), opts(trailSelect));
-    ok('trail picker text: name + difficulty in the new words + length only when known', J([...trailSelect.options].slice(1).map(o => o.textContent)) === J(bike ? ['Descente (Noire · 4 km)', 'Piste verte (Verte · 3 km)'] : ['Adams (Noire · 2 km)', 'La tortue (Verte · 1.1 km)']), [...trailSelect.options].map(o => o.textContent));
+    ok('sector list: this activity\'s sectors (like the infraction/signalisation forms)', J(opts(sectorSelect)) === J(bike ? ['', 'sentiers-velo'] : ['', 'mont-orford', 'mont-giroux-nord']), opts(sectorSelect));
+    ok('no sector chosen yet: trail list is just the placeholder, no checklist', opts(trailSelect).length === 1 && document.getElementById('issues-hint').hidden === false && document.getElementById('issues-group').hidden === true, opts(trailSelect));
     const snow = document.getElementById('snow-condition-group');
     ok('snow condition question only for ski', (snow.style.display === 'none') === bike, snow.style.display);
-    ok('no trail selected yet: hint shown, no checklist', document.getElementById('issues-hint').hidden === false && document.getElementById('issues-group').hidden === true, document.getElementById('issues-group').innerHTML);
-    trailSelect.value = bike ? 'bike_1' : 'trail_1';
+    sectorSelect.value = bike ? 'sentiers-velo' : 'mont-orford';
+    sectorSelect.dispatchEvent(new Event('change'));
+    ok('trail list = this sector\'s trails of the shown kind only (La tortue has no sector: not offered here either, same limitation as infractions/signalisations)', J(opts(trailSelect)) === J(bike ? ['', 'bike_2', 'bike_1'] : ['', 'trail_2']), opts(trailSelect));
+    ok('trail picker text: plain name (sector pickers don\'t show difficulty/length; no clash here so no number/kind suffix either)', J([...trailSelect.options].slice(1).map(o => o.textContent)) === J(bike ? ['Descente', 'Piste verte'] : ['Adams']), [...trailSelect.options].map(o => o.textContent));
+    trailSelect.value = bike ? 'bike_1' : 'trail_2';
     trailSelect.dispatchEvent(new Event('change'));
     await wait(300);
     const expectedIssues = APP_CONFIG.trailKinds[bike ? 'bike' : 'uphill'].issues;
@@ -107,11 +110,15 @@
     const w = writesOf('trail_inspections');
     ok('inspection saved with network', w.length === 1 && w[0].network === (bike ? 'bike' : 'ski'), w);
     ok('snow condition saved for ski, ignored for bike', bike ? w[0].snow_condition === null : w[0].snow_condition === 'good', w[0] && w[0].snow_condition);
+    ok('changing sector clears the trail selection and the checklist', (() => { sectorSelect.value = ''; sectorSelect.dispatchEvent(new Event('change')); return opts(trailSelect).length === 1 && document.getElementById('issues-hint').hidden === false; })());
   }
 
   if (PAGE === 'inspection-trail-report' && downhill) {
-    // Started on Descente (?kind=downhill): the picker offers the downhill runs, not the uphill trails
-    ok('downhill: trail list is the downhill runs only', J(opts(trailSelect)) === J(['', 'run_2', 'run_1']), opts(trailSelect));
+    // Started on Descente (?kind=downhill): sector first, same as Montée, then the downhill runs
+    // of that sector - not the uphill trails, even though they share the same sector.
+    sectorSelect.value = 'mont-orford';
+    sectorSelect.dispatchEvent(new Event('change'));
+    ok('downhill: trail list is that sector\'s downhill runs only', J(opts(trailSelect)) === J(['', 'run_2', 'run_1']), opts(trailSelect));
     trailSelect.value = 'run_1';
     trailSelect.dispatchEvent(new Event('change'));
     await wait(300);
