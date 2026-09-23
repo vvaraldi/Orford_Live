@@ -89,15 +89,17 @@
   }
 
   if (PAGE === 'inspection-trail-report' && !downhill) {
-    ok('sector list: this activity\'s sectors (like the infraction/signalisation forms)', J(opts(sectorSelect)) === J(bike ? ['', 'sentiers-velo'] : ['', 'mont-orford', 'mont-giroux-nord']), opts(sectorSelect));
-    ok('no sector chosen yet: trail list is just the placeholder, no checklist', opts(trailSelect).length === 1 && document.getElementById('issues-hint').hidden === false && document.getElementById('issues-group').hidden === true, opts(trailSelect));
+    // Montée (and bike) each have exactly one sector in this mock ("Randonnée alpine" in
+    // production, "mont-orford"/"sentiers-velo" here): a sector step would never narrow anything
+    // down, so it is skipped - flat, alphabetical list instead, orphans included (La tortue,
+    // which has no sector at all, is reachable here - unlike in the sector-first case below).
+    ok('single-sector kind: the sector step is skipped', document.getElementById('sector-group').hidden === true, document.getElementById('sector-group').hidden);
+    ok('trail list = this activity\'s inspected trails of the shown kind, flat, orphans included', J(opts(trailSelect)) === J(bike ? ['', 'bike_2', 'bike_1'] : ['', 'trail_2', 'trail_1']), opts(trailSelect));
+    ok('trail picker text: name + difficulty in the new words + length only when known (the flat-list style, not the sector picker\'s plain-name one)', J([...trailSelect.options].slice(1).map(o => o.textContent)) === J(bike ? ['Descente (Noire · 4 km)', 'Piste verte (Verte · 3 km)'] : ['Adams (Noire · 2 km)', 'La tortue (Verte · 1.1 km)']), [...trailSelect.options].map(o => o.textContent));
     const snow = document.getElementById('snow-condition-group');
     ok('snow condition question only for ski', (snow.style.display === 'none') === bike, snow.style.display);
-    sectorSelect.value = bike ? 'sentiers-velo' : 'mont-orford';
-    sectorSelect.dispatchEvent(new Event('change'));
-    ok('trail list = this sector\'s trails of the shown kind only (La tortue has no sector: not offered here either, same limitation as infractions/signalisations)', J(opts(trailSelect)) === J(bike ? ['', 'bike_2', 'bike_1'] : ['', 'trail_2']), opts(trailSelect));
-    ok('trail picker text: plain name (sector pickers don\'t show difficulty/length; no clash here so no number/kind suffix either)', J([...trailSelect.options].slice(1).map(o => o.textContent)) === J(bike ? ['Descente', 'Piste verte'] : ['Adams']), [...trailSelect.options].map(o => o.textContent));
-    trailSelect.value = bike ? 'bike_1' : 'trail_2';
+    ok('no trail selected yet: hint shown, no checklist', document.getElementById('issues-hint').hidden === false && document.getElementById('issues-group').hidden === true, document.getElementById('issues-group').innerHTML);
+    trailSelect.value = bike ? 'bike_1' : 'trail_1';
     trailSelect.dispatchEvent(new Event('change'));
     await wait(300);
     const expectedIssues = APP_CONFIG.trailKinds[bike ? 'bike' : 'uphill'].issues;
@@ -110,15 +112,30 @@
     const w = writesOf('trail_inspections');
     ok('inspection saved with network', w.length === 1 && w[0].network === (bike ? 'bike' : 'ski'), w);
     ok('snow condition saved for ski, ignored for bike', bike ? w[0].snow_condition === null : w[0].snow_condition === 'good', w[0] && w[0].snow_condition);
-    ok('changing sector clears the trail selection and the checklist', (() => { sectorSelect.value = ''; sectorSelect.dispatchEvent(new Event('change')); return opts(trailSelect).length === 1 && document.getElementById('issues-hint').hidden === false; })());
   }
 
   if (PAGE === 'inspection-trail-report' && downhill) {
-    // Started on Descente (?kind=downhill): sector first, same as Montée, then the downhill runs
-    // of that sector - not the uphill trails, even though they share the same sector.
+    // Started on Descente (?kind=downhill): today's mock also gives downhill only one sector
+    // (mont-orford), so it is ALSO the flat-list case here, same reasoning as Montée above -
+    // just happens to list the same 2 runs as the old sector-agnostic assertion did.
+    ok('downhill also has only one sector in this mock: sector step skipped, flat list', document.getElementById('sector-group').hidden === true && J(opts(trailSelect)) === J(['', 'run_2', 'run_1']), [document.getElementById('sector-group').hidden, opts(trailSelect)]);
+
+    // ---- Force the OTHER branch: once a kind spans more than one sector, the sector step must
+    // appear. Inject a second sector + a downhill trail in it (nothing else in the mock touched),
+    // force SectorService's per-page cache to refresh, then re-run the page's own loadSectors().
+    window.__data.sectors.push({ id: 'test-extra-sector', name: 'Secteur test', network: 'ski', order: 99, aliases: [] });
+    window.__data.trails.push({ id: 'run_extra', name: 'Piste test', kind: 'downhill', network: 'ski', sector: 'test-extra-sector', status: 'open' });
+    await SectorService.loadAll(true);
+    await SectorService.loadTrails(true);
+    await loadSectors();
+    ok('once downhill spans 2 sectors, the sector step appears', document.getElementById('sector-group').hidden === false, document.getElementById('sector-group').hidden);
+    ok('the new sector is offered alongside the existing one', opts(sectorSelect).includes('mont-orford') && opts(sectorSelect).includes('test-extra-sector'), opts(sectorSelect));
+    sectorSelect.value = 'test-extra-sector';
+    sectorSelect.dispatchEvent(new Event('change'));
+    ok('picking the new sector shows only its own downhill trail', J(opts(trailSelect)) === J(['', 'run_extra']), opts(trailSelect));
+
     sectorSelect.value = 'mont-orford';
     sectorSelect.dispatchEvent(new Event('change'));
-    ok('downhill: trail list is that sector\'s downhill runs only', J(opts(trailSelect)) === J(['', 'run_2', 'run_1']), opts(trailSelect));
     trailSelect.value = 'run_1';
     trailSelect.dispatchEvent(new Event('change'));
     await wait(300);

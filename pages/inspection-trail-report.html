@@ -74,7 +74,7 @@
         <div class="form-section-header"><h2 class="form-section-title">📍 Informations générales</h2></div>
         <div class="form-section-body">
           <div class="form-grid">
-            <div class="form-group"><label class="form-label form-label-required" for="sector-select">Secteur</label><select class="form-select" id="sector-select" required><option value="">Sélectionner un secteur</option></select></div>
+            <div class="form-group" id="sector-group"><label class="form-label form-label-required" for="sector-select">Secteur</label><select class="form-select" id="sector-select" required><option value="">Sélectionner un secteur</option></select></div>
             <div class="form-group"><label class="form-label form-label-required" for="trail-select">Sentier</label><select class="form-select" id="trail-select" required><option value="">Sélectionner d'abord un secteur</option></select></div>
             <div class="form-group"><label class="form-label" for="inspector-name">Inspecteur</label><input type="text" class="form-input" id="inspector-name" readonly><input type="hidden" id="inspector-id"></div>
             <div class="form-group"><label class="form-label form-label-required" for="inspection-date">Date d'inspection</label><input type="date" class="form-input" id="inspection-date" required></div>
@@ -155,9 +155,11 @@
     let selectedFiles = [], currentTrailStatus = null, storage = null;
     let photoPicker = null;
     const form = document.getElementById('trail-inspection-form');
+    const sectorGroup = document.getElementById('sector-group');
     const sectorSelect = document.getElementById('sector-select');
     const trailSelect = document.getElementById('trail-select');
-    let sectors = []; // sectors and their trails, from Firestore (SectorService)
+    let sectors = [];   // sectors and their trails, from Firestore (SectorService)
+    let allTrails = []; // this activity's active trails - only used when the sector step is skipped
     const inspectorName = document.getElementById('inspector-name');
     const inspectorId = document.getElementById('inspector-id');
     const inspectionDate = document.getElementById('inspection-date');
@@ -236,18 +238,53 @@
       fileInput.addEventListener('change', e => { processFiles(Array.from(e.target.files)); fileInput.value = ''; });
     }
 
-    // Sector first, then trail (like the infraction/signalisation forms): SectorService.load()
-    // reads every trail once and groups them by sector; the trail list only ever offers the
-    // kind currently shown (Kind.current() - kind.js + header switcher). A trail with no sector
-    // is not reachable here, same limitation as those other forms.
+    // Sector first, then trail (like the infraction/signalisation forms) - but ONLY when the
+    // kind currently shown (Kind.current() - kind.js + header switcher) actually has trails in
+    // more than one sector. Today, downhill runs are spread across several real sectors, but
+    // every uphill trail sits in the single catch-all "Randonnée alpine" sector: picking a
+    // sector there would never narrow anything down, so that case skips straight to a flat,
+    // alphabetical list instead - same as before the sector step existed (orphan trails with no
+    // sector included, unlike the sector-first case where they are not reachable).
     async function loadSectors() {
       try {
-        sectors = await SectorService.load();
+        const [sectorList, trailList] = await Promise.all([SectorService.load(), SectorService.loadTrails()]);
+        sectors = sectorList;
+        allTrails = trailList.filter(t => Network.matches(t) && TrailService.isActive(t));
       } catch (e) {
         console.error('Error loading sectors:', e);
         showError('Impossible de charger les secteurs. Rechargez la page.');
       }
-      SectorService.fillSectors(sectorSelect, sectors, 'Sélectionner un secteur');
+      updateTrailPicker();
+    }
+
+    // The sectors that actually hold a trail of the kind currently shown
+    function kindSectors() {
+      return sectors.filter(s => (s.items || []).some(i => i.kind === Kind.current()));
+    }
+
+    function updateTrailPicker() {
+      if (kindSectors().length > 1) {
+        sectorGroup.hidden = false;
+        sectorSelect.required = true;
+        SectorService.fillSectors(sectorSelect, sectors, 'Sélectionner un secteur');
+        trailSelect.innerHTML = '<option value="">Sélectionner d\'abord un secteur</option>';
+      } else {
+        sectorGroup.hidden = true;
+        sectorSelect.required = false;
+        sectorSelect.value = '';
+        trailSelect.innerHTML = '<option value="">Sélectionner un sentier</option>';
+        allTrails
+          .filter(t => TrailService.kindOf(t) === Kind.current())
+          .sort((a, b) => String(a.name).localeCompare(String(b.name), 'fr'))
+          .forEach(t => {
+            const opt = document.createElement('option');
+            opt.value = t.id;
+            opt.textContent = TrailService.describe(t); // name (difficulty · length), the last two only when known
+            opt.dataset.name = t.name;
+            trailSelect.appendChild(opt);
+          });
+      }
+      updateStatusOptionsForTrail();
     }
 
     function populateTrails() {
@@ -384,9 +421,9 @@
           inspectorName.value = savedInspectorName;
           inspectorId.value = savedInspectorId;
           // form.reset() alone would leave the trail list showing whichever sector was last
-          // picked (its options were swapped in by fillTrails, not the original placeholder)
-          SectorService.fillSectors(sectorSelect, sectors, 'Sélectionner un secteur');
-          trailSelect.innerHTML = '<option value="">Sélectionner d\'abord un secteur</option>';
+          // picked (its options were swapped in by fillTrails/updateTrailPicker, not the
+          // original placeholder)
+          updateTrailPicker();
           selectedFiles = [];
           previewContainer.innerHTML = '';
           currentTrailStatus = null;
