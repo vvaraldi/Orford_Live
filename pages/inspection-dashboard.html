@@ -93,6 +93,17 @@
     .inspection-modal__title { font-size: 1.25rem; font-weight: 600; }
     .inspection-modal__close { background: none; border: none; font-size: 1.5rem; cursor: pointer; color: var(--theme-text-secondary); }
     .inspection-modal__body { padding: 1rem; }
+
+    /* Same rules under the .detail-modal names: the shared photo-location pop-up
+       (js/services/photo-map-modal.js) uses that markup, this page its own .inspection-modal one */
+    .detail-modal { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 1000; align-items: center; justify-content: center; padding: 1rem; }
+    .detail-modal.show { display: flex; }
+    .detail-modal__content { background: var(--theme-surface); border-radius: var(--radius-lg); max-width: 600px; width: 100%; max-height: 90vh; overflow: hidden; display: flex; flex-direction: column; }
+    .detail-modal__header { display: flex; align-items: center; justify-content: space-between; padding: 1rem; border-bottom: 1px solid var(--theme-border); }
+    .detail-modal__title { font-size: 1.25rem; font-weight: 600; }
+    .detail-modal__close { background: none; border: none; font-size: 1.5rem; cursor: pointer; color: var(--theme-text-secondary); }
+    .detail-modal__body { padding: 1rem; overflow-y: auto; flex: 1; }
+    .detail-modal__footer { padding: 1rem; border-top: 1px solid var(--theme-border); display: flex; justify-content: flex-end; gap: 1rem; }
     .detail-row { display: flex; justify-content: space-between; padding: 0.5rem 0; border-bottom: 1px solid var(--theme-border); }
     .detail-row:last-child { border-bottom: none; }
     .detail-row__label { color: var(--theme-text-secondary); }
@@ -213,6 +224,7 @@
   <script src="../js/services/photo-service.js"></script>
   <script src="../js/services/trail-service.js"></script>
   <script src="../js/services/map-service.js"></script>
+  <script src="../js/services/photo-map-modal.js"></script>
 
   <script>
     // State
@@ -538,8 +550,10 @@
      * PhotoService.photosFrom() handles every stored format (legacy string
      * arrays, modern objects), so this needs no per-photo shape checks.
      * Shared by both modals below - the markup was previously duplicated.
+     * mapId: the one map (js/services/photo-map-modal.js) a photo of THIS inspection belongs
+     * on - a trail's kind map for a trail inspection, the network's main map for a shelter one.
      */
-    function renderPhotosSection(insp) {
+    function renderPhotosSection(insp, mapId) {
       const photos = PhotoService.photosFrom(insp);
       if (!photos.length) return '';
 
@@ -547,7 +561,7 @@
         const c = p.coordinates;
         let loc = '';
         if (c && c.latitude && c.longitude) {
-          loc = `<div class="photo-location"><a href="#" onclick="openPhotoLocationModal(${c.latitude},${c.longitude});return false;" title="Carte locale">📍 Carte</a> <a href="https://www.google.com/maps?q=${c.latitude},${c.longitude}" target="_blank" rel="noopener noreferrer" title="Google Maps" aria-label="Google Maps">🗺️</a></div>`;
+          loc = `<div class="photo-location"><a href="#" onclick="openPhotoLocationModal(${c.latitude},${c.longitude},['${mapId}']);return false;" title="Carte locale">📍 Carte</a> <a href="https://www.google.com/maps?q=${c.latitude},${c.longitude}" target="_blank" rel="noopener noreferrer" title="Google Maps" aria-label="Google Maps">🗺️</a></div>`;
         }
         return `<div class="photo-item"><img src="${p.url}" class="photo-thumb" onclick="window.open('${p.url}','_blank')">${loc}</div>`;
       }).join('');
@@ -586,7 +600,7 @@
         if (insp.notes && insp.notes.trim()) {
           html += `<div class="detail-section"><div class="detail-section__title">📝 Notes</div><div class="notes-box">${escapeHtml(insp.notes).replace(/\n/g, '<br>')}</div></div>`;
         }
-        html += renderPhotosSection(insp);
+        html += renderPhotosSection(insp, TrailService.mapIdOf(trail));
         body.innerHTML = html;
       }
       document.getElementById('inspection-modal').classList.add('show');
@@ -620,7 +634,7 @@
         if (insp.notes && insp.notes.trim()) {
           html += `<div class="detail-section"><div class="detail-section__title">📝 Notes</div><div class="notes-box">${escapeHtml(insp.notes).replace(/\n/g, '<br>')}</div></div>`;
         }
-        html += renderPhotosSection(insp);
+        html += renderPhotosSection(insp, Network.config().map);
         body.innerHTML = html;
       }
       document.getElementById('inspection-modal').classList.add('show');
@@ -632,52 +646,10 @@
       document.body.style.overflow = '';
     }
 
-    // Photo location modal - using affine transformation from original app
-    const PhotoMapModal = (function() {
-      // GPS -> pixel on the map of the kind currently shown (null when that map has no calibration).
-      // Every listed inspection is already of that kind (see loadDashboardData), so this is always right.
-      const mapId = () => TrailService.mapIdOf(currentKind);
-      const gpsToPixel = (lat, lon) => MapService.gpsToPixel(lat, lon, mapId());
-
-      function open(lat, lon) {
-        // This activity's map cannot place GPS positions (no calibration): open Google Maps instead
-        if (!gpsToPixel(lat, lon)) { window.open(`https://www.google.com/maps?q=${lat},${lon}`, '_blank', 'noopener'); return; }
-        let modal = document.getElementById('photo-map-modal');
-        if (!modal) {
-          document.body.insertAdjacentHTML('beforeend', `
-            <div class="inspection-modal" id="photo-map-modal">
-              <div class="inspection-modal__content" style="max-width:900px;">
-                <div class="inspection-modal__header"><h3 class="inspection-modal__title">📍 Localisation</h3><button class="inspection-modal__close" onclick="PhotoMapModal.close()">×</button></div>
-                <div class="inspection-modal__body" style="padding:0;">
-                  <div style="overflow:auto;max-height:60vh;"><div id="photo-map-wrap" style="position:relative;display:inline-block;"><img src="${MapService.imageUrl(mapId())}" style="display:block;width:auto;height:auto;max-width:none;"><div id="photo-marker" style="position:absolute;width:20px;height:20px;background:red;border:3px solid white;border-radius:50%;transform:translate(-50%,-50%);box-shadow:0 2px 8px rgba(0,0,0,0.4);"></div></div></div>
-                  <div id="photo-coords" style="padding:1rem;background:var(--theme-surface-alt);border-top:1px solid var(--theme-border);"></div>
-                </div>
-                <div style="padding:1rem;display:flex;gap:1rem;justify-content:flex-end;border-top:1px solid var(--theme-border);"><a id="photo-google-link" href="#" target="_blank" rel="noopener noreferrer" class="btn btn-primary">🗺️ Google Maps</a><button class="btn btn-secondary" onclick="PhotoMapModal.close()">Fermer</button></div>
-              </div>
-            </div>
-          `);
-          modal = document.getElementById('photo-map-modal');
-          modal.addEventListener('click', e => { if (e.target.id === 'photo-map-modal') PhotoMapModal.close(); });
-        }
-        const pixel = gpsToPixel(lat, lon);
-        document.getElementById('photo-marker').style.left = pixel.x + 'px';
-        document.getElementById('photo-marker').style.top = pixel.y + 'px';
-        document.getElementById('photo-coords').innerHTML = `<strong>GPS:</strong> ${lat.toFixed(6)}°, ${lon.toFixed(6)}°`;
-        document.getElementById('photo-google-link').href = `https://www.google.com/maps?q=${lat},${lon}`;
-        modal.classList.add('show');
-        document.body.style.overflow = 'hidden';
-        const wrap = document.getElementById('photo-map-wrap').parentElement;
-        wrap.scrollLeft = Math.max(0, pixel.x - wrap.clientWidth/2);
-        wrap.scrollTop = Math.max(0, pixel.y - wrap.clientHeight/2);
-      }
-      function close() {
-        const modal = document.getElementById('photo-map-modal');
-        if (modal) { modal.classList.remove('show'); document.body.style.overflow = ''; }
-      }
-      return { open, close };
-    })();
-    window.openPhotoLocationModal = PhotoMapModal.open;
-    window.PhotoMapModal = PhotoMapModal;
+    // Photo location modal: js/services/photo-map-modal.js (shared with inspection-history.html,
+    // infraction-admin.html, signalisation-admin.html, signalisation-resume.html). Callers here
+    // pass the one map a photo's own trail/shelter belongs on (see renderPhotosSection above) -
+    // no switch, since there is nothing else it could sensibly be shown on.
 
     // Recent inspections
     async function loadRecentInspections() {

@@ -1,0 +1,109 @@
+<script>
+  // ---- mocked Firebase / auth (real page scripts + real network.js/layout.js run unchanged) ----
+  window.__errs = []; window.addEventListener('error', e => window.__errs.push(e.message)); window.addEventListener('unhandledrejection', e => window.__errs.push('rejection: ' + (e.reason && e.reason.message || e.reason)));
+  const Q = new URLSearchParams(location.search);
+  const NET = Q.get('net') || 'ski';             // ski | bike | both
+  const DAY = 86400000;
+  const T = ms => ({ toDate: () => new Date(ms) });
+  const ago = d => T(Date.now() - d * DAY);
+  window.__writes = [];
+  window.__reloads = 0;
+  window.__data = {
+    sectors: [
+      { id: 'mont-orford', name: 'Mont-Orford', network: 'ski', order: 1, aliases: [] },
+      { id: 'mont-giroux-nord', name: 'Mont Giroux Nord', network: 'ski', order: 2, aliases: ['giroux-nord'] },
+      { id: 'sentiers-velo', name: 'Sentiers vélo', network: 'bike', order: 1, aliases: [] }
+    ],
+    trails: [
+      { id: 'trail_1', name: 'La tortue', status: 'open', length: 1.1, difficulty: 'easy', network: 'ski', coordinates: { left: 450, top: 394 } },        // legacy: no kind (uphill default), old difficulty word
+      { id: 'trail_2', name: 'Adams', status: 'closed', length: 2, difficulty: 'hard', network: 'ski', sector: 'mont-orford', coordinates: { left: 300, top: 300 } },
+      { id: 'bike_1', name: 'Piste verte', status: 'open', length: 3, difficulty: 'easy', network: 'bike', sector: 'sentiers-velo', number: 7, coordinates: { left: 100, top: 100 } },
+      { id: 'bike_2', name: 'Descente', status: 'closed', length: 4, difficulty: 'hard', network: 'bike', sector: 'sentiers-velo', coordinates: { left: 200, top: 150 } },
+      // downhill runs: never inspected, so they must not appear in the inspection apps or on the public page
+      { id: 'run_1', name: 'Slalom', kind: 'downhill', status: 'open', difficulty: 'double-black', network: 'ski', sector: 'mont-orford', number: 20, coordinates: { left: 500, top: 500 } },
+      { id: 'run_2', name: 'Maxi', kind: 'downhill', difficulty: 'black', network: 'ski', sector: 'mont-orford', number: 26 },   // no position yet
+      // a hidden (archived) uphill trail: gone from the apps, kept in the history
+      { id: 'trail_3', name: 'Ancien sentier', kind: 'uphill', status: 'open', difficulty: 'blue', network: 'ski', sector: 'mont-orford', number: 9, archived: true, coordinates: { left: 600, top: 200 } }
+      // trail_1 (La tortue) has no sector: it is not offered in the infraction / signalisation forms
+    ],
+    shelters: [
+      { id: 'shelter_1', name: 'Abri Nord', network: 'ski', coordinates: { left: 350, top: 250 } }
+    ],
+    trail_inspections: [
+      { id: 'I1', trail_id: 'trail_1', condition: 'good', trail_status: 'open', date: ago(1), inspector_name: 'Test', inspector_id: 'u1', network: 'ski', photos: [] },
+      { id: 'I2', trail_id: 'trail_2', condition: 'critical', trail_status: 'closed', date: ago(2), inspector_name: 'Test', inspector_id: 'u1', network: 'ski', photos: [] },
+      { id: 'IA1', trail_id: 'trail_3', condition: 'good', trail_status: 'open', date: ago(3), inspector_name: 'Test', inspector_id: 'u1', network: 'ski', photos: [] },   // on the hidden trail
+      { id: 'IB1', trail_id: 'bike_1', condition: 'warning', trail_status: 'open', date: ago(1), inspector_name: 'Test', inspector_id: 'u1', network: 'bike', photos: [] }
+    ],
+    shelter_inspections: [
+      { id: 'SI1', shelter_id: 'shelter_1', condition: 'good', date: ago(1), inspector_name: 'Test', inspector_id: 'u1', photos: [] }
+    ],
+    inspectors: [ { id: 'u1', name: 'Test' } ],
+    infractions: [
+      { id: 'INF1', patrolId: 'u1', patrolName: 'Test', offenderName: 'Jean', fault: 'downhill', sector: 'giroux-nord', trail: 'Magog', offPiste: false, archived: false, photos: [], network: 'ski', createdAt: ago(3), offenceTimestamp: ago(3) },   // old format: name only, no trail record named "Magog" any more (tests the "(ancienne piste)" fallback)
+      { id: 'INF2', patrolId: 'u1', patrolName: 'Test', offenderName: 'Luc', fault: 'saut-dangereux', sector: 'mont-orford', trail: 'Maxi', trailId: 'run_2', offPiste: false, archived: false, photos: [], network: 'ski', createdAt: ago(4), offenceTimestamp: ago(4) },   // new format: has a trailId
+      { id: 'INF3', patrolId: 'u1', patrolName: 'Test', offenderName: 'Ann', fault: 'downhill', sector: 'mont-orford', trail: 'MAXI', offPiste: false, archived: false, photos: [], network: 'ski', createdAt: ago(5), offenceTimestamp: ago(5) },   // old format: name only, spelled differently
+      { id: 'INF4', patrolId: 'u1', patrolName: 'Test', offenderName: 'Bob', fault: 'downhill', sector: 'mont-orford', trail: 'Ancien nom', offPiste: false, archived: false, photos: [], network: 'ski', createdAt: ago(6), offenceTimestamp: ago(6) },   // old format: a trail that no longer exists
+      { id: 'INFB', patrolId: 'u1', patrolName: 'Test', offenderName: 'Bike Guy', fault: 'autres', sector: 'sentiers-velo', trail: 'Piste verte', offPiste: false, archived: false, photos: [], network: 'bike', createdAt: ago(2), offenceTimestamp: ago(2) }
+    ],
+    signalisations: [
+      { id: 'SIG1', inspectorId: 'u1', inspectorName: 'Test', status: 'ouverte', sector: 'giroux-nord', sectorDisplayName: 'Mont Giroux Nord', trail: 'Magog', comments: 'c', resolved: false, archived: false, network: 'ski', createdAt: ago(3), photos: [] },   // old format: name only, no trail record named "Magog" any more
+      { id: 'SIG2', inspectorId: 'u1', inspectorName: 'Test', status: 'fermee', sector: 'mont-orford', sectorDisplayName: 'Mont-Orford', trail: 'Maxi', trailId: 'run_2', comments: '', resolved: false, archived: false, network: 'ski', createdAt: ago(4), photos: [], coordinates: { latitude: 45.31, longitude: -72.23 } },
+      { id: 'SIGB', inspectorId: 'u1', inspectorName: 'Test', status: 'ouverte', sector: 'sentiers-velo', sectorDisplayName: 'Sentiers vélo', trail: 'Piste verte', comments: '', resolved: false, archived: false, network: 'bike', createdAt: ago(2), photos: [] }
+    ]
+  };
+  const snapOf = arr => ({
+    empty: arr.length === 0, size: arr.length,
+    docs: arr.map(d => ({ id: d.id, ref: { __name: null, __id: d.id }, data: () => { const { id, ...r } = d; return r; } })),
+    forEach(fn) { this.docs.forEach(fn); }
+  });
+  let auto = 0;
+  function query(name) {
+    const api = {
+      where: () => api, orderBy: () => api, limit: () => api,
+      get: async () => {
+        window.__reads = (window.__reads || []).concat(name);
+        if (name === 'sectors' && Q.get('sectorsFail') === '1') throw new Error('permission-denied');
+        const snap = snapOf(window.__data[name] || []); snap.docs.forEach(d => { d.ref.__name = name; }); return snap;
+      },
+      doc: id0 => {
+        const id = id0 || ('auto' + (++auto));
+        return {
+          id, __name: name, __id: id,
+          update: async d => { window.__writes.push([name, id, 'update', d]); const row = (window.__data[name] || []).find(r => r.id === id); if (row) Object.assign(row, d); },
+          set: async d => { window.__writes.push([name, id, 'set', d]); },
+          get: async () => { const row = (window.__data[name] || []).find(r => r.id === id); return { exists: !!row, id, data: () => { if (!row) return {}; const { id: _i, ...r } = row; return r; } }; }
+        };
+      },
+      add: async d => { window.__writes.push([name, null, 'add', d]); return { id: 'new' }; }
+    };
+    return api;
+  }
+  window.db = { collection: query, batch: () => { const ops = []; return { set: (ref, d) => ops.push([ref.__name, ref.__id, 'set', d]), update: (ref, d) => ops.push([ref.__name, ref.__id, 'update', d]), commit: async () => { window.__writes.push(['batch', ops]); } }; } };
+  window.storage = { ref: () => ({}), refFromURL: () => ({ delete: async () => {} }) };
+  window.firebase = { auth: () => ({ currentUser: { uid: 'u1', email: 't@x' } }), storage: () => window.storage, firestore: { FieldValue: { serverTimestamp: () => 'TS', delete: () => 'DEL' }, Timestamp: { fromDate: d => d } } };
+  var currentUser = { uid: 'u1', email: 't@x' };
+  var currentUserData = {
+    uid: 'u1', name: 'Test', role: Q.get('as') === 'system' ? 'system_admin' : (Q.get('as') === 'inspector' ? 'inspector' : 'admin'),
+    networks: NET === 'both' ? ['ski', 'bike'] : [NET],
+    allowInspection: true, allowInfraction: true, allowSignalisation: true
+  };
+  // two-activity user: pick the current one like the header switcher would have
+  if (NET === 'both' && Q.get('choice')) { try { localStorage.setItem('orford-network', JSON.stringify({ id: Q.get('choice'), season: Network.ofSeason() })); } catch (e) {} }
+  else { try { localStorage.removeItem('orford-network'); } catch (e) {} }
+  // never start a test carrying over a kind choice made by a previous test in the same browser profile
+  try { localStorage.removeItem('orford-kind'); } catch (e) {}
+  // ?kind=downhill: start already on that kind, like a user who switched then reloaded
+  if (Q.get('kind')) { try { localStorage.setItem('orford-kind', JSON.stringify({ network: NET === 'both' ? (Q.get('choice') || 'ski') : NET, kind: Q.get('kind') })); } catch (e) {} }
+  Network.reload = () => { window.__reloads++; };
+  // what the real auth.js does once the user is known
+  function checkAuthStatus(opts) {
+    if (!Network.setUser(currentUserData)) { document.body.textContent = 'ACCESS DENIED (no activity)'; return; }
+    const l = document.getElementById('loading'); if (l) l.style.display = 'none';
+    const m = document.getElementById('main-content'); if (m) m.style.display = 'block';
+    if (typeof updateUIForUser === 'function') updateUIForUser(currentUserData);
+    return opts.onAuthenticated(currentUserData);
+  }
+  function onFirebaseReady(cb) { cb(); }
+  function getAuthErrorMessage(e) { return e.message; }
+</script>

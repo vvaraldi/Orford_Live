@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html><head><meta charset="utf-8"><title>Kind tests</title></head>
+<body>
+<pre id="out">running...</pre>
+<script src="/js/core/config.js"></script>
+<script src="/js/core/network.js"></script>
+<script src="/js/core/kind.js"></script>
+<script>
+(() => {
+  const out = []; const J = JSON.stringify;
+  const ok = (n, c, x) => out.push((c ? 'PASS ' : 'FAIL ') + n + (c ? '' : ' :: ' + J(x)));
+  let reloads = 0;
+  Network.reload = () => { reloads++; };
+  const asSystemAdmin = () => Network.setUser({ role: 'system_admin', networks: ['ski', 'bike'] });
+  const clear = () => { try { localStorage.removeItem('orford-kind'); localStorage.removeItem('orford-network'); } catch (e) {} };
+
+  // ---- default: no persisted choice ----
+  // Network.current() picks by season otherwise; force ski regardless of today's actual date.
+  clear();
+  localStorage.setItem('orford-network', J({ id: 'ski', season: Network.ofSeason() }));
+  asSystemAdmin();
+  ok('ski, no persisted choice: defaults to the first inspectionKind (uphill)', Network.current() === 'ski' && Kind.current() === 'uphill', Kind.current());
+  ok('ids() returns the activity\'s inspectionKinds', J(Kind.ids()) === J(['uphill', 'downhill']), Kind.ids());
+
+  // ---- a persisted choice for the SAME network is honoured ----
+  clear();
+  localStorage.setItem('orford-network', J({ id: 'ski', season: Network.ofSeason() }));
+  localStorage.setItem('orford-kind', J({ network: 'ski', kind: 'downhill' }));
+  asSystemAdmin();
+  ok('a persisted choice for the current network is honoured', Network.current() === 'ski' && Kind.current() === 'downhill', Kind.current());
+
+  // ---- a persisted choice for a DIFFERENT network is ignored ----
+  clear();
+  localStorage.setItem('orford-network', J({ id: 'ski', season: Network.ofSeason() }));
+  localStorage.setItem('orford-kind', J({ network: 'bike', kind: 'downhill' })); // wrong network (also not a bike kind)
+  asSystemAdmin();
+  ok('a persisted choice saved for another network is ignored (falls back to default)', Network.current() === 'ski' && Kind.current() === 'uphill', Kind.current());
+
+  // ---- an invalid/unknown kind is ignored ----
+  clear();
+  localStorage.setItem('orford-network', J({ id: 'ski', season: Network.ofSeason() }));
+  localStorage.setItem('orford-kind', J({ network: 'ski', kind: 'sideways' }));
+  asSystemAdmin();
+  ok('an unknown kind value is ignored (falls back to default)', Network.current() === 'ski' && Kind.current() === 'uphill', Kind.current());
+
+  // ---- bike: a single kind, always itself, never a switcher's worth of ids ----
+  clear();
+  localStorage.setItem('orford-network', J({ id: 'bike', season: Network.ofSeason() }));
+  asSystemAdmin();
+  ok('bike: one kind only, current() is simply that one', Network.current() === 'bike' && Kind.current() === 'bike' && J(Kind.ids()) === J(['bike']), [Kind.current(), Kind.ids()]);
+
+  // ---- set(): validation and the reload hook ----
+  clear();
+  localStorage.setItem('orford-network', J({ id: 'ski', season: Network.ofSeason() }));
+  asSystemAdmin();
+  reloads = 0;
+  Kind.set('not-a-kind');
+  ok('set(): an invalid kind is a no-op (no write, no reload)', reloads === 0 && localStorage.getItem('orford-kind') === null, [reloads, localStorage.getItem('orford-kind')]);
+  Kind.set(Kind.current());
+  ok('set(): the same kind already shown is a no-op', reloads === 0 && localStorage.getItem('orford-kind') === null, reloads);
+  Kind.set('downhill');
+  const saved = JSON.parse(localStorage.getItem('orford-kind') || 'null');
+  ok('set(): a valid different kind is persisted (tied to the network) and reloads', reloads === 1 && saved && saved.network === 'ski' && saved.kind === 'downhill', [reloads, saved]);
+
+  document.getElementById('out').textContent = out.join('\n');
+})();
+</script>
+</body></html>

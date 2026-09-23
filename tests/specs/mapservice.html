@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html><head><meta charset="utf-8"><title>MapService tests</title></head>
+<body>
+<pre id="out">running...</pre>
+<script src="/js/core/config.js"></script>
+<script src="/js/core/network.js"></script>
+<script src="/js/services/map-service.js"></script>
+<script>
+(async () => {
+  const out = []; const J = JSON.stringify;
+  const ok = (n, c, x) => out.push((c ? 'PASS ' : 'FAIL ') + n + (c ? '' : ' :: ' + J(x)));
+  const near = (a, b, tol) => Math.abs(a - b) <= tol;
+  const wait = ms => new Promise(r => setTimeout(r, ms));
+
+  // ---- 1. Ski parity with the OLD conversion (Cramer's rule on the 3 corners) ----
+  function oldSolve(m) {
+    const det = m[0][0] * (m[1][1] * m[2][2] - m[1][2] * m[2][1]) - m[0][1] * (m[1][0] * m[2][2] - m[1][2] * m[2][0]) + m[0][2] * (m[1][0] * m[2][1] - m[1][1] * m[2][0]);
+    const detX = m[0][3] * (m[1][1] * m[2][2] - m[1][2] * m[2][1]) - m[0][1] * (m[1][3] * m[2][2] - m[1][2] * m[2][3]) + m[0][2] * (m[1][3] * m[2][1] - m[1][1] * m[2][3]);
+    const detY = m[0][0] * (m[1][3] * m[2][2] - m[1][2] * m[2][3]) - m[0][3] * (m[1][0] * m[2][2] - m[1][2] * m[2][0]) + m[0][2] * (m[1][0] * m[2][3] - m[1][3] * m[2][0]);
+    const detZ = m[0][0] * (m[1][1] * m[2][3] - m[1][3] * m[2][1]) - m[0][1] * (m[1][0] * m[2][3] - m[1][3] * m[2][0]) + m[0][3] * (m[1][0] * m[2][1] - m[1][1] * m[2][0]);
+    return [detX / det, detY / det, detZ / det];
+  }
+  const sk = APP_CONFIG.maps.ski;
+  const c = { topLeft: { lat: 45.296611, lon: -72.243361 }, topRight: { lat: 45.325861, lon: -72.249972 }, bottomLeft: { lat: 45.299444, lon: -72.205667 } }; // the corners that used to be in config.js
+  ok('config.js no longer holds a calibration; 3 maps: ski, ski-downhill, bike', !Object.values(APP_CONFIG.maps).some(m => 'calibration' in m) && J(Object.keys(APP_CONFIG.maps)) === J(['ski', 'ski-downhill', 'bike']));
+  ok('map ids: an activity id resolves to its main map, a map id to itself', MapService.keyOf('ski') === 'ski' && MapService.keyOf('bike') === 'bike' && MapService.keyOf('ski-downhill') === 'ski-downhill' && MapService.mapOf('ski-downhill').width === 1670 && MapService.mapOf('ski-downhill').height === 736);
+  const docs = {};
+  const writes = [];
+  window.firebase = { firestore: { FieldValue: { serverTimestamp: () => 'TS' } } };
+  window.db = { collection: name => ({
+    get: async () => ({ forEach: fn => Object.keys(docs).forEach(id => fn({ id, data: () => docs[id] })) }),
+    doc: id => ({ set: async data => { writes.push({ name, id, data }); } })
+  }) };
+  ok('nothing saved yet: ski cannot be located', MapService.canLocate('ski') === false && MapService.definition('ski') === null);
+  docs.ski = { mode: 'affine', width: 800, height: 700, points: [{ x: 0, y: 0, ...c.topLeft }, { x: 800, y: 0, ...c.topRight }, { x: 0, y: 700, ...c.bottomLeft }] };
+  await MapService.load(true);
+  const p1 = { ...c.topLeft, x: 0, y: 0 }, p2 = { ...c.topRight, x: sk.width, y: 0 }, p3 = { ...c.bottomLeft, x: 0, y: sk.height };
+  const cx = oldSolve([[p1.lat, p1.lon, 1, p1.x], [p2.lat, p2.lon, 1, p2.x], [p3.lat, p3.lon, 1, p3.x]]);
+  const cy = oldSolve([[p1.lat, p1.lon, 1, p1.y], [p2.lat, p2.lon, 1, p2.y], [p3.lat, p3.lon, 1, p3.y]]);
+  const oldPix = (lat, lon) => { const x = Math.round(cx[0] * lat + cx[1] * lon + cx[2]), y = Math.round(cy[0] * lat + cy[1] * lon + cy[2]); return { x: Math.max(0, Math.min(sk.width, x)), y: Math.max(0, Math.min(sk.height, y)) }; };
+  const samples = [[45.310, -72.230], [45.30, -72.22], [45.32, -72.24], [45.3145, -72.2333], [45.2981, -72.2101], [45.5, -72.5], [45.0, -72.0]];
+  const diffs = samples.map(([la, lo]) => { const a = oldPix(la, lo), b = MapService.gpsToPixel(la, lo, 'ski'); return b ? Math.max(Math.abs(a.x - b.x), Math.abs(a.y - b.y)) : 999; });
+  ok('ski: new conversion equals the old one on ' + samples.length + ' samples (max diff px)', Math.max(...diffs) <= 1, diffs);
+  ok('ski: canLocate once its calibration is loaded', MapService.canLocate('ski') === true);
+  ok('ski: definition is the saved one, 3 points, affine', (() => { const d = MapService.definition('ski'); return d.mode === 'affine' && d.points.length === 3; })(), MapService.definition('ski'));
+  ok('bike: no calibration -> cannot locate, gpsToPixel null', MapService.canLocate('bike') === false && MapService.gpsToPixel(45.3, -72.2, 'bike') === null);
+  ok('bike: definition null', MapService.definition('bike') === null);
+
+  // ---- 2. Round trip GPS -> pixel -> GPS ----
+  const rt = samples.slice(0, 5).map(([la, lo]) => { const t = MapService.fit(MapService.definition('ski').points, 'affine'); const px = MapService.apply(t, la, lo); const g = MapService.unapply(t, px.x, px.y); return Math.max(Math.abs(g.lat - la), Math.abs(g.lon - lo)); });
+  ok('ski affine: pixel -> GPS -> back within 1e-9 deg', Math.max(...rt) < 1e-9, rt);
+  ok('pixelToGps of the image centre is inside the ski area', (() => { const g = MapService.pixelToGps(400, 350, 'ski'); return g && g.lat > 45.29 && g.lat < 45.33 && g.lon < -72.20 && g.lon > -72.26; })(), MapService.pixelToGps(400, 350, 'ski'));
+
+  // ---- 3. Perspective (4 points) recovers a known projective map ----
+  const lat0 = 45.30, lon0 = -72.24;
+  const truth = (lat, lon) => { // a made-up perspective view of the area
+    const X = (lon - lon0) * 100, Y = (lat - lat0) * 100; // ~ 0..4 range
+    const w = 1 + 0.15 * X - 0.22 * Y;
+    return { x: (300 * X + 60 * Y + 40) / w, y: (-25 * X + 380 * Y + 20) / w };
+  };
+  const geoPts = [[45.296, -72.245], [45.296, -72.205], [45.326, -72.212], [45.322, -72.247]];
+  const pts4 = geoPts.map(([la, lo]) => { const p = truth(la, lo); return { x: p.x, y: p.y, lat: la, lon: lo }; });
+  const t4 = MapService.fit(pts4, 'perspective');
+  ok('perspective: fit succeeds', !t4.error, t4);
+  const errs = [[45.31, -72.23], [45.30, -72.21], [45.32, -72.24], [45.305, -72.225]].map(([la, lo]) => { const e = truth(la, lo), g = MapService.apply(t4, la, lo); return g ? Math.hypot(e.x - g.x, e.y - g.y) : 999; });
+  ok('perspective: 4 unseen points land within 0.01 px of the truth', Math.max(...errs) < 0.01, errs);
+  const back = MapService.unapply(t4, MapService.apply(t4, 45.31, -72.23).x, MapService.apply(t4, 45.31, -72.23).y);
+  ok('perspective: inverse round trip', near(back.lat, 45.31, 1e-9) && near(back.lon, -72.23, 1e-9), back);
+  const t3 = MapService.fit(pts4.slice(0, 3), 'affine');
+  const e3 = MapService.apply(t3, 45.31, -72.23), e4 = MapService.apply(t4, 45.31, -72.23), tr = truth(45.31, -72.23);
+  ok('on a perspective map the 4-point fit beats the 3-point one', Math.hypot(e4.x - tr.x, e4.y - tr.y) < Math.hypot(e3.x - tr.x, e3.y - tr.y), { p4: e4, p3: e3, truth: tr });
+
+  // ---- 4. Bad input ----
+  const line3 = [{ x: 0, y: 0, lat: 45.30, lon: -72.24 }, { x: 100, y: 100, lat: 45.31, lon: -72.23 }, { x: 200, y: 200, lat: 45.32, lon: -72.22 }];
+  ok('3 aligned points are refused', !!MapService.fit(line3, 'affine').error, MapService.fit(line3, 'affine'));
+  ok('too few points are refused', !!MapService.fit(line3.slice(0, 2), 'affine').error && !!MapService.fit(line3, 'perspective').error);
+  ok('incomplete point is refused', !!MapService.fit([{ x: 1, y: 2, lat: 45, lon: null }, line3[1], line3[2]], 'affine').error);
+  ok('unknown method is refused', !!MapService.fit(line3, 'other').error);
+  const crossed = [{ x: 0, y: 0, lat: 45.30, lon: -72.24 }, { x: 800, y: 0, lat: 45.30, lon: -72.20 }, { x: 0, y: 700, lat: 45.33, lon: -72.20 }, { x: 800, y: 700, lat: 45.33, lon: -72.24 }];
+  const cr = MapService.fit(crossed, 'perspective');
+  out.push('INFO crossed-order perspective fit -> ' + (cr.error ? 'refused: ' + cr.error : 'accepted (accepted fits still mapped all 4 points in front)'));
+  const four4line = [0, 1, 2, 3].map(i => ({ x: i * 100, y: i * 50, lat: 45.30 + i * 0.01, lon: -72.24 + i * 0.01 }));
+  ok('4 aligned points are refused', !!MapService.fit(four4line, 'perspective').error, MapService.fit(four4line, 'perspective'));
+
+  // ---- 5. Firestore: load, source, stale, save ----
+  docs.bike = { mode: 'perspective', points: pts4.map(p => ({ ...p, x: Math.round(p.x), y: Math.round(p.y) })), width: 1600, height: 919 };
+  docs.ski = { mode: 'affine', points: [{ x: 0, y: 0, lat: 45.3, lon: -72.25 }, { x: 800, y: 0, lat: 45.3, lon: -72.2 }, { x: 0, y: 700, lat: 45.33, lon: -72.25 }], width: 999, height: 999 }; // made for another image size
+  await MapService.load(true);
+  const dBike = MapService.definition('bike');
+  ok('bike: saved calibration is used (perspective, 4 points)', dBike && dBike.mode === 'perspective' && dBike.points.length === 4, dBike);
+  ok('bike: can now locate', MapService.canLocate('bike') === true && !!MapService.gpsToPixel(45.31, -72.23, 'bike'));
+  const dSki = MapService.definition('ski');
+  ok('ski: a saved calibration made for another image size is ignored (stale) -> cannot locate', dSki.stale === true && MapService.canLocate('ski') === false, dSki);
+  await MapService.save('bike', 'affine', pts4, 'uid1');
+  ok('save writes maps/bike with mode, rounded points, size, user', writes.length === 1 && writes[0].name === 'maps' && writes[0].id === 'bike' && writes[0].data.mode === 'affine' && writes[0].data.points.length === 3 && writes[0].data.width === 1600 && writes[0].data.height === 919 && writes[0].data.updatedBy === 'uid1' && writes[0].data.points.every(p => Number.isInteger(p.x) && Number.isInteger(p.y)), writes[0]);
+  ok('after save the new calibration is in force immediately', MapService.definition('bike').mode === 'affine' && MapService.definition('bike').points.length === 3);
+  let refused = null; try { await MapService.save('bike', 'affine', line3, 'uid1'); } catch (e) { refused = e.message; }
+  ok('save refuses an unusable calibration and writes nothing', !!refused && writes.length === 1, refused);
+  let noSize = null; try { await MapService.save('nope', 'affine', pts4, 'u'); } catch (e) { noSize = e.message; }
+  ok('save refuses an unknown map', !!noSize, noSize);
+
+  const wDown = await MapService.save('ski-downhill', 'perspective', pts4.map(p => ({ ...p, x: p.x % 1600, y: p.y % 700 })), 'uid1').then(() => writes.find(w => w.id === 'ski-downhill'));
+  ok('the downhill map is calibrated and saved on its own (maps/ski-downhill, 1670x736), independent of the touring map', !!wDown && wDown.data.width === 1670 && wDown.data.height === 736 && MapService.canLocate('ski-downhill') === true && MapService.definition('ski-downhill').mode === 'perspective', wDown);
+  // a failing read keeps what was loaded
+  window.db = { collection: () => ({ get: async () => { throw new Error('permission-denied'); } }) };
+  const warn = console.warn; let warned = 0; console.warn = () => { warned++; };
+  await MapService.load(true); console.warn = warn;
+  ok('failed Firestore read -> warns and keeps what was loaded', warned === 1 && MapService.canLocate('bike') === true, warned);
+
+  document.getElementById('out').textContent = out.join('\n');
+})().catch(e => { document.getElementById('out').textContent = 'FAIL exception ' + e.message + '\n' + e.stack; });
+</script>
+</body></html>

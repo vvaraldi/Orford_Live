@@ -1,0 +1,27 @@
+<pre id="out" style="position:fixed;left:0;bottom:0;background:#fff;color:#000;font-size:11px;z-index:99999">running...</pre>
+<script>
+(async () => {
+  const out = []; const J = JSON.stringify;
+  const ok = (n, c, x) => out.push((c ? 'PASS ' : 'FAIL ') + n + (c ? '' : ' :: ' + J(x)));
+  const wait = ms => new Promise(r => setTimeout(r, ms));
+  const PAGE = Q.get('page'); const AS = Q.get('as') || 'admin';
+  const opts = el => [...el.options].map(o => o.value);
+  await wait(900);
+  ok('no script errors on load', window.__errs.length === 0, window.__errs);
+  ok('header rendered', !!document.querySelector('header.header') && !!document.getElementById('mobile-nav'));
+  ok('confirm() and alert() are the browser\'s own synchronous ones (ui.js must not replace them with Promise-returning dialogs)', /\[native code\]/.test(Function.prototype.toString.call(window.confirm)) && /\[native code\]/.test(Function.prototype.toString.call(window.alert)) && typeof confirmDialog === 'function' && typeof alertDialog === 'function');
+  ok('current activity set (' + Network.current() + ')', !!Network.current());
+
+  if (PAGE === 'index') {
+    const cards = [...document.querySelectorAll('#app-grid .app-card')].map(c => c.className.match(/app-card--(\w+)/)[1]);
+    ok('portal shows the app cards', cards.includes('inspection') && cards.includes('infraction') && cards.includes('signalisation') && cards.includes('support') && cards.includes('status'), cards);
+  }
+
+  if (PAGE === 'user-management') {
+    const sys = AS === 'system';
+    ok('the temporary data initialisation is gone (no section, no function)', !document.getElementById('backfill-section') && typeof backfillDataNetworks === 'undefined');
+    ok('export activity list: all + own for system admin, own only for admin', JSON.stringify([...document.getElementById('export-network').options].map(o => o.value)) === JSON.stringify(sys ? ['', 'ski', 'bike'] : (NET === 'both' ? ['ski', 'bike'] : [NET])));
+  }
+  document.getElementById('out').textContent = out.join('\n');
+})().catch(e => { document.getElementById('out').textContent = 'HARNESS ERROR ' + e.stack; });
+</script>

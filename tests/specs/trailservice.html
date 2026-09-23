@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html><head><meta charset="utf-8"><title>TrailService tests</title></head>
+<body>
+<pre id="out">running...</pre>
+<script src="/js/core/config.js"></script>
+<script src="/js/core/network.js"></script>
+<script src="/js/services/trail-service.js"></script>
+<script>
+(() => {
+  const out = []; const J = JSON.stringify;
+  const ok = (n, c, x) => out.push((c ? 'PASS ' : 'FAIL ') + n + (c ? '' : ' :: ' + J(x)));
+  const T = TrailService;
+
+  // kinds
+  ok('kind: explicit kind wins', T.kindOf({ kind: 'downhill', network: 'ski' }) === 'downhill');
+  ok('kind: legacy ski trail (no kind) is uphill', T.kindOf({ id: 'trail_1' }) === 'uphill' && T.kindOf({ network: 'ski' }) === 'uphill');
+  ok('kind: legacy bike trail is bike', T.kindOf({ network: 'bike' }) === 'bike');
+  ok('kind: unknown kind value falls back', T.kindOf({ kind: 'weird', network: 'bike' }) === 'bike');
+  ok('kind labels', T.kindLabel('uphill') === 'Montée' && T.kindLabel('downhill') === 'Descente' && T.kindLabel('bike') === 'Vélo');
+
+  // difficulty
+  ok('scales: uphill 3 levels, downhill and bike 4', J(T.scaleOf('uphill')) === J(['green', 'blue', 'black']) && J(T.scaleOf('downhill')) === J(['green', 'blue', 'black', 'double-black']) && J(T.scaleOf('bike')) === J(['green', 'blue', 'black', 'double-black']));
+  ok('difficulty: legacy easy/medium/hard -> green/blue/black', T.difficultyOf({ difficulty: 'easy' }) === 'green' && T.difficultyOf({ difficulty: 'medium' }) === 'blue' && T.difficultyOf({ difficulty: 'hard' }) === 'black');
+  ok('difficulty: new values kept, unknown/missing -> null', T.difficultyOf({ difficulty: 'double-black' }) === 'double-black' && T.difficultyOf({ difficulty: 'x' }) === null && T.difficultyOf({}) === null);
+  ok('difficulty labels', T.difficultyLabel('green') === 'Verte' && T.difficultyLabel('double-black', true) === '⚫⚫ Double noire' && T.difficultyLabel(null) === '');
+
+  // inspected kinds per activity
+  ok('ski: uphill AND downhill inspected, lift not', T.isInspected({ kind: 'uphill', network: 'ski' }, 'ski') === true && T.isInspected({ kind: 'downhill', network: 'ski' }, 'ski') === true && T.isInspected({ kind: 'lift', network: 'ski' }, 'ski') === false);
+  ok('ski: a legacy trail (no kind) is inspected', T.isInspected({ id: 'trail_1' }, 'ski') === true);
+  ok('bike: bike trails inspected, legacy bike too', T.isInspected({ kind: 'bike' }, 'bike') === true && T.isInspected({ network: 'bike' }, 'bike') === true);
+
+  // archived (hidden) trails and maps
+  ok('archived: only archived === true hides a trail', T.isArchived({ archived: true }) === true && T.isArchived({ archived: false }) === false && T.isArchived({}) === false && T.isArchived(null) === false);
+  ok('active = inspected AND not archived (ski: uphill and downhill, not lift)', T.isActive({ kind: 'uphill' }, 'ski') === true && T.isActive({ kind: 'uphill', archived: true }, 'ski') === false && T.isActive({ kind: 'downhill' }, 'ski') === true && T.isActive({ kind: 'lift' }, 'ski') === false && T.isActive({ id: 'trail_1' }, 'ski') === true);
+  ok('an archived trail is still "inspected" (so the history keeps it)', T.isInspected({ kind: 'uphill', archived: true }, 'ski') === true);
+  ok('each kind has its own map: uphill -> ski, downhill -> ski-downhill, bike -> bike', T.mapIdOf('uphill') === 'ski' && T.mapIdOf('downhill') === 'ski-downhill' && T.mapIdOf('bike') === 'bike' && T.mapIdOf({ id: 'trail_1' }) === 'ski' && T.mapIdOf({ network: 'bike' }) === 'bike' && T.mapIdOf({ kind: 'downhill' }) === 'ski-downhill');
+  ok('every kind points at a map that exists', Object.values(APP_CONFIG.trailKinds).every(k => APP_CONFIG.maps[k.map]) && Object.values(APP_CONFIG.networks).every(n => APP_CONFIG.maps[n.map]));
+  ok('issue checklist is per kind, lift has none', T.issuesOf('uphill').length === 5 && T.issuesOf('downhill').length === 5 && T.issuesOf({ kind: 'bike' }).length === 6 && J(T.issuesOf('lift')) === '[]');
+  // lifts (Remontées mécaniques)
+  ok('lift: a kind of its own, no difficulty, never inspected, placed on the downhill map', T.kindOf({ kind: 'lift', network: 'ski' }) === 'lift' && T.kindLabel('lift') === 'Remontée' && J(T.scaleOf('lift')) === '[]' && T.isInspected({ kind: 'lift' }, 'ski') === false && T.isActive({ kind: 'lift' }, 'ski') === false && T.mapIdOf('lift') === 'ski-downhill');
+  ok('ski offers uphill, downhill and lift; bike only bike; reports can be shown on the downhill and touring maps for ski', J(APP_CONFIG.networks.ski.trailKinds) === J(['uphill', 'downhill', 'lift']) && J(APP_CONFIG.networks.bike.trailKinds) === J(['bike']) && J(APP_CONFIG.networks.ski.reportMaps) === J(['ski-downhill', 'ski']) && J(APP_CONFIG.networks.bike.reportMaps) === J(['bike']));
+  ok('new lift ids: lift_1, lift_2...', T.nextId('lift', []) === 'lift_1' && T.nextId('lift', ['lift_1', 'lift_2']) === 'lift_3');
+  // status and condition wording (proposal agreed: Bon état / Attention requise / État critique)
+  ok('status: open/closed/unknown wording and icons', T.statusText('open') === 'Ouvert' && T.statusText('closed') === 'Fermé' && T.statusText('unknown', true) === '❓ Inconnu' && T.statusText('weird') === 'Inconnu');
+  ok('status: only open / closed are recognised', T.statusOf({ status: 'open' }) === 'open' && T.statusOf({ status: 'closed' }) === 'closed' && T.statusOf({ status: 'warning' }) === 'unknown' && T.statusOf({}) === 'unknown');
+  ok('condition wording', T.conditionText('good') === 'Bon état' && T.conditionText('warning') === 'Attention requise' && T.conditionText('critical') === 'État critique' && T.conditionText('not-inspected') === 'Non inspecté' && T.conditionText(undefined) === 'Inconnu');
+  ok('condition icons', T.conditionIcon('good') === '✅' && T.conditionIcon('critical') === '❌' && T.conditionIcon('zzz') === '❓');
+
+  // labels shown to users
+  ok('marker label: number, else id without prefix', T.markerLabel({ id: 'trail_3', number: 7 }) === '7' && T.markerLabel({ id: 'bike_3' }) === '3' && T.markerLabel({ id: 'run_12', number: '' }) === '12' && T.markerLabel({ id: 'x', number: '6A' }) === '6A');
+  ok('describe: name only when nothing else is known (no "undefined km")', T.describe({ name: 'Adams' }) === 'Adams', T.describe({ name: 'Adams' }));
+  ok('describe: name + difficulty + length', T.describe({ name: 'La tortue', difficulty: 'easy', length: 1.1 }) === 'La tortue (Verte · 1.1 km)', T.describe({ name: 'La tortue', difficulty: 'easy', length: 1.1 }));
+  ok('describe: length only / difficulty only', T.describe({ name: 'A', length: 2 }) === 'A (2 km)' && T.describe({ name: 'A', difficulty: 'black' }) === 'A (Noire)');
+
+  // sorting and ids
+  const list = [{ name: 'Zed' }, { name: 'Alpha', number: '10' }, { name: 'Beta', number: '2' }, { name: 'Gamma', number: '2A' }].sort(T.compare).map(t => t.name);
+  ok('sort: numbered first (numeric order), then by name', J(list) === J(['Beta', 'Gamma', 'Alpha', 'Zed']), list);
+  ok('nextId: prefix by kind, one more than the highest', T.nextId('uphill', ['trail_1', 'trail_11', 'bike_2']) === 'trail_12' && T.nextId('downhill', ['trail_1']) === 'run_1' && T.nextId('bike', ['bike_1', 'bike_2']) === 'bike_3');
+  ok('config: no old difficulty words left in the scales', !JSON.stringify(APP_CONFIG.difficultyScales).match(/easy|medium|hard/));
+
+  document.getElementById('out').textContent = out.join('\n');
+})();
+</script>
+</body></html>

@@ -1,0 +1,188 @@
+<pre id="out" style="position:fixed;left:0;bottom:0;background:#fff;color:#000;font-size:11px;z-index:99999">running...</pre>
+<script>
+(async () => {
+  const out = []; const J = JSON.stringify;
+  const ok = (n, c, x) => out.push((c ? 'PASS ' : 'FAIL ') + n + (c ? '' : ' :: ' + J(x)));
+  const wait = ms => new Promise(r => setTimeout(r, ms));
+  const AS_SYS = Q.get('as') === 'system';
+  const $ = id => document.getElementById(id);
+  const type = (input, value) => { input.value = value; input.dispatchEvent(new Event('input', { bubbles: true })); };
+  const change = (input, value) => { input.value = value; input.dispatchEvent(new Event('change', { bubbles: true })); };
+  const choose = change;
+  const clickMap = (x, y) => { const r = $('trail-map').getBoundingClientRect(); $('trail-map').dispatchEvent(new MouseEvent('click', { clientX: r.left + x, clientY: r.top + y, bubbles: true })); };
+  const markers = () => [...document.querySelectorAll('#trail-overlay g')].map(g => g.textContent);
+  // A row of the list as an object (the checkbox column only exists for a system admin)
+  const trs = () => [...document.querySelectorAll('#trail-rows tr.trail-row')];
+  const cells = tr => { const c = [...tr.children]; return AS_SYS ? c.slice(1) : c; };
+  const list = () => trs().map(tr => { const c = cells(tr); return { number: c[0].querySelector('input').value, name: c[1].textContent, sector: c[2].textContent, kind: c[3].textContent, difficulty: c[4].textContent, length: c[5].textContent, status: c[6].textContent, position: c[7].textContent, orphan: tr.classList.contains('is-orphan'), archived: tr.classList.contains('is-archived') }; });
+  const headings = () => [...document.querySelectorAll('#trail-rows tr.trail-group')].map(tr => tr.textContent);
+  const rowOf = name => trs().find(tr => cells(tr)[1].textContent.startsWith(name));
+  const numInput = tr => cells(tr)[0].querySelector('input');
+  const edit = name => { rowOf(name).querySelector('button').click(); };
+  const writesTo = (coll, kind) => window.__writes.filter(x => x[0] === coll && (!kind || x[2] === kind));
+  const batched = () => window.__writes.filter(x => x[0] === 'batch').flatMap(x => x[1]);
+  window.confirm = () => true; // "hide this trail?", "assign the sector?", "run the migration?"
+  await wait(900);
+  ok('no script errors on load', window.__errs.length === 0, window.__errs);
+
+  switchTab('trails');
+  await wait(900);
+
+  // ---- who sees what ----
+  ok('sector panel, bulk bar and checkbox column: system admin only', ['sector-panel', 'trail-bulk', 'trail-th-select'].every(id => $(id).hidden === !AS_SYS), ['sector-panel', 'trail-bulk', 'trail-th-select'].map(id => $(id).hidden));
+  ok('the old separate Secteurs tab is gone', !document.querySelector('[data-tab="sectors"]') && !$('sectors-tab'));
+  ok('network list: the admin\'s activities', J([...$('trail-network').options].map(o => o.value)) === J(AS_SYS || NET === 'both' ? ['ski', 'bike'] : [NET]), [...$('trail-network').options].map(o => o.value));
+
+  // ---- the list, grouped by sector; trails without a sector first and highlighted ----
+  let rows = list();
+  ok('groups: "Sans secteur" first, then the sectors in their order', J(headings()) === J(['⚠ Sans secteur (1)', 'Mont-Orford (3)']), headings());
+  ok('4 active trails; the hidden one is not listed', rows.length === 4 && rows.every(r => !r.archived), rows.map(r => r.name));
+  ok('the sector-less trail is highlighted and says so', rows[0].name === 'La tortue' && rows[0].orphan && rows[0].sector === 'Sans secteur' && rows.slice(1).every(r => !r.orphan), rows.map(r => [r.name, r.orphan, r.sector]));
+  ok('inside a sector: by kind (downhill then uphill), then by number', J(rows.slice(1).map(r => r.name)) === J(['Slalom', 'Maxi', 'Adams']), rows.map(r => r.name));
+  ok('numbers are shown in the list (typed inline), legacy difficulty in the new words, length "-" when unknown', rows[1].number === '20' && rows[2].number === '26' && /Double noire/.test(rows[1].difficulty) && /Verte/.test(rows[0].difficulty) && rows[2].length === '-', rows);
+  ok('orphan banner: 1 trail without a sector, with a way to show it', $('trail-orphan-banner').hidden === false && /1 sentier sans secteur/.test($('trail-orphan-text').textContent) && (AS_SYS || /system admin doit/.test($('trail-orphan-text').textContent)), $('trail-orphan-text').textContent);
+  ok('sector filter: all, without sector, then the activity\'s sectors', J([...$('trail-sector-filter').options].map(o => o.value)) === J(['', '__none', 'mont-orford', 'mont-giroux-nord']), [...$('trail-sector-filter').options].map(o => o.value));
+  choose($('trail-sector-filter'), '__none');
+  ok('filter "Sans secteur"', list().length === 1 && list()[0].name === 'La tortue');
+  choose($('trail-sector-filter'), 'mont-orford');
+  ok('filter by sector', list().length === 3 && list().every(r => r.sector === 'Mont-Orford'));
+  choose($('trail-sector-filter'), '');
+  $('trail-orphan-show').click();
+  ok('"Les afficher" filters on the sector-less trails', $('trail-sector-filter').value === '__none' && list().length === 1);
+  choose($('trail-sector-filter'), '');
+
+  // ---- one map per kind (kinds: uphill, downhill, lift for ski) ----
+  ok('kind filter offers uphill, downhill and lift for ski', J([...$('trail-kind-filter').options].map(o => o.value)) === J(['', 'uphill', 'downhill', 'lift']), [...$('trail-kind-filter').options].map(o => o.value));
+  ok('touring map by default (800 px), title, no size warning', $('trail-image').naturalWidth === 800 && /Carte : Ski - Montée/.test($('trail-map-title').textContent) && $('trail-size-warning').hidden === true, [$('trail-image').naturalWidth, $('trail-map-title').textContent]);
+  ok('touring map markers: the 2 placed uphill trails only', J(markers().sort()) === J(['1', '2']), markers());
+  choose($('trail-kind-filter'), 'downhill'); await wait(800);
+  ok('downhill filter: the 2 runs; the DOWNHILL map (1670 px) with the run markers', list().length === 2 && $('trail-image').naturalWidth === 1670 && /Carte : Ski - Descente/.test($('trail-map-title').textContent) && J(markers()) === J(['20']), [list().length, $('trail-image').naturalWidth, markers()]);
+  choose($('trail-kind-filter'), ''); await wait(800);
+
+  // ---- hidden trails ----
+  choose($('trail-view'), 'archived');
+  rows = list();
+  ok('view "masqués": the hidden trail, marked and greyed', rows.length === 1 && rows[0].name === 'Ancien sentier (masqué)' && rows[0].archived && rows[0].number === '9' && !rows[0].orphan, rows);
+  ok('a hidden trail\'s number cannot be edited in the list', numInput(trs()[0]).disabled === true);
+  choose($('trail-view'), 'all'); ok('view "tous": 5 trails', list().length === 5, list().length);
+  choose($('trail-view'), 'active');
+
+  // ---- sector panel (system admin) ----
+  if (AS_SYS) {
+    const sr = [...document.querySelectorAll('#sector-rows tr')];
+    ok('sector panel: the activity\'s sectors with how many visible trails each holds', sr.length === 2 && /3 sentier\(s\)/.test(sr[0].children[2].textContent) && /0 sentier\(s\)/.test(sr[1].children[2].textContent) && /giroux-nord/.test(sr[1].children[2].textContent), sr.map(r => r.children[2].textContent));
+    window.__writes.length = 0;
+    sr[1].children[1].querySelector('input').value = 'Mont Giroux Nord (renommé)';
+    sr[1].children[3].querySelector('button').click(); await wait(400);
+    const sw = writesTo('sectors', 'update')[0];
+    ok('renaming a sector updates sectors/mont-giroux-nord (name + order + who/when)', !!sw && sw[1] === 'mont-giroux-nord' && sw[3].name === 'Mont Giroux Nord (renommé)' && sw[3].order === 2 && sw[3].modifiedBy === 'u1', sw);
+    window.__writes.length = 0;
+    type($('sector-new-name'), 'Éclaireur Nord'); $('sector-new-add').click(); await wait(400);
+    const sn = writesTo('sectors', 'set')[0];
+    ok('a new sector: readable id, this activity, next order, empty old list, no alias', !!sn && sn[1] === 'eclaireur-nord' && sn[3].name === 'Éclaireur Nord' && sn[3].network === 'ski' && sn[3].order === 3 && J(sn[3].trails) === '[]' && J(sn[3].aliases) === '[]', sn);
+  }
+
+  // ---- inline number in the list ----
+  window.__writes.length = 0;
+  change(numInput(rowOf('La tortue')), '4'); await wait(300);
+  const nw = writesTo('trails', 'update')[0];
+  ok('typing a number in the list saves it (only the number)', !!nw && nw[1] === 'trail_1' && nw[3].number === '4' && !('name' in nw[3]) && nw[3].modifiedBy === 'u1', nw);
+  window.__writes.length = 0;
+  const maxi = numInput(rowOf('Maxi'));
+  change(maxi, '20'); await wait(300);
+  ok('a number already used by the same kind (downhill 20) is refused and put back', writesTo('trails', 'update').length === 0 && maxi.value === '26', [maxi.value, window.__writes]);
+
+  // ---- edit: sector, kinds, lift ----
+  edit('La tortue'); await wait(300);
+  ok('editor: sector list = activity\'s sectors; only a system admin can change it', J([...$('tr-sector').options].map(o => o.value).slice(0, 3)) === J(['', 'mont-orford', 'mont-giroux-nord']) && $('tr-sector').disabled === !AS_SYS && $('tr-sector-hint').hidden === AS_SYS, [$('tr-sector').disabled, $('tr-sector-hint').hidden]);
+  ok('editor: kinds are uphill, downhill, lift', J([...$('tr-kind').options].map(o => o.value)) === J(['uphill', 'downhill', 'lift']));
+  if (AS_SYS) change($('tr-sector'), 'mont-giroux-nord');
+  window.__writes.length = 0;
+  $('tr-save').click(); await wait(400);
+  const up = writesTo('trails', 'update')[0];
+  ok(AS_SYS ? 'save writes the chosen sector' : 'save by a plain admin does NOT send a sector (the rules would refuse it)', !!up && up[1] === 'trail_1' && (AS_SYS ? up[3].sector === 'mont-giroux-nord' : !('sector' in up[3])), up);
+
+  $('trail-new').click(); await wait(200);
+  type($('tr-name'), 'Quad test'); choose($('tr-kind'), 'lift'); await wait(800);
+  ok('lift: no difficulty field, on the downhill map', $('tr-difficulty-group').hidden === true && $('trail-image').naturalWidth === 1670, [$('tr-difficulty-group').hidden, $('trail-image').naturalWidth]);
+  if (AS_SYS) change($('tr-sector'), 'mont-orford');
+  window.__writes.length = 0;
+  $('tr-save').click(); await wait(400);
+  const lift = writesTo('trails', 'set')[0];
+  ok('new lift: id lift_N, kind lift, no difficulty' + (AS_SYS ? ', with its sector' : ', no sector (plain admin)'), !!lift && /^lift_\d+$/.test(lift[1]) && lift[3].kind === 'lift' && !('difficulty' in lift[3]) && (AS_SYS ? lift[3].sector === 'mont-orford' : !('sector' in lift[3])), lift);
+  choose($('tr-kind'), 'lift');
+
+  // ---- save and go to the next trail without a position ----
+  edit('Slalom'); await wait(300);
+  $('tr-clear').click();
+  window.__writes.length = 0;
+  $('tr-save-next').click(); await wait(600);
+  ok('"Enregistrer et suivant": saves, then opens the NEXT trail of the list; it has no position, so it is ready to place (map click)', $('trail-editor').hidden === false && /Maxi/.test($('trail-editor-title').textContent) && $('trail-map').classList.contains('is-placing') && $('trail-image').naturalWidth === 1670, [$('trail-editor-title').textContent, $('trail-map').className]);
+  clickMap(600, 300);
+  ok('the click places it', $('tr-x').value === '600' && $('tr-y').value === '300', [$('tr-x').value, $('tr-y').value]);
+  $('tr-save-next').click(); await wait(600);
+  ok('next trail WITH a position (Adams): opened as well, not in placing mode, on its own map (touring)', $('trail-editor').hidden === false && /Adams/.test($('trail-editor-title').textContent) && !$('trail-map').classList.contains('is-placing') && $('tr-x').value === '300' && $('trail-image').naturalWidth === 800, [$('trail-editor-title').textContent, $('trail-map').className, $('tr-x').value]);
+  $('tr-save-next').click(); await wait(600);
+  // a system admin has moved La tortue to Mont Giroux Nord (next group); for a plain admin it is still first ("Sans secteur"), so Adams is the last trail
+  if (AS_SYS) {
+    ok('and on to the next group (La tortue, now in Mont Giroux Nord)', /La tortue/.test($('trail-editor-title').textContent) && $('trail-editor').hidden === false, $('trail-editor-title').textContent);
+    $('tr-save-next').click(); await wait(600);
+  }
+  ok('after the last trail of the list: nothing more to open, the editor closes', $('trail-editor').hidden === true, $('trail-editor').hidden);
+
+  // ---- hide / restore still work ----
+  $('tr-cancel').click();
+  edit('Adams'); await wait(200);
+  window.__writes.length = 0;
+  $('tr-archive').click(); await wait(400);
+  const hid = writesTo('trails', 'update')[0];
+  ok('"Masquer" writes archived: true with who and when', !!hid && hid[1] === 'trail_2' && hid[3].archived === true && hid[3].archivedBy === 'u1' && Object.keys(hid[3]).length === 3, hid);
+  choose($('trail-view'), 'archived');
+  edit('Ancien sentier'); await wait(300);
+  window.__writes.length = 0;
+  $('tr-restore').click(); await wait(400);
+  const rest = writesTo('trails', 'update')[0];
+  ok('"Restaurer" removes the archived fields', !!rest && rest[1] === 'trail_3' && rest[3].archived === 'DEL', rest);
+  choose($('trail-view'), 'active');
+
+  // ---- bulk assignment (system admin) ----
+  if (AS_SYS) {
+    choose($('trail-sector-filter'), '');
+    const all = trs().map(tr => tr.querySelector('input[type=checkbox]'));
+    const laTortue = rowOf('La tortue').querySelector('input[type=checkbox]');
+    laTortue.checked = true; laTortue.dispatchEvent(new Event('change'));
+    ok('ticking shows the count', /1 coché/.test($('trail-selected-count').textContent), $('trail-selected-count').textContent);
+    $('trail-select-all').checked = true; $('trail-select-all').dispatchEvent(new Event('change'));
+    ok('"tout cocher" ticks the whole displayed list', /(\d+) coché/.test($('trail-selected-count').textContent) && +/(\d+) coché/.exec($('trail-selected-count').textContent)[1] === list().length, $('trail-selected-count').textContent);
+    $('trail-select-all').checked = false; $('trail-select-all').dispatchEvent(new Event('change'));
+    const boxes = () => trs().map(tr => tr.querySelector('input[type=checkbox]'));
+    boxes().forEach(b => { if (b.checked) { b.checked = false; b.dispatchEvent(new Event('change')); } });
+    ['La tortue', 'Maxi'].forEach(n => { const b = rowOf(n).querySelector('input[type=checkbox]'); b.checked = true; b.dispatchEvent(new Event('change')); });
+    window.__writes.length = 0;
+    $('trail-bulk-apply').click(); await wait(300);
+    ok('no sector chosen: nothing written, asks for one', batched().length === 0);
+    choose($('trail-bulk-sector'), 'mont-giroux-nord');
+    $('trail-bulk-apply').click(); await wait(500);
+    const b = batched().filter(o => o[0] === 'trails');
+    ok('bulk: the sector is set on the 2 ticked trails only (in one batch)', b.length === 2 && b.every(o => o[2] === 'update' && o[3].sector === 'mont-giroux-nord' && o[3].modifiedBy === 'u1') && J(b.map(o => o[1]).sort()) === J(['run_2', 'trail_1']), b);
+    ok('the selection is cleared afterwards', $('trail-selected-count').textContent === '');
+    // remove the sector
+    const t2 = rowOf('La tortue').querySelector('input[type=checkbox]'); t2.checked = true; t2.dispatchEvent(new Event('change'));
+    choose($('trail-bulk-sector'), '__none'); window.__writes.length = 0;
+    $('trail-bulk-apply').click(); await wait(500);
+    const r = batched().filter(o => o[0] === 'trails');
+    ok('bulk "Retirer le secteur" deletes the field', r.length === 1 && r[0][3].sector === 'DEL', r);
+  }
+
+  // ---- bike ----
+  if (AS_SYS) {
+    choose($('trail-network'), 'bike'); await wait(800);
+    const b = list();
+    ok('bike list: the 2 bike trails, in their sector; kinds: a single one, no kind filter', b.length === 2 && b.every(r => r.kind === 'Vélo' && r.sector === 'Sentiers vélo') && $('trail-kind-filter').parentElement.hidden === true, b);
+    ok('bike map (1600 px), title, marker labels', $('trail-image').naturalWidth === 1600 && /Carte : Vélo/.test($('trail-map-title').textContent) && J(markers().sort()) === J(['2', '7']), [$('trail-image').naturalWidth, markers()]);
+    ok('bike: no banner (no trail without a sector)', $('trail-orphan-banner').hidden === true);
+  }
+  ok('no script errors at the end', window.__errs.length === 0, window.__errs);
+  $('out').textContent = out.join('\n');
+})().catch(e => { document.getElementById('out').textContent = 'HARNESS ERROR ' + e.stack; });
+</script>

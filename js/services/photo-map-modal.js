@@ -1,20 +1,27 @@
 /**
- * photo-map-modal.js - "Localisation de la photo" pop-up (infractions and signalisations)
- * ======================================================================================
- * Shows where a photo was taken on a map, with a switch between the activity's maps
- * (APP_CONFIG.networks[id].reportMaps: for ski the downhill map and the touring map).
+ * photo-map-modal.js - "Localisation de la photo" pop-up
+ * ========================================================
+ * Shows where a photo was taken on a map.
  *
- *   PhotoMapModal.open(lat, lon)   opens it (or opens Google Maps when no map of the
- *                                  activity can place that position)
+ *   PhotoMapModal.open(lat, lon)          infractions/signalisations: a switch between the
+ *                                         activity's report maps (APP_CONFIG.networks[id].
+ *                                         reportMaps - for ski the downhill and touring maps),
+ *                                         since a report can be anywhere on the mountain.
+ *   PhotoMapModal.open(lat, lon, mapIds)  inspection dashboard/history: a photo belongs to one
+ *                                         specific trail of one specific kind, so mapIds fixes
+ *                                         the map to that kind's own (TrailService.mapIdOf) -
+ *                                         no switch shown (there is nothing to switch to).
  *   PhotoMapModal.close()
  *
- * The map shown first is the default one (the first of reportMaps: for ski the downhill map);
- * the map picked with the switch is kept while the page stays open. Every map can be picked:
- * on one that has no GPS calibration yet (Administration > Cartes) the map is shown without the
- * marker, with a note.
+ * Either way: opens Google Maps instead when no offered map can place the position at all. The
+ * map shown first is the default one (mapIds[0], or reportMaps' default - for ski the downhill
+ * map); when there is a choice, the one picked with the switch is kept while the page stays open.
+ * Every map can be picked: one with no GPS calibration yet (Administration > Cartes) is shown
+ * without the marker, with a note.
  *
- * Uses the .detail-modal markup of the infraction-admin, signalisation-admin and
- * signalisation-resume pages. Requires config.js, network.js and map-service.js.
+ * Uses the .detail-modal markup (infraction-admin, signalisation-admin, signalisation-resume,
+ * inspection-history already have it; inspection-dashboard has its own copy of the same rules).
+ * Requires config.js, network.js and map-service.js (also trail-service.js when passing mapIds).
  */
 const PhotoMapModal = (function () {
   'use strict';
@@ -22,8 +29,11 @@ const PhotoMapModal = (function () {
   let chosen = null;      // map id being shown
   let pinned = null;      // map id the user picked with the switch (kept while the page stays open)
   let position = null;    // { lat, lon } being shown
+  let forcedMaps = null;  // set by open(lat, lon, mapIds): offer only these, no reportMaps switch
 
   const $ = id => document.getElementById(id);
+  const mapsOffered = () => forcedMaps || MapService.reportMaps().all;
+  const defaultMap = () => forcedMaps ? forcedMaps[0] : MapService.reportMaps().default;
 
   function build() {
     document.body.insertAdjacentHTML('beforeend', `
@@ -43,7 +53,7 @@ const PhotoMapModal = (function () {
 
   // Draws the chosen map, the marker and the switch
   function render() {
-    const { all } = MapService.reportMaps();
+    const all = mapsOffered();
     const { lat, lon } = position;
 
     const box = $('photo-map-switch');
@@ -81,12 +91,18 @@ const PhotoMapModal = (function () {
     $('photo-google-link').href = `https://www.google.com/maps?q=${lat},${lon}`;
   }
 
-  function open(lat, lon) {
-    const { all, default: def } = MapService.reportMaps();
-    // No map of this activity can place the position at all (none calibrated): Google Maps instead
+  /**
+   * @param {number} lat
+   * @param {number} lon
+   * @param {string[]} [mapIds] restrict to exactly these maps, no switch (see file header)
+   */
+  function open(lat, lon, mapIds) {
+    forcedMaps = mapIds || null;
+    const all = mapsOffered();
+    // No map on offer can place the position at all (none calibrated): Google Maps instead
     if (!all.some(id => MapService.gpsToPixel(lat, lon, id))) { window.open(`https://www.google.com/maps?q=${lat},${lon}`, '_blank', 'noopener'); return; }
 
-    chosen = pinned && all.includes(pinned) ? pinned : def;
+    chosen = (!forcedMaps && pinned && all.includes(pinned)) ? pinned : defaultMap();
     position = { lat, lon };
     if (!$('photo-map-modal')) build();
     render();

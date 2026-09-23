@@ -1,0 +1,209 @@
+<pre id="out" style="position:fixed;left:0;bottom:0;background:#fff;color:#000;font-size:11px;z-index:99999">running...</pre>
+<script>
+(async () => {
+  const out = []; const J = JSON.stringify;
+  const ok = (n, c, x) => out.push((c ? 'PASS ' : 'FAIL ') + n + (c ? '' : ' :: ' + J(x)));
+  const wait = ms => new Promise(r => setTimeout(r, ms));
+  const PAGE = Q.get('page');
+  const opts = el => [...el.options].map(o => o.value);
+  const bike = NET === 'bike' || (NET === 'both' && Q.get('choice') === 'bike');
+  const downhill = Q.get('kind') === 'downhill'; // ?kind=downhill: this page load already starts on that kind
+  const reads = () => window.__reads || [];
+  const writesOf = name => window.__writes.flatMap(w => w[0] === 'batch' ? w[1].filter(op => op[0] === name && op[2] === 'set').map(op => op[3]) : (w[0] === name && w[2] === 'set' ? [w[3]] : []));
+  await wait(900);
+  ok('current activity is ' + (bike ? 'bike' : 'ski'), Network.current() === (bike ? 'bike' : 'ski'), Network.current());
+  ok('confirm() and alert() are the browser\'s own synchronous ones (ui.js must not replace them with Promise-returning dialogs)', /\[native code\]/.test(Function.prototype.toString.call(window.confirm)) && /\[native code\]/.test(Function.prototype.toString.call(window.alert)) && typeof confirmDialog === 'function' && typeof alertDialog === 'function');
+
+  // ---------- header: switcher + feature-gated nav (any page) ----------
+  const sw = document.getElementById('network-switch');
+  if (NET === 'both') {
+    ok('switcher is shown for a user with two activities and shows the current one', sw && !sw.hidden && sw.textContent.includes(bike ? 'Vélo' : 'Ski'), sw && sw.textContent);
+    ok('mobile drawer lists both activities, current one highlighted', document.querySelectorAll('#mobile-network a').length === 2 && document.querySelector('#mobile-network .mobile-nav__link--active').textContent.includes(bike ? 'Vélo' : 'Ski'));
+    sw.click();
+    const saved = JSON.parse(localStorage.getItem('orford-network') || 'null');
+    ok('clicking the switcher stores the other activity and reloads', window.__reloads === 1 && saved && saved.id === (bike ? 'ski' : 'bike'), [window.__reloads, saved]);
+  } else {
+    ok('switcher hidden for a single-activity user', sw && sw.hidden === true);
+  }
+  const shelterLink = document.querySelector('.nav [data-requires="shelters"]');
+  if (shelterLink) ok('shelter nav link follows the activity', (shelterLink.style.display === 'none') === bike, shelterLink.style.display);
+
+  // ---------- pages ----------
+  if (PAGE === 'inspection-dashboard') {
+    const img = document.getElementById('map-image');
+    if (!downhill) {
+      // ---- default kind at load: Montée for ski, bike's only kind ----
+      const trailMarkers = [...document.querySelectorAll('.map-marker:not(.map-marker--shelter)')].map(m => m.textContent).sort();
+      ok('trail markers of this activity only; label = number field or id without prefix', J(trailMarkers) === J(bike ? ['2', '7'] : ['1', '2']), trailMarkers);
+      ok('shelter markers only where shelters exist', document.querySelectorAll('.map-marker--shelter').length === (bike ? 0 : 1));
+      ok('total trails stat', document.getElementById('stat-total').textContent === '2', document.getElementById('stat-total').textContent);
+      ok(bike ? 'bike: shelters and shelter inspections are never read' : 'ski: shelters are read', bike ? (!reads().includes('shelters') && !reads().includes('shelter_inspections')) : reads().includes('shelters'), reads());
+      const rows = document.querySelectorAll('#recent-inspections .inspection-row');
+      ok('recent inspections of this activity only', rows.length === (bike ? 1 : 3), rows.length);
+      ok('map image is this activity\'s', img.src.endsWith(bike ? 'assets/map/Bike_Map_web.jpg' : 'assets/map/Ski-Touring_Map.png'), img.src);
+      ok((bike ? 'bike' : 'ski') + ' map loads: no missing flag', !document.getElementById('map-wrapper').classList.contains('is-missing'));
+
+      // quick status change writes the network and keeps snow only for ski
+      contextTrailId = bike ? 'bike_1' : 'trail_1';
+      if (!bike) trailInspections['trail_1'].snow_condition = 'good';
+      await setTrailStatus('closed');
+      const w = writesOf('trail_inspections');
+      ok('quick status inspection carries the network', w.length === 1 && w[0].network === (bike ? 'bike' : 'ski'), w);
+      ok('snow condition kept for ski, always null for bike', bike ? w[0].snow_condition === null : w[0].snow_condition === 'good', w[0] && w[0].snow_condition);
+    } else {
+      // ---- ski, started on Descente (?kind=downhill): Kind.current() is read once at load ----
+      const trailMarkers = [...document.querySelectorAll('.map-marker:not(.map-marker--shelter)')].map(m => m.textContent).sort();
+      ok('downhill: only the downhill trail markers (run_2 has no position yet)', J(trailMarkers) === J(['20']), trailMarkers);
+      ok('downhill: no shelter marker (shelters are on the touring map only)', document.querySelectorAll('.map-marker--shelter').length === 0);
+      ok('downhill: stats count both downhill trails, even the one without a position', document.getElementById('stat-total').textContent === '2', document.getElementById('stat-total').textContent);
+      ok('downhill: the downhill map is shown', img.src.endsWith('assets/map/Ski-Downhill_Map_web.jpg'), img.src);
+
+      // 1.9 regression: the photo-location popup must use the DOWNHILL map while viewing Descente,
+      // not the network's default (touring) map - was a real bug, found while discussing consolidation.
+      window.__data.maps = [{ id: 'ski-downhill', mode: 'affine', width: 1670, height: 736, points: [
+        { x: 0, y: 0, lat: 45.33, lon: -72.26 }, { x: 1670, y: 0, lat: 45.33, lon: -72.20 }, { x: 0, y: 736, lat: 45.29, lon: -72.26 }] }];
+      await MapService.load(true);
+      openPhotoLocationModal(45.31, -72.23);
+      await wait(200);
+      const photoImg = document.querySelector('#photo-map-wrap img');
+      ok('1.9: photo location on Descente uses the downhill map, not the touring one', photoImg && photoImg.getAttribute('src').endsWith('Ski-Downhill_Map_web.jpg'), photoImg && photoImg.getAttribute('src'));
+      PhotoMapModal.close();
+    }
+
+    // ---- kind switch (shared header control, kind.js + layout.js): uphill vs downhill for ski,
+    // bike has one kind. Switching itself is a page reload - kind.js's own unit test (t-kind.html)
+    // covers the persisted-choice logic; this only checks the button reflects Kind.current().
+    const kSw = document.getElementById('kind-switch');
+    if (bike) {
+      ok('bike: no kind switch (only one inspected kind)', kSw && kSw.hidden === true);
+    } else {
+      const label = downhill ? 'Descente' : 'Montée';
+      ok('ski: kind switch shows the current kind (' + label + ')', kSw && kSw.hidden === false && kSw.textContent.includes(label), kSw && kSw.textContent);
+      ok('mobile drawer lists both kinds, the current one highlighted', document.querySelectorAll('#mobile-kind a').length === 2 && document.querySelector('#mobile-kind .mobile-nav__link--active').textContent.includes(label));
+      const reloadsBefore = window.__reloads;
+      kSw.click();
+      const savedKind = JSON.parse(localStorage.getItem('orford-kind') || 'null');
+      const next = downhill ? 'uphill' : 'downhill';
+      ok('clicking the kind switch stores "' + next + '" for this network and reloads', window.__reloads === reloadsBefore + 1 && savedKind && savedKind.kind === next && savedKind.network === 'ski', [window.__reloads, savedKind]);
+    }
+  }
+
+  if (PAGE === 'inspection-trail-report' && !downhill) {
+    ok('trail list = this activity\'s inspected trails of the shown kind only (ski defaults to Montée: downhill runs not offered)', J(opts(trailSelect)) === J(bike ? ['', 'bike_2', 'bike_1'] : ['', 'trail_2', 'trail_1']), opts(trailSelect));
+    ok('trail picker text: name + difficulty in the new words + length only when known', J([...trailSelect.options].slice(1).map(o => o.textContent)) === J(bike ? ['Descente (Noire · 4 km)', 'Piste verte (Verte · 3 km)'] : ['Adams (Noire · 2 km)', 'La tortue (Verte · 1.1 km)']), [...trailSelect.options].map(o => o.textContent));
+    const snow = document.getElementById('snow-condition-group');
+    ok('snow condition question only for ski', (snow.style.display === 'none') === bike, snow.style.display);
+    ok('no trail selected yet: hint shown, no checklist', document.getElementById('issues-hint').hidden === false && document.getElementById('issues-group').hidden === true, document.getElementById('issues-group').innerHTML);
+    trailSelect.value = bike ? 'bike_1' : 'trail_1';
+    trailSelect.dispatchEvent(new Event('change'));
+    await wait(300);
+    const expectedIssues = APP_CONFIG.trailKinds[bike ? 'bike' : 'uphill'].issues;
+    const shownIssues = [...document.querySelectorAll('#issues-group input[type=checkbox]')].map(c => c.value);
+    ok('issue checklist matches the selected trail\'s kind (' + (bike ? 'bike' : 'uphill') + ')', document.getElementById('issues-hint').hidden === true && document.getElementById('issues-group').hidden === false && J(shownIssues) === J(expectedIssues), shownIssues);
+    document.getElementById('status-open').checked = true;
+    document.getElementById('condition-good').checked = true;
+    document.getElementById('snow-good').checked = true; // ticked even where hidden: must be ignored for bike
+    await handleSubmit({ preventDefault() {} });
+    const w = writesOf('trail_inspections');
+    ok('inspection saved with network', w.length === 1 && w[0].network === (bike ? 'bike' : 'ski'), w);
+    ok('snow condition saved for ski, ignored for bike', bike ? w[0].snow_condition === null : w[0].snow_condition === 'good', w[0] && w[0].snow_condition);
+  }
+
+  if (PAGE === 'inspection-trail-report' && downhill) {
+    // Started on Descente (?kind=downhill): the picker offers the downhill runs, not the uphill trails
+    ok('downhill: trail list is the downhill runs only', J(opts(trailSelect)) === J(['', 'run_2', 'run_1']), opts(trailSelect));
+    trailSelect.value = 'run_1';
+    trailSelect.dispatchEvent(new Event('change'));
+    await wait(300);
+    const shownIssues = [...document.querySelectorAll('#issues-group input[type=checkbox]')].map(c => c.value);
+    ok('downhill: issue checklist is the downhill list', J(shownIssues) === J(APP_CONFIG.trailKinds.downhill.issues), shownIssues);
+  }
+
+  if (PAGE === 'inspection-shelter-report') {
+    if (bike) {
+      ok('bike: form replaced by a notice', document.getElementById('shelter-inspection-form').style.display === 'none' && document.body.textContent.includes("Il n'y a pas d'abris"));
+      ok('bike: shelters are never read', !reads().includes('shelters'), reads());
+    } else if (downhill) {
+      // Started on Descente: shelters live on the touring map only, so the form is replaced too
+      ok('ski, downhill: form replaced by a "not in this view" notice', document.getElementById('shelter-inspection-form').style.display === 'none' && document.body.textContent.includes("Il n'y a pas d'abris en vue « Descente »"), document.body.textContent);
+    } else {
+      ok('ski: shelter list', J(opts(shelterSelect)) === J(['', 'shelter_1']), opts(shelterSelect));
+      shelterSelect.value = 'shelter_1';
+      ['condition', 'cleanliness', 'accessibility'].forEach(n => { form.querySelector(`input[name="${n}"]`).checked = true; });
+      await handleSubmit({ preventDefault() {} });
+      const w = writesOf('shelter_inspections');
+      ok('ski: shelter inspection saved with network', w.length === 1 && w[0].network === 'ski', w);
+    }
+  }
+
+  if (PAGE === 'inspection-history' && !downhill) {
+    ok('history lists this activity\'s inspections of the shown kind, INCLUDING the one on a hidden trail (history is kept)', allInspections.length === (bike ? 1 : 4) && (bike || allInspections.some(i => i.id === 'IA1' && i.location === 'Ancien sentier')), allInspections.map(i => i.id + ':' + i.location));
+    ok('type filter has "shelter" only where shelters exist', (opts(document.getElementById('type-filter')).includes('shelter')) === !bike, opts(document.getElementById('type-filter')));
+  }
+
+  if (PAGE === 'inspection-history' && downhill) {
+    // No downhill-run inspection exists yet in this mock: only the (kind-agnostic) shelter one shows
+    ok('downhill: trail inspections scoped to downhill (none yet), shelter inspections still show (not kind-specific)', allInspections.length === 1 && allInspections[0].type === 'shelter', allInspections.map(i => i.id + ':' + i.type));
+  }
+
+  if (PAGE === 'inspection-admin' && !downhill) {
+    ok('statistics cover this activity\'s inspections of the shown kind (a hidden trail\'s inspections still count)', trailInspections.length === (bike ? 1 : 3) && shelterInspections.length === (bike ? 0 : 1), [trailInspections.length, shelterInspections.length]);
+    ok('season start uses the activity\'s statsSince (bike 1 May, ski 1 Sep)', seasonStart.getMonth() === (bike ? 4 : 8) && seasonStart.getDate() === 1, seasonStart);
+    ok('bike and ski share the same map centre', MAP_CENTER && MAP_CENTER.lat === 45.31 && MAP_CENTER.lon === -72.23, MAP_CENTER);
+    const card = document.getElementById('stat-shelter-inspections').closest('.stat-card');
+    ok('shelter statistic hidden without shelters', (card.style.display === 'none') === bike);
+    // bike now has a map centre too, so the outlier check runs; this mock's bike inspection has no photo
+    if (bike) ok('bike: outlier check runs (map centre set) but finds no GPS photo in this mock', document.getElementById('outlier-photo-container').textContent.includes('Aucune photo'), document.getElementById('outlier-photo-container').textContent);
+  }
+
+  if (PAGE === 'inspection-admin' && downhill) {
+    ok('downhill: trail statistics scoped to downhill (none yet in this mock), shelter statistics stay network-wide (data management must not be kind-scoped)', trailInspections.length === 0 && shelterInspections.length === 1, [trailInspections.length, shelterInspections.length]);
+  }
+
+  if (PAGE === 'inspection-admin') {
+    // "Gestion des données" text must say plainly what each tool reaches, so nobody assumes a
+    // delete is limited to whatever kind is selected in the header when it plainly is not.
+    const deleteDesc = document.getElementById('delete-desc').textContent;
+    const orphanDesc = document.getElementById('orphan-desc').textContent;
+    const dbDesc = document.getElementById('db-desc').textContent;
+    ok('delete tool: says which activity, and (for ski) that it covers every kind regardless of the header', deleteDesc.includes(`« ${Network.config().name} »`) && (bike ? !/Montée|Descente/.test(deleteDesc) : /Montée et Descente/.test(deleteDesc) && /vue sélectionnée/.test(deleteDesc)), deleteDesc);
+    ok('orphan cleanup: says it is NOT scoped to the current activity (reads the whole database)', /TOUTES les activités/.test(orphanDesc) && orphanDesc.includes(`« ${Network.config().name} »`), orphanDesc);
+    ok('db stats: says it is NOT scoped to the current activity either', /TOUTES les données stockées/.test(dbDesc) && /tous réseaux confondus/.test(dbDesc), dbDesc);
+
+    // ---- season navigator (Statistiques tab): mirrors the app's own season math so the
+    // expectations are correct regardless of network (ski/bike anchor on different dates) or
+    // today's real date, rather than hardcoding assumptions that would rot ----
+    const seasonLabelEl = document.getElementById('season-label');
+    const prevBtn = document.getElementById('season-prev');
+    const nextBtn = document.getElementById('season-next');
+    const floorDate = (() => { const e = APP_CONFIG.earliestSeasonStart; return new Date(e.year, e.month - 1, e.day); })();
+    const currentStart = () => {
+      const { statsSince } = Network.config();
+      const now = new Date();
+      const thisYear = new Date(now.getFullYear(), statsSince.month - 1, statsSince.day);
+      return thisYear <= now ? thisYear : new Date(now.getFullYear() - 1, statsSince.month - 1, statsSince.day);
+    };
+    const startOf = offset => { const a = currentStart(); return new Date(a.getFullYear() - offset, a.getMonth(), a.getDate()); };
+
+    ok('starts on the current season: label says so, "Next" disabled (no future data)', /Saison en cours/.test(seasonLabelEl.textContent) && nextBtn.disabled === true, seasonLabelEl.textContent);
+    const canGoBackOnce = startOf(1) >= floorDate;
+    ok('"Previous" is enabled iff a season exists on/after config.js\'s earliestSeasonStart (winter 2025-2026)', prevBtn.disabled === !canGoBackOnce, [prevBtn.disabled, canGoBackOnce, startOf(1).toISOString(), floorDate.toISOString()]);
+
+    if (canGoBackOnce) {
+      prevBtn.click();
+      await wait(300);
+      const oneBack = seasonLabelEl.textContent;
+      ok('"Previous" once: label now names a past season (a year range), "Next" becomes enabled', /^Saison \d{4}(-\d{4})? \(/.test(oneBack) && !/en cours/.test(oneBack) && nextBtn.disabled === false, oneBack);
+      const canGoBackTwice = startOf(2) >= floorDate;
+      ok('"Previous" now reflects whether going back once MORE would cross the earliest reachable season', prevBtn.disabled === !canGoBackTwice, [prevBtn.disabled, canGoBackTwice]);
+      nextBtn.click();
+      await wait(300);
+      ok('"Next": back to the current season, "Next" disabled again', /Saison en cours/.test(seasonLabelEl.textContent) && nextBtn.disabled === true, seasonLabelEl.textContent);
+    } else {
+      ok('"Previous" click is a no-op when already at the earliest reachable season (disabled button)', prevBtn.disabled === true);
+    }
+    ok('no script errors from repeatedly re-rendering the charts (season navigation calls renderCharts() every time)', window.__errs.length === 0, window.__errs);
+  }
+  document.getElementById('out').textContent = out.join('\n');
+})().catch(e => { document.getElementById('out').textContent = 'HARNESS ERROR ' + e.stack; });
+</script>

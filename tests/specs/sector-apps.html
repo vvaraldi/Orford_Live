@@ -1,0 +1,174 @@
+<pre id="out" style="position:fixed;left:0;bottom:0;background:#fff;color:#000;font-size:11px;z-index:99999">running...</pre>
+<script>
+(async () => {
+  const out = []; const J = JSON.stringify;
+  const ok = (n, c, x) => out.push((c ? 'PASS ' : 'FAIL ') + n + (c ? '' : ' :: ' + J(x)));
+  const wait = ms => new Promise(r => setTimeout(r, ms));
+  const PAGE = Q.get('page');
+  const opts = el => [...el.options].map(o => o.value);
+  const bike = NET === 'bike' || (NET === 'both' && Q.get('choice') === 'bike');
+  await wait(800);
+  ok('current activity is ' + (bike ? 'bike' : 'ski'), Network.current() === (bike ? 'bike' : 'ski'), Network.current());
+  ok('confirm() and alert() are the browser\'s own synchronous ones (ui.js must not replace them with Promise-returning dialogs)', /\[native code\]/.test(Function.prototype.toString.call(window.confirm)) && /\[native code\]/.test(Function.prototype.toString.call(window.alert)) && typeof confirmDialog === 'function' && typeof alertDialog === 'function');
+  const SKI_SECTORS = ['', 'mont-orford', 'mont-giroux-nord'];
+
+  if (PAGE === 'infraction-report') {
+    ok('sectors of this activity only', J(opts(sectorSelect)) === J(bike ? ['', 'sentiers-velo'] : SKI_SECTORS), opts(sectorSelect));
+    ok('fault types come from this activity\'s config', J(opts(faultSelect)) === J(bike ? ['', 'autres'] : ['', 'downhill', 'saut-dangereux', 'ski-hors-piste', 'ski-piste-fermee', 'saut-des-chaises', 'manoeuvre-dangereuse', 'autres']), opts(faultSelect));
+    ok('practices come from this activity\'s config', J(opts(practiceSelect)) === J(bike ? ['', 'velo', 'autres'] : ['', 'ski', 'snowboard', 'raquette', 'autres']), opts(practiceSelect));
+    const mine = opts(reportSelector).filter(v => v !== 'new');
+    ok('past reports of this activity only (legacy = ski)', J(mine.sort()) === J(bike ? ['INFB'] : ['INF1', 'INF2', 'INF3', 'INF4']), mine);
+
+    if (!bike) {
+      // ---- the trails of a sector come from trail records (all kinds together), the picker shows names only ----
+      sectorSelect.value = 'mont-orford'; populateTrails();
+      ok('sector with trail records: uphill and downhill together, by name; hidden and sector-less trails are not offered', J(opts(trailSelect)) === J(['', 'trail_2', 'run_2', 'run_1']) && J([...trailSelect.options].slice(1).map(o => o.textContent)) === J(['Adams', 'Maxi', 'Slalom']), [opts(trailSelect), [...trailSelect.options].map(o => o.textContent)]);
+      // ---- a sector with no trail record yet has no trails to offer (the old name-list fallback was removed) ----
+      sectorSelect.value = 'mont-giroux-nord'; populateTrails();
+      ok('sector without trail records: only the placeholder (no name-list fallback any more)', J(opts(trailSelect)) === J(['']), opts(trailSelect));
+      // two names that look the same get their number to tell them apart (only then)
+      const fake = { items: [{ id: 'a', name: 'Familiale', number: '11', kind: 'downhill' }, { id: 'b', name: 'familiale', number: undefined, kind: 'uphill' }, { id: 'c', name: 'Adams', number: '5', kind: 'downhill' }] };
+      SectorService.fillTrails(trailSelect, fake, '--');
+      ok('duplicate names in one sector show the number (or the kind) in brackets, other names stay plain', J([...trailSelect.options].slice(1).map(o => o.textContent)) === J(['Familiale (11)', 'familiale (uphill)', 'Adams']), [...trailSelect.options].map(o => o.textContent));
+
+      // ---- OLD record (name only, old sector alias, trail no longer in any list): kept as an extra option ----
+      reportSelector.value = 'INF1'; handleReportChange();
+      ok('old record: alias selects the current sector, name kept as "(ancienne piste)" since no list has it any more', sectorSelect.value === 'mont-giroux-nord' && trailSelect.value === 'legacy:Magog', [sectorSelect.value, trailSelect.value]);
+      await handleModify();
+      let u = window.__writes.filter(x => x[0] === 'infractions' && x[2] === 'update');
+      ok('modify saves the canonical sector, the name, trailId null, and never sends "network"', u.length === 1 && u[0][3].sector === 'mont-giroux-nord' && u[0][3].trail === 'Magog' && u[0][3].trailId === null && !('network' in u[0][3]), u);
+      window.__writes.length = 0; resetForm();
+
+      // ---- OLD record whose name matches a trail record (other spelling): selected by name, upgraded on save ----
+      reportSelector.value = 'INF3'; handleReportChange();
+      ok('old record "MAXI" (name only) finds the trail record "Maxi" by name', sectorSelect.value === 'mont-orford' && trailSelect.value === 'run_2', [sectorSelect.value, trailSelect.value]);
+      await handleModify();
+      u = window.__writes.filter(x => x[0] === 'infractions' && x[2] === 'update');
+      ok('saving it stores the trail name and now the trailId (the record upgrades itself)', u.length === 1 && u[0][3].trail === 'Maxi' && u[0][3].trailId === 'run_2', u);
+      window.__writes.length = 0; resetForm();
+
+      // ---- OLD record whose trail no longer exists: kept as it was ----
+      reportSelector.value = 'INF4'; handleReportChange();
+      ok('old record with a trail that is gone: the old name is kept as an extra option', trailSelect.value === 'legacy:Ancien nom' && [...trailSelect.options].some(o => o.textContent === 'Ancien nom (ancienne piste)'), [trailSelect.value, opts(trailSelect)]);
+      await handleModify();
+      u = window.__writes.filter(x => x[0] === 'infractions' && x[2] === 'update');
+      ok('saving it keeps the old name and adds no trailId', u.length === 1 && u[0][3].trail === 'Ancien nom' && u[0][3].trailId === null, u);
+      window.__writes.length = 0; resetForm();
+
+      // ---- NEW record (has a trailId): selected by id ----
+      reportSelector.value = 'INF2'; handleReportChange();
+      ok('new-format record: selected by its trailId', trailSelect.value === 'run_2', trailSelect.value);
+      window.__writes.length = 0; resetForm();
+
+      // ---- create a new report from a trail record ----
+      sectorSelect.value = 'mont-orford'; populateTrails(); trailSelect.value = 'run_1';
+      offenderName.value = 'New Person'; faultSelect.value = 'downhill';
+      await handleSubmit({ preventDefault() {} });
+      const w = window.__writes.filter(x => x[0] === 'infractions' && x[2] === 'add');
+      ok('a new report is saved with network "ski", the trail NAME (as before) and the trailId', w.length === 1 && w[0][3].network === 'ski' && w[0][3].trail === 'Slalom' && w[0][3].trailId === 'run_1' && w[0][3].sector === 'mont-orford', w);
+    } else {
+      sectorSelect.value = 'sentiers-velo'; populateTrails();
+      ok('bike sector: trail records of the bike activity', J(opts(trailSelect)) === J(['', 'bike_2', 'bike_1']), opts(trailSelect));
+      trailSelect.value = 'bike_1';
+      offenderName.value = 'New Biker'; faultSelect.value = 'autres';
+      await handleSubmit({ preventDefault() {} });
+      const w = window.__writes.filter(x => x[0] === 'infractions' && x[2] === 'add');
+      ok('a new report is saved with network "bike", the name and the trailId', w.length === 1 && w[0][3].network === 'bike' && w[0][3].sector === 'sentiers-velo' && w[0][3].trail === 'Piste verte' && w[0][3].trailId === 'bike_1', w);
+    }
+  }
+
+  if (PAGE === 'signalisation-report') {
+    ok('sectors of this activity only', J(opts(sectorSelect)) === J(bike ? ['', 'sentiers-velo'] : SKI_SECTORS), opts(sectorSelect));
+    const mine = opts(reportSelector).filter(v => v !== 'new');
+    ok('past reports of this activity only (legacy = ski)', J(mine.sort()) === J(bike ? ['SIGB'] : ['SIG1', 'SIG2']), mine);
+    if (!bike) {
+      reportSelector.value = 'SIG1'; handleReportChange();
+      ok('old report: alias selects the current sector, name kept as "(ancienne piste)" since no list has it any more', sectorSelect.value === 'mont-giroux-nord' && trailSelect.value === 'legacy:Magog', [sectorSelect.value, trailSelect.value]);
+      await handleModify();
+      let u = window.__writes.filter(x => x[0] === 'signalisations' && x[2] === 'update');
+      ok('modify saves the canonical sector, the name, trailId null, and never sends "network"', u.length === 1 && u[0][3].sector === 'mont-giroux-nord' && u[0][3].trail === 'Magog' && u[0][3].trailId === null && !('network' in u[0][3]), u);
+      window.__writes.length = 0; resetForm();
+      reportSelector.value = 'SIG2'; handleReportChange();
+      ok('new-format report: selected by its trailId', sectorSelect.value === 'mont-orford' && trailSelect.value === 'run_2', [sectorSelect.value, trailSelect.value]);
+      window.__writes.length = 0; resetForm();
+    }
+    sectorSelect.value = bike ? 'sentiers-velo' : 'mont-orford';
+    populateTrails(); trailSelect.value = bike ? 'bike_1' : 'run_2'; statusSelect.value = 'ouverte';
+    await handleSubmit({ preventDefault() {} });
+    const w = window.__writes.filter(x => x[0] === 'signalisations' && x[2] === 'add');
+    ok('a new report is saved with the current network, the trail name and the trailId', w.length === 1 && w[0][3].network === (bike ? 'bike' : 'ski') && w[0][3].trail === (bike ? 'Piste verte' : 'Maxi') && w[0][3].trailId === (bike ? 'bike_1' : 'run_2'), w);
+  }
+
+  if (PAGE === 'infraction-admin') {
+    const ids = [...document.querySelectorAll('#infractions-tbody tr[data-id]')].map(r => r.dataset.id).sort();
+    ok('lists this activity\'s infractions only (old and new format together)', J(ids) === J(bike ? ['INFB'] : ['INF1', 'INF2', 'INF3', 'INF4']), ids);
+    if (bike) {
+      ok('bike labels: fault shown from the bike config', document.querySelector('#infractions-tbody tr[data-id=INFB]').textContent.includes('Autres (voir commentaire)'), document.querySelector('#infractions-tbody tr[data-id=INFB]').textContent);
+    } else {
+      ok('ski fault label shown', [...document.querySelectorAll('#infractions-tbody tr')].some(r => r.textContent.includes('Saut dangereux')));
+      const text = id => document.querySelector(`#infractions-tbody tr[data-id=${id}]`).textContent;
+      ok('old and new records show the same way (the stored trail name)', text('INF2').includes('Maxi') && text('INF3').includes('MAXI') && text('INF4').includes('Ancien nom'), [text('INF2'), text('INF3'), text('INF4')]);
+    }
+  }
+
+  if (PAGE === 'signalisation-admin') {
+    const ids = [...document.querySelectorAll('#reports-tbody tr[data-id]')].map(r => r.dataset.id).sort();
+    ok('lists this activity\'s reports only (legacy = ski)', J(ids) === J(bike ? ['SIGB'] : ['SIG1', 'SIG2']), ids);
+    ok('sector filter offers this activity\'s sectors only', J(opts(document.getElementById('filter-sector'))) === J(bike ? ['', 'sentiers-velo'] : SKI_SECTORS), opts(document.getElementById('filter-sector')));
+  }
+
+  if (PAGE === 'signalisation-resume') {
+    const ids = [...document.querySelectorAll('#reports-tbody tr[data-id]')].map(r => r.dataset.id).sort();
+    ok('lists this activity\'s active reports only (legacy = ski)', J(ids) === J(bike ? ['SIGB'] : ['SIG1', 'SIG2']), ids);
+    const img = document.getElementById('map-image');
+    const swBtns = () => [...document.querySelectorAll('#map-switch button')];
+    if (bike) {
+      ok('bike: one map, no switch', document.getElementById('map-switch').hidden === true && img.src.endsWith('assets/map/Bike_Map_web.jpg'), img.src);
+      ok('bike map loads: no missing flag', !document.getElementById('map-wrapper').classList.contains('is-missing'));
+    } else {
+      ok('ski: no map is calibrated yet -> the default is the downhill map (first of the activity\'s report maps)', img.src.endsWith('assets/map/Ski-Downhill_Map_web.jpg'), img.src);
+      ok('ski: a switch with both maps (downhill, touring); no markers without a calibration', document.getElementById('map-switch').hidden === false && J(swBtns().map(b => b.textContent)) === J(['🎿 Ski - Descente', '⛷️ Ski - Montée']) && document.querySelectorAll('.map-marker').length === 0 && /Carte non calibrée/.test(document.getElementById('map-count').textContent), swBtns().map(b => b.textContent));
+
+      // the touring map gets calibrated (as the system admin does in Administration > Cartes)
+      window.__data.maps = [{ id: 'ski', mode: 'affine', width: 800, height: 700, points: [
+        { x: 0, y: 0, lat: 45.296611, lon: -72.243361 }, { x: 800, y: 0, lat: 45.325861, lon: -72.249972 }, { x: 0, y: 700, lat: 45.299444, lon: -72.205667 }] }];
+      await MapService.load(true);
+      ok('reportMaps: the default is the DOWNHILL map even though only the touring map is calibrated', MapService.reportMaps().default === 'ski-downhill' && J(MapService.reportMaps().usable) === J(['ski']) && J(MapService.reportMaps().all) === J(['ski-downhill', 'ski']), MapService.reportMaps());
+      swBtns().find(b => /Montée/.test(b.textContent)).click(); await wait(500);
+      ok('switch to the touring map: image, active button and the report marker (SIG2 has a GPS position)', img.src.endsWith('assets/map/Ski-Touring_Map.png') && swBtns().find(b => /Montée/.test(b.textContent)).classList.contains('btn-primary') && document.querySelectorAll('.map-marker').length === 1 && /1 rapport\(s\) avec localisation/.test(document.getElementById('map-count').textContent), [img.src, document.querySelectorAll('.map-marker').length, document.getElementById('map-count').textContent]);
+      swBtns().find(b => /Descente/.test(b.textContent)).click(); await wait(500);
+      ok('switch back to the downhill map (not calibrated): no marker, explanation shown', img.src.endsWith('assets/map/Ski-Downhill_Map_web.jpg') && document.querySelectorAll('.map-marker').length === 0 && /Carte non calibrée/.test(document.getElementById('map-count').textContent));
+
+      // ---- the location pop-up (shared module) ----
+      const opened = []; const realOpen = window.open; window.open = (...a) => { opened.push(a[0]); };
+      window.__data.maps = []; await MapService.load(true);
+      openPhotoLocationModal(45.31, -72.23);
+      ok('no calibrated map: the pop-up opens Google Maps instead', opened.length === 1 && /google\.com\/maps\?q=45\.31,-72\.23/.test(opened[0]) && !document.getElementById('photo-map-modal'), opened);
+      window.__data.maps = [{ id: 'ski', mode: 'affine', width: 800, height: 700, points: [
+        { x: 0, y: 0, lat: 45.296611, lon: -72.243361 }, { x: 800, y: 0, lat: 45.325861, lon: -72.249972 }, { x: 0, y: 700, lat: 45.299444, lon: -72.205667 }] }];
+      await MapService.load(true);
+      openPhotoLocationModal(45.31, -72.23);
+      const modal = document.getElementById('photo-map-modal'); const mimg = document.getElementById('photo-map-img');
+      const mBtns = () => [...document.querySelectorAll('#photo-map-switch button')];
+      ok('pop-up: opens on the DOWNHILL map (default) although it is not calibrated; both buttons of the switch can be clicked', !!modal && modal.classList.contains('show') && mimg.getAttribute('src').endsWith('Ski-Downhill_Map_web.jpg') && mBtns().length === 2 && mBtns().every(b => !b.disabled) && mBtns()[0].classList.contains('btn-primary'), [mimg.getAttribute('src'), mBtns().map(b => b.textContent + ':' + b.disabled)]);
+      ok('pop-up on an uncalibrated map: no marker, an explanation, the Google Maps link stays', document.getElementById('photo-marker').style.display === 'none' && /ne peut pas être placée sur cette carte/.test(document.getElementById('photo-coords').textContent) && /google\.com\/maps\?q=45\.31,-72\.23/.test(document.getElementById('photo-google-link').href), [document.getElementById('photo-marker').style.display, document.getElementById('photo-coords').textContent]);
+      mBtns()[1].click();
+      ok('switching to the touring map (calibrated): marker placed with the GPS position, note gone', mimg.getAttribute('src').endsWith('Ski-Touring_Map.png') && document.getElementById('photo-marker').style.display === '' && /^\d+px$/.test(document.getElementById('photo-marker').style.left) && /45\.310000/.test(document.getElementById('photo-coords').textContent) && !/ne peut pas être placée/.test(document.getElementById('photo-coords').textContent), [document.getElementById('photo-marker').style.left, document.getElementById('photo-coords').textContent]);
+      PhotoMapModal.close();
+      // calibrate the downhill map too: the switch works both ways
+      window.__data.maps.push({ id: 'ski-downhill', mode: 'affine', width: 1670, height: 736, points: [
+        { x: 0, y: 0, lat: 45.33, lon: -72.26 }, { x: 1670, y: 0, lat: 45.33, lon: -72.20 }, { x: 0, y: 736, lat: 45.29, lon: -72.26 }] });
+      await MapService.load(true);
+      PhotoMapModal.close(); openPhotoLocationModal(45.31, -72.23);
+      ok('both calibrated: the touring choice made earlier with the switch is kept (pinned)', mimg.getAttribute('src').endsWith('Ski-Touring_Map.png') && mBtns().every(b => !b.disabled), [mimg.getAttribute('src'), mBtns().map(b => b.disabled)]);
+      const touringLeft = document.getElementById('photo-marker').style.left;
+      mBtns()[0].click();
+      ok('pop-up switch to the downhill map (now calibrated): the marker sits at ITS position on that map', mimg.getAttribute('src').endsWith('Ski-Downhill_Map_web.jpg') && document.getElementById('photo-marker').style.display === '' && document.getElementById('photo-marker').style.left !== touringLeft && mBtns()[0].classList.contains('btn-primary'), [mimg.getAttribute('src'), touringLeft, document.getElementById('photo-marker').style.left]);
+      PhotoMapModal.close(); openPhotoLocationModal(45.312, -72.231);
+      ok('the map picked with the switch is kept for the next position', mimg.getAttribute('src').endsWith('Ski-Downhill_Map_web.jpg'), mimg.getAttribute('src'));
+      window.open = realOpen;
+    }
+  }
+  document.getElementById('out').textContent = out.join('\n');
+})().catch(e => { document.getElementById('out').textContent = 'HARNESS ERROR ' + e.stack; });
+</script>
