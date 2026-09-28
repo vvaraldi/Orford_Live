@@ -17,6 +17,7 @@
 3. Improve the user experience
 #	Priority	Item
 3.0 Add the possibility to create a report from the summary page. Use of right click or a link once clicked on the trail ?
+3.05 Use two maps one for geolocalisation and one for status  (open and close)
 3.1	Medium-High	Check the new UI at phone width
 3.2	Medium	Add a hint when a trail is "missing" because of the wrong kind selected
 3.3	Medium	Get real feedback on the bike issue checklist
@@ -49,12 +50,27 @@ will need to migrate database and potentially all the site to another host and a
 
 
 
-Log de trail builder:
-- date, trail builder responsable(approbation etc...), trail builder support, volontaire, photos, travails, trail,
-- Code QR pour enregistrer un volontaire pour la saison
+Objectif :
+Livraison pour vélo fin Mars up and running
+
 
 signalisation et obstable:
 - état, localisation, maintenance ?
 
-
 filtre signalisation par sentier, geolocaliser les signalisations et obstables
+
+Log de trail builder:
+- date, trail builder responsable(approbation etc...), trail builder support, volontaire, photos, travails, trail,
+- Code QR pour enregistrer un volontaire pour la saison
+
+
+
+Outcome of the meeting
+Agreed on European data server
+Agreed on data imported and inclusion of some personal data
+Created a Regis@orford.com account to manage the data (regis is the owner)
+Regis has a github account
+
+To Do
+Duplicate the website from the same local folder
+Remove vincent.varaldi as owner of the data
