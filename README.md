@@ -7,13 +7,16 @@
 1.5	Medium-High	Do one real, logged-in end-to-end pass
 1.6	Medium	Bike content: real fault/practice list, bike sectors
 1.7	Medium	Finalize branding ("Regis" name/logo)
+
 2. Improve the code
 #	Priority	Item
 2.3	Low	Rules/site deploy via Firebase CLI (revisit in October)
 2.4	Low-Medium	Watch client-side full-collection reads
 2.5	Low	Trim legacy back-compat branches
+
 3. Improve the user experience
 #	Priority	Item
+3.0 Add the possibility to create a report from the summary page. Use of right click or a link once clicked on the trail ?
 3.1	Medium-High	Check the new UI at phone width
 3.2	Medium	Add a hint when a trail is "missing" because of the wrong kind selected
 3.3	Medium	Get real feedback on the bike issue checklist
@@ -25,6 +28,7 @@ in parallel :
 
 Step 2
 - Manage Infraction with different fault type for ski touring, velo and downhill
+- When I click on close all... it add to a "bonne état" state... it should have nothing.
 
 Step 2.5
 - Manage Signalisations for ski touring, velo and downhill
