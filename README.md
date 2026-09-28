@@ -49,3 +49,12 @@ will need to migrate database and potentially all the site to another host and a
 
 
 
+Log de trail builder:
+- date, trail builder responsable(approbation etc...), trail builder support, volontaire, photos, travails, trail,
+- Code QR pour enregistrer un volontaire pour la saison
+
+signalisation et obstable:
+- état, localisation, maintenance ?
+
+
+filtre signalisation par sentier, geolocaliser les signalisations et obstables
