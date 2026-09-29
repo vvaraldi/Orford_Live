@@ -67,7 +67,7 @@
       openPhotoLocationModal(45.31, -72.23);
       await wait(200);
       const photoImg = document.querySelector('#photo-map-wrap img');
-      ok('1.9: photo location on Descente uses the downhill geo map, not the touring one', photoImg && photoImg.getAttribute('src').endsWith('Ski-Downhill_Geolocalisation-map.png'), photoImg && photoImg.getAttribute('src'));
+      ok('1.9: photo location on Descente uses the downhill geo map, not the touring one', photoImg && photoImg.getAttribute('src').endsWith('Ski-Downhill_Geolocalisation-map_web.jpg'), photoImg && photoImg.getAttribute('src'));
       PhotoMapModal.close();
     }
 
