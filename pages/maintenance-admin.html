@@ -77,6 +77,24 @@
                 <option value="builder">Artisan responsable</option>
               </select>
             </div>
+            <div class="form-group">
+              <label class="form-label" for="filter-sector">Secteur</label>
+              <select class="form-select" id="filter-sector">
+                <option value="">Tous les secteurs</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label class="form-label" for="filter-trail">Piste / Sentier</label>
+              <select class="form-select" id="filter-trail">
+                <option value="">Toutes les pistes</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label class="form-label" for="filter-builder">Artisan</label>
+              <select class="form-select" id="filter-builder">
+                <option value="">Tous les artisans</option>
+              </select>
+            </div>
             <div class="form-check">
               <input type="checkbox" id="show-archived">
               <label for="show-archived">Afficher les archivées</label>
@@ -144,6 +162,15 @@
     let sortBy = 'date';
     let currentLogId = null;
     let sectors = []; // every sector (names), from Firestore (SectorService)
+    // Filters: options are built from what actually appears in logsData, not the full
+    // trail/sector/user catalog, so a choice always narrows the list to something non-empty.
+    let filterSector = '';
+    let filterTrail = '';
+    let filterBuilder = '';
+
+    // A trail identifies an entry by id when it has one, else by name (mirrors
+    // SectorService.readTrail's own id-or-name convention for legacy/free-text entries).
+    const entryTrailKey = entry => entry.trailId || ('name:' + (entry.trailName || ''));
 
     // Logs store the sector id only. If the sectors cannot be loaded the page falls back to the id.
     const sectorNameOf = (sectorId, fallback) => SectorService.nameOf(sectors, sectorId, fallback);
@@ -167,6 +194,20 @@
     function bindEvents() {
       document.getElementById('sort-by').addEventListener('change', (e) => {
         sortBy = e.target.value;
+        renderLogs();
+      });
+
+      document.getElementById('filter-sector').addEventListener('change', (e) => {
+        filterSector = e.target.value;
+        updateTrailFilterOptions(); // the trail list narrows to this sector's trails
+        renderLogs();
+      });
+      document.getElementById('filter-trail').addEventListener('change', (e) => {
+        filterTrail = e.target.value;
+        renderLogs();
+      });
+      document.getElementById('filter-builder').addEventListener('change', (e) => {
+        filterBuilder = e.target.value;
         renderLogs();
       });
 
@@ -207,6 +248,7 @@
           logsData.push(data);
         });
 
+        updateFilterOptions();
         renderLogs();
       } catch (e) {
         console.error('Error loading maintenance logs:', e);
@@ -214,15 +256,74 @@
       }
     }
 
+    // Rebuilds the three filter dropdowns from what actually appears in logsData, keeping the
+    // current selection when it is still one of the options (otherwise resetting to "all").
+    function updateFilterOptions() {
+      const sectorIds = new Set();
+      const builders = new Map(); // id -> name
+      logsData.forEach(log => {
+        (log.entries || []).forEach(e => { if (e.sector) sectorIds.add(e.sector); });
+        if (log.builderId) builders.set(log.builderId, log.builderName || log.builderId);
+        (log.supportBuilderIds || []).forEach((id, i) => {
+          if (!builders.has(id)) builders.set(id, (log.supportBuilderNames || [])[i] || id);
+        });
+      });
+
+      const sectorSelect = document.getElementById('filter-sector');
+      const sectorOptions = Array.from(sectorIds, id => ({ id, name: sectorNameOf(id, id) }))
+        .sort((a, b) => a.name.localeCompare(b.name, 'fr'));
+      sectorSelect.replaceChildren(new Option('Tous les secteurs', ''), ...sectorOptions.map(s => new Option(s.name, s.id)));
+      sectorSelect.value = sectorOptions.some(s => s.id === filterSector) ? filterSector : '';
+      filterSector = sectorSelect.value;
+
+      updateTrailFilterOptions();
+
+      const builderSelect = document.getElementById('filter-builder');
+      const builderOptions = Array.from(builders, ([id, name]) => ({ id, name }))
+        .sort((a, b) => a.name.localeCompare(b.name, 'fr'));
+      builderSelect.replaceChildren(new Option('Tous les artisans', ''), ...builderOptions.map(b => new Option(b.name, b.id)));
+      builderSelect.value = builderOptions.some(b => b.id === filterBuilder) ? filterBuilder : '';
+      filterBuilder = builderSelect.value;
+    }
+
+    // The trail dropdown narrows to filterSector's trails when one is chosen.
+    function updateTrailFilterOptions() {
+      const trailSelect = document.getElementById('filter-trail');
+      const trails = new Map(); // entryTrailKey -> name
+      logsData.forEach(log => {
+        (log.entries || []).forEach(e => {
+          if (filterSector && e.sector !== filterSector) return;
+          const key = entryTrailKey(e);
+          if (!trails.has(key)) trails.set(key, e.trailName || key);
+        });
+      });
+      const trailOptions = Array.from(trails, ([id, name]) => ({ id, name }))
+        .sort((a, b) => a.name.localeCompare(b.name, 'fr'));
+      trailSelect.replaceChildren(new Option('Toutes les pistes', ''), ...trailOptions.map(t => new Option(t.name, t.id)));
+      trailSelect.value = trailOptions.some(t => t.id === filterTrail) ? filterTrail : '';
+      filterTrail = trailSelect.value;
+    }
+
     function renderLogs() {
       const tbody = document.getElementById('logs-tbody');
 
-      if (logsData.length === 0) {
+      let filtered = logsData;
+      if (filterSector) {
+        filtered = filtered.filter(log => (log.entries || []).some(e => e.sector === filterSector));
+      }
+      if (filterTrail) {
+        filtered = filtered.filter(log => (log.entries || []).some(e => entryTrailKey(e) === filterTrail));
+      }
+      if (filterBuilder) {
+        filtered = filtered.filter(log => log.builderId === filterBuilder || (log.supportBuilderIds || []).includes(filterBuilder));
+      }
+
+      if (filtered.length === 0) {
         tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;">Aucun journal trouvé</td></tr>';
         return;
       }
 
-      let sorted = [...logsData];
+      let sorted = [...filtered];
       if (sortBy === 'date') {
         sorted.sort((a, b) => {
           const dateA = a.date?.toDate?.() || a.createdAt?.toDate?.() || new Date(0);

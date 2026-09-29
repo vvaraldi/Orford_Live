@@ -295,8 +295,8 @@ const APP_CONFIG = {
     signalisation: {
       title: 'Signalisation',
       items: [
-        { id: 'signalisation-report', label: 'Rapport', icon: '📝', href: 'pages/signalisation-report.html' },
         { id: 'signalisation-resume', label: 'Résumé', icon: '🗺️', href: 'pages/signalisation-resume.html' },
+        { id: 'signalisation-report', label: 'Rapport', icon: '📝', href: 'pages/signalisation-report.html' },
         { id: 'signalisation-admin', label: 'Gestion', icon: '📋', href: 'pages/signalisation-admin.html', admin: true }
       ]
     },
