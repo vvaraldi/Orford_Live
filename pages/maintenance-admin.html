@@ -243,7 +243,7 @@
           <tr data-id="${log.id}">
             <td>${dateStr}</td>
             <td>${escapeHtml(log.builderName || '-')}</td>
-            <td>${escapeHtml(log.supportBuilderName || '-')}</td>
+            <td>${escapeHtml((log.supportBuilderNames || []).join(', ') || '-')}</td>
             <td>${(log.volunteerNames || []).length}</td>
             <td>${entryCount}</td>
             <td>${status}</td>
@@ -306,7 +306,7 @@
           <div class="detail-grid">
             <div class="detail-item"><strong>Date:</strong> ${dateStr}</div>
             <div class="detail-item"><strong>Responsable:</strong> ${escapeHtml(log.builderName || '-')}</div>
-            <div class="detail-item"><strong>Support:</strong> ${escapeHtml(log.supportBuilderName || 'Aucun')}</div>
+            <div class="detail-item"><strong>Support:</strong> ${escapeHtml((log.supportBuilderNames || []).join(', ') || 'Aucun')}</div>
             <div class="detail-item"><strong>Statut:</strong> ${log.archived ? 'Archivée' : 'Active'}</div>
           </div>
           <p style="font-size:0.75rem;color:var(--theme-text-secondary);margin-top:0.5rem;">

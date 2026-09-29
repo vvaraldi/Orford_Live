@@ -53,12 +53,12 @@
     }
     .entry-block__title { font-weight: 600; }
 
-    /* Scrollable, filterable volunteer picker */
-    .volunteer-picker { border: 1px solid var(--theme-border); border-radius: var(--radius-md); }
-    .volunteer-list { max-height: 220px; overflow-y: auto; padding: 0.5rem; }
-    .volunteer-list__empty { color: var(--theme-text-secondary); font-size: 0.875rem; padding: 0.5rem; }
-    .volunteer-item { display: flex; align-items: center; gap: 0.5rem; padding: 0.25rem 0; }
-    .volunteer-item input { width: 16px; height: 16px; }
+    /* Scrollable, filterable multi-select picker (support builders, volunteers) */
+    .picker-box { border: 1px solid var(--theme-border); border-radius: var(--radius-md); }
+    .picker-list { max-height: 220px; overflow-y: auto; padding: 0.5rem; }
+    .picker-list__empty { color: var(--theme-text-secondary); font-size: 0.875rem; padding: 0.5rem; }
+    .picker-item { display: flex; align-items: center; gap: 0.5rem; padding: 0.25rem 0; }
+    .picker-item input { width: 16px; height: 16px; }
   </style>
 </head>
 <body data-theme="light" data-module="maintenance" data-nav="maintenance" data-page="maintenance-report">
@@ -104,20 +104,20 @@
             <input type="date" class="form-input" id="log-date" required>
           </div>
 
-          <!-- Support builder -->
+          <!-- Support builders -->
           <div class="form-group">
-            <label class="form-label" for="support-builder-select">Artisan de sentiers en support <span class="form-hint">(optionnel)</span></label>
-            <select class="form-select" id="support-builder-select">
-              <option value="">-- Aucun --</option>
-            </select>
+            <label class="form-label">Artisans de sentiers en support <span class="form-hint">(optionnel, plusieurs possibles)</span></label>
+            <div class="picker-box">
+              <div class="picker-list" id="support-builder-list"></div>
+            </div>
           </div>
 
           <!-- Volunteers -->
           <div class="form-group">
-            <label class="form-label">Bénévoles présents <span class="form-hint">(optionnel)</span></label>
-            <div class="volunteer-picker">
+            <label class="form-label">Bénévoles présents <span class="form-hint">(optionnel, plusieurs possibles)</span></label>
+            <div class="picker-box">
               <input type="text" class="form-input" id="volunteer-filter" placeholder="Filtrer par nom...">
-              <div class="volunteer-list" id="volunteer-list"></div>
+              <div class="picker-list" id="volunteer-list"></div>
             </div>
           </div>
 
@@ -169,7 +169,7 @@
     let loadedFileUrls = [];
 
     // Elements
-    let reportSelector, builderName, logDate, supportBuilderSelect;
+    let reportSelector, builderName, logDate, supportBuilderListEl;
     let volunteerFilter, volunteerListEl;
     let entriesContainer, addEntryBtn;
     let saveBtn, modifyBtn, resetBtn;
@@ -203,7 +203,7 @@
       reportSelector = document.getElementById('report-selector');
       builderName = document.getElementById('builder-name');
       logDate = document.getElementById('log-date');
-      supportBuilderSelect = document.getElementById('support-builder-select');
+      supportBuilderListEl = document.getElementById('support-builder-list');
       volunteerFilter = document.getElementById('volunteer-filter');
       volunteerListEl = document.getElementById('volunteer-list');
       entriesContainer = document.getElementById('entries-container');
@@ -250,10 +250,7 @@
           supportBuilders.push({ id: doc.id, name: data.name || data.email || doc.id });
         });
         supportBuilders.sort((a, b) => a.name.localeCompare(b.name, 'fr'));
-        supportBuilderSelect.replaceChildren(
-          new Option('-- Aucun --', ''),
-          ...supportBuilders.map(b => new Option(b.name, b.id))
-        );
+        renderSupportBuilderList();
       } catch (e) {
         console.error('Error loading support builders:', e);
       }
@@ -277,53 +274,83 @@
       }
     }
 
-    function renderVolunteerList() {
-      const filter = SectorService.norm(volunteerFilter.value);
-      // Which ids are currently checked, so re-rendering (filtering) does not lose the selection
-      const checked = new Set(Array.from(volunteerListEl.querySelectorAll('input[type=checkbox]:checked')).map(el => el.value));
-
-      const visible = filter ? volunteers.filter(v => SectorService.norm(v.name).includes(filter)) : volunteers;
-
-      if (visible.length === 0) {
-        volunteerListEl.innerHTML = '<div class="volunteer-list__empty">Aucun bénévole inscrit.</div>';
+    // Generic multi-select checkbox list, shared by the support-builder and volunteer pickers.
+    function renderCheckboxList(container, items, checkedIds, emptyText) {
+      if (items.length === 0) {
+        container.innerHTML = `<div class="picker-list__empty">${emptyText}</div>`;
         return;
       }
-
-      volunteerListEl.innerHTML = '';
-      visible.forEach(v => {
-        const item = document.createElement('label');
-        item.className = 'volunteer-item';
+      container.innerHTML = '';
+      items.forEach(item => {
+        const label = document.createElement('label');
+        label.className = 'picker-item';
         const input = document.createElement('input');
         input.type = 'checkbox';
-        input.value = v.id;
-        input.checked = checked.has(v.id);
+        input.value = item.id;
+        input.checked = checkedIds.has(item.id);
         const span = document.createElement('span');
-        span.textContent = v.name;
-        item.appendChild(input);
-        item.appendChild(span);
-        volunteerListEl.appendChild(item);
+        span.textContent = item.name;
+        label.appendChild(input);
+        label.appendChild(span);
+        container.appendChild(label);
       });
     }
 
-    function checkedVolunteers() {
-      return Array.from(volunteerListEl.querySelectorAll('input[type=checkbox]:checked')).map(el => {
-        const v = volunteers.find(x => x.id === el.value);
-        return { id: el.value, name: v ? v.name : el.value };
+    function checkedItemsOf(container, items) {
+      return Array.from(container.querySelectorAll('input[type=checkbox]:checked')).map(el => {
+        const item = items.find(x => x.id === el.value);
+        return { id: el.value, name: item ? item.name : el.value };
       });
+    }
+
+    // Adds ids missing from `items` (e.g. a builder/volunteer removed since the log was saved),
+    // so a log being edited never silently drops who it named, mirroring how
+    // SectorService.selectTrail keeps an unknown trail as an extra option.
+    function addMissingItems(items, ids, names) {
+      (ids || []).forEach((id, i) => {
+        if (!items.find(x => x.id === id)) {
+          items.push({ id, name: (names && names[i]) || id });
+        }
+      });
+    }
+
+    function renderVolunteerList() {
+      const filter = SectorService.norm(volunteerFilter.value);
+      // Which ids are currently checked, so re-rendering (filtering) does not lose the selection
+      const checked = new Set(checkedItemsOf(volunteerListEl, volunteers).map(v => v.id));
+      const visible = filter ? volunteers.filter(v => SectorService.norm(v.name).includes(filter)) : volunteers;
+      renderCheckboxList(volunteerListEl, visible, checked, 'Aucun bénévole inscrit.');
+    }
+
+    function checkedVolunteers() {
+      return checkedItemsOf(volunteerListEl, volunteers);
     }
 
     function setCheckedVolunteers(ids, names) {
       // The picker only lists the currently-loaded 200 most recent volunteers; an older one
-      // named on a log being edited may not be in that list. Add it as an extra, checked entry
-      // rather than silently dropping it, mirroring SectorService.selectTrail's "unknown" handling.
-      (ids || []).forEach((id, i) => {
-        if (!volunteers.find(v => v.id === id)) {
-          volunteers.push({ id, name: (names && names[i]) || id });
-        }
-      });
+      // named on a log being edited may not be in that list.
+      addMissingItems(volunteers, ids, names);
       renderVolunteerList();
       const idSet = new Set(ids || []);
       volunteerListEl.querySelectorAll('input[type=checkbox]').forEach(el => {
+        el.checked = idSet.has(el.value);
+      });
+    }
+
+    function renderSupportBuilderList() {
+      const checked = new Set(checkedItemsOf(supportBuilderListEl, supportBuilders).map(b => b.id));
+      renderCheckboxList(supportBuilderListEl, supportBuilders, checked, 'Aucun autre artisan disponible.');
+    }
+
+    function checkedSupportBuilders() {
+      return checkedItemsOf(supportBuilderListEl, supportBuilders);
+    }
+
+    function setCheckedSupportBuilders(ids, names) {
+      addMissingItems(supportBuilders, ids, names);
+      renderSupportBuilderList();
+      const idSet = new Set(ids || []);
+      supportBuilderListEl.querySelectorAll('input[type=checkbox]').forEach(el => {
         el.checked = idSet.has(el.value);
       });
     }
@@ -478,7 +505,7 @@
         logDate.value = `${year}-${month}-${day}`;
       }
 
-      supportBuilderSelect.value = log.supportBuilderId || '';
+      setCheckedSupportBuilders(log.supportBuilderIds || [], log.supportBuilderNames || []);
       setCheckedVolunteers(log.volunteerIds || [], log.volunteerNames || []);
 
       clearEntries();
@@ -500,7 +527,7 @@
       reportSelector.value = 'new';
 
       setDefaultValues();
-      supportBuilderSelect.value = '';
+      setCheckedSupportBuilders([], []);
       setCheckedVolunteers([], []);
 
       clearEntries();
@@ -596,7 +623,7 @@
 
       try {
         const entriesPayload = await buildEntriesPayload();
-        const supportBuilder = supportBuilders.find(b => b.id === supportBuilderSelect.value);
+        const supportBuildersChecked = checkedSupportBuilders();
         const volunteersChecked = checkedVolunteers();
 
         const [year, month, day] = logDate.value.split('-');
@@ -607,8 +634,8 @@
           date: firebase.firestore.Timestamp.fromDate(logDateValue),
           builderId: currentUser.uid,
           builderName: builderName.value,
-          supportBuilderId: supportBuilder ? supportBuilder.id : null,
-          supportBuilderName: supportBuilder ? supportBuilder.name : null,
+          supportBuilderIds: supportBuildersChecked.map(b => b.id),
+          supportBuilderNames: supportBuildersChecked.map(b => b.name),
           volunteerIds: volunteersChecked.map(v => v.id),
           volunteerNames: volunteersChecked.map(v => v.name),
           entries: entriesPayload,
@@ -617,11 +644,14 @@
           modifiedAt: firebase.firestore.FieldValue.serverTimestamp()
         };
 
-        await db.collection('maintenance_logs').add(logData);
+        const docRef = await db.collection('maintenance_logs').add(logData);
 
         showToast('Journal enregistré avec succès', 'success');
-        resetForm();
+        // Stay on this report (switch to "Modifier" mode) instead of resetting to a blank
+        // form, so entries can keep being added the same day without reselecting it.
         await loadUserLogs();
+        reportSelector.value = docRef.id;
+        handleReportChange();
 
       } catch (e) {
         console.error('Error saving maintenance log:', e);
@@ -641,7 +671,7 @@
 
       try {
         const entriesPayload = await buildEntriesPayload();
-        const supportBuilder = supportBuilders.find(b => b.id === supportBuilderSelect.value);
+        const supportBuildersChecked = checkedSupportBuilders();
         const volunteersChecked = checkedVolunteers();
 
         const [year, month, day] = logDate.value.split('-');
@@ -649,8 +679,8 @@
 
         const updateData = {
           date: firebase.firestore.Timestamp.fromDate(logDateValue),
-          supportBuilderId: supportBuilder ? supportBuilder.id : null,
-          supportBuilderName: supportBuilder ? supportBuilder.name : null,
+          supportBuilderIds: supportBuildersChecked.map(b => b.id),
+          supportBuilderNames: supportBuildersChecked.map(b => b.name),
           volunteerIds: volunteersChecked.map(v => v.id),
           volunteerNames: volunteersChecked.map(v => v.name),
           entries: entriesPayload,

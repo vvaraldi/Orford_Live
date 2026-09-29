@@ -203,11 +203,14 @@ service cloud.firestore {
     // No login there, so this is the app's only public write - deliberately narrow: create-only,
     // closed field set, typed/bounded, agreement must be accepted, createdAt must be the server
     // clock (blocks a scripted client from backdating/spoofing). Read is limited to signed-in
-    // users so the maintenance log's volunteer picker can list names; nobody can update/delete
-    // a registration through the app.
+    // users so the maintenance log's volunteer picker can list names. An admin can delete a
+    // registration (Administration > Bénévoles) once it is no longer needed for the season;
+    // maintenance_logs store the volunteer's name directly (volunteerNames), not a reference to
+    // this collection, so deleting one here never affects a past log. Nobody can update one.
     match /volunteers/{volunteerId} {
       allow read: if request.auth != null;
-      allow update, delete: if false;
+      allow update: if false;
+      allow delete: if isAdmin() && canWorkIn(recordNetwork(resource.data));
       allow create: if
           request.resource.data.keys().hasOnly(['nom', 'prenom', 'network', 'agreementAccepted', 'createdAt']) &&
           request.resource.data.keys().hasAll(['nom', 'prenom', 'network', 'agreementAccepted', 'createdAt']) &&

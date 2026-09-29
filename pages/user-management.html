@@ -322,6 +322,9 @@
       <button class="admin-tabs__btn" data-tab="maps" id="maps-tab-btn" onclick="switchTab('maps')" style="display: none;">
         📍 Cartes
       </button>
+      <button class="admin-tabs__btn" data-tab="volunteers" id="volunteers-tab-btn" onclick="switchTab('volunteers')" style="display: none;">
+        🙋 Bénévoles
+      </button>
       <button class="admin-tabs__btn" data-tab="import" onclick="switchTab('import')">
         📥 Import
       </button>
@@ -627,6 +630,52 @@
             <img id="cal-image" alt="Carte à calibrer">
             <svg id="cal-overlay" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"></svg>
           </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- TAB: VOLUNTEERS (bike network) -->
+    <div class="admin-tab-content" id="volunteers-tab">
+      <div class="data-export-section">
+        <div class="data-export-section__header">
+          <span>🙋</span>
+          <h3>Bénévoles inscrits</h3>
+        </div>
+        <p class="data-export-section__description">
+          Bénévoles inscrits via la page d'inscription dédiée (réseau vélo). Supprimer un bénévole ici
+          ne modifie pas les journaux d'entretien déjà enregistrés : son nom y est copié, pas lié à cette liste.
+        </p>
+
+        <div style="display:flex; gap:0.75rem; align-items:center; margin-bottom:0.75rem; flex-wrap:wrap;">
+          <button type="button" class="btn btn-danger btn-sm" id="delete-selected-volunteers-btn" disabled>🗑️ Supprimer la sélection</button>
+          <button type="button" class="btn btn-danger btn-sm" id="delete-all-volunteers-btn">🗑️ Supprimer tout</button>
+          <button type="button" class="btn btn-secondary btn-sm" id="refresh-volunteers-btn">🔄 Actualiser</button>
+          <span id="volunteers-count" style="font-size:0.85rem; color:var(--theme-text-secondary);"></span>
+        </div>
+
+        <div class="data-table__body">
+          <table class="table table--hover table--responsive" id="volunteers-table">
+            <thead>
+              <tr>
+                <th style="width:2.5rem;"><input type="checkbox" id="volunteers-select-all"></th>
+                <th>Nom</th>
+                <th>Prénom</th>
+                <th>Date d'inscription</th>
+              </tr>
+            </thead>
+            <tbody id="volunteers-tbody"></tbody>
+          </table>
+        </div>
+
+        <div class="empty-state" id="volunteers-empty-state" style="display: none;">
+          <div class="empty-state__icon">🙋</div>
+          <h3 class="empty-state__title">Aucun bénévole inscrit</h3>
+          <p class="empty-state__description">Personne ne s'est encore inscrit via la page dédiée.</p>
+        </div>
+
+        <div class="loading-state" id="volunteers-loading">
+          <div class="loading-spinner"></div>
+          <p class="loading-text">Chargement des bénévoles...</p>
         </div>
       </div>
     </div>
@@ -967,6 +1016,125 @@
       document.querySelectorAll('.admin-tab-content').forEach(content => {
         content.classList.toggle('is-active', content.id === `${tabName}-tab`);
       });
+    }
+
+    // ========================================
+    // VOLUNTEERS (bike network)
+    // ========================================
+
+    let volunteersData = [];
+
+    async function loadVolunteersTab() {
+      const loading = document.getElementById('volunteers-loading');
+      const emptyState = document.getElementById('volunteers-empty-state');
+      const tbody = document.getElementById('volunteers-tbody');
+
+      loading.style.display = 'flex';
+      emptyState.style.display = 'none';
+      tbody.innerHTML = '';
+
+      try {
+        const snap = await db.collection('volunteers')
+          .where('network', '==', 'bike')
+          .orderBy('createdAt', 'desc')
+          .get();
+
+        volunteersData = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        renderVolunteersTab();
+      } catch (e) {
+        console.error('Error loading volunteers:', e);
+        showMessage('Erreur lors du chargement des bénévoles.', 'error');
+      } finally {
+        loading.style.display = 'none';
+      }
+    }
+
+    function renderVolunteersTab() {
+      const tbody = document.getElementById('volunteers-tbody');
+      const emptyState = document.getElementById('volunteers-empty-state');
+      const countEl = document.getElementById('volunteers-count');
+
+      countEl.textContent = `${volunteersData.length} bénévole${volunteersData.length > 1 ? 's' : ''}`;
+
+      if (volunteersData.length === 0) {
+        tbody.innerHTML = '';
+        emptyState.style.display = 'flex';
+        updateVolunteersSelectionState();
+        return;
+      }
+      emptyState.style.display = 'none';
+
+      tbody.innerHTML = volunteersData.map(v => {
+        const date = v.createdAt?.toDate?.();
+        const dateStr = date ? date.toLocaleDateString('fr-CA', { year: 'numeric', month: 'short', day: 'numeric' }) : '-';
+        return `
+        <tr>
+          <td><input type="checkbox" class="volunteer-checkbox" value="${v.id}"></td>
+          <td data-label="Nom">${escapeHtml(v.nom || '-')}</td>
+          <td data-label="Prénom">${escapeHtml(v.prenom || '-')}</td>
+          <td data-label="Date d'inscription">${dateStr}</td>
+        </tr>
+      `;
+      }).join('');
+
+      tbody.querySelectorAll('.volunteer-checkbox').forEach(cb => {
+        cb.addEventListener('change', updateVolunteersSelectionState);
+      });
+      updateVolunteersSelectionState();
+    }
+
+    function updateVolunteersSelectionState() {
+      const checkboxes = Array.from(document.querySelectorAll('.volunteer-checkbox'));
+      const checked = checkboxes.filter(cb => cb.checked);
+      document.getElementById('delete-selected-volunteers-btn').disabled = checked.length === 0;
+
+      const selectAll = document.getElementById('volunteers-select-all');
+      selectAll.checked = checkboxes.length > 0 && checked.length === checkboxes.length;
+      selectAll.indeterminate = checked.length > 0 && checked.length < checkboxes.length;
+    }
+
+    function toggleAllVolunteers(checked) {
+      document.querySelectorAll('.volunteer-checkbox').forEach(cb => { cb.checked = checked; });
+      updateVolunteersSelectionState();
+    }
+
+    // Firestore batches cap at 500 writes; chunk deletes to stay under that.
+    async function deleteVolunteersByIds(ids) {
+      const CHUNK = 450;
+      for (let i = 0; i < ids.length; i += CHUNK) {
+        const batch = db.batch();
+        ids.slice(i, i + CHUNK).forEach(id => batch.delete(db.collection('volunteers').doc(id)));
+        await batch.commit();
+      }
+    }
+
+    async function deleteSelectedVolunteers() {
+      const ids = Array.from(document.querySelectorAll('.volunteer-checkbox:checked')).map(cb => cb.value);
+      if (ids.length === 0) return;
+      if (!confirm(`Supprimer ${ids.length} bénévole${ids.length > 1 ? 's' : ''} sélectionné${ids.length > 1 ? 's' : ''} ? Cette action est irréversible. Les journaux d'entretien existants ne sont pas affectés.`)) return;
+
+      try {
+        await deleteVolunteersByIds(ids);
+        showMessage(`${ids.length} bénévole${ids.length > 1 ? 's' : ''} supprimé${ids.length > 1 ? 's' : ''}.`, 'success');
+        loadVolunteersTab();
+      } catch (e) {
+        console.error('Error deleting volunteers:', e);
+        showMessage('Erreur lors de la suppression.', 'error');
+      }
+    }
+
+    async function deleteAllVolunteers() {
+      if (volunteersData.length === 0) return;
+      if (!confirm(`Supprimer TOUS les bénévoles inscrits (${volunteersData.length}) ? Cette action est irréversible. Les journaux d'entretien existants ne sont pas affectés.`)) return;
+
+      try {
+        await deleteVolunteersByIds(volunteersData.map(v => v.id));
+        showMessage('Tous les bénévoles ont été supprimés.', 'success');
+        loadVolunteersTab();
+      } catch (e) {
+        console.error('Error deleting all volunteers:', e);
+        showMessage('Erreur lors de la suppression.', 'error');
+      }
     }
 
     // ========================================
@@ -1876,6 +2044,15 @@ Marie Tremblay,marie.tremblay@example.com,MotDePasse456,admin,,true,true,true,fa
             document.getElementById('maps-tab-btn').style.display = '';
             MapCalibration.init(currentUser.uid);
           }
+          // Volunteers (bike network only): shown to a system admin or an admin who works in bike
+          if (isCurrentUserSystemAdmin || myNetworks().includes('bike')) {
+            document.getElementById('volunteers-tab-btn').style.display = '';
+            loadVolunteersTab();
+          }
+          document.getElementById('volunteers-select-all').addEventListener('change', (e) => toggleAllVolunteers(e.target.checked));
+          document.getElementById('delete-selected-volunteers-btn').addEventListener('click', deleteSelectedVolunteers);
+          document.getElementById('delete-all-volunteers-btn').addEventListener('click', deleteAllVolunteers);
+          document.getElementById('refresh-volunteers-btn').addEventListener('click', loadVolunteersTab);
           document.getElementById('filter-network').insertAdjacentHTML('beforeend',
             NETWORK_IDS.map(id => `<option value="${id}">${APP_CONFIG.networks[id].icon} ${APP_CONFIG.networks[id].name}</option>`).join(''));
           document.getElementById('user-role').addEventListener('change', applyNetworkLocks);
