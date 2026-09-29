@@ -89,6 +89,16 @@
       },
       compress: { overBytes: 1024 * 1024, quality: 0.7, maxWidth: 1200 },
       parallel: true
+    },
+    maintenance: {
+      // Same shape as infraction/signalisation (per-user folder, not per-record):
+      // a maintenance log has several entries, each with its own PhotoPicker, so
+      // callers pass a distinct `stamp` per entry to keep paths from colliding.
+      path: function (o) {
+        return 'maintenance/' + o.userId + '/' + (o.stamp + o.index) + '_' + o.filename;
+      },
+      compress: { overBytes: 1024 * 1024, quality: 0.7, maxWidth: 1200 },
+      parallel: false
     }
   };
 

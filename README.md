@@ -16,33 +16,28 @@
 
 3. Improve the user experience
 #	Priority	Item
-3.0 Add the possibility to create a report from the summary page. Use of right click or a link once clicked on the trail ?
-3.05 Use two maps one for geolocalisation and one for status  (open and close)
-3.1	Medium-High	Check the new UI at phone width
-3.2	Medium	Add a hint when a trail is "missing" because of the wrong kind selected
-3.3	Medium	Get real feedback on the bike issue checklist
-3.5	Low	Season label wording for bike
-3.6	Low	Accessibility audit pass
+3.0 when I click on close all... it add to a "bonne état" state... it should have nothing.
+3.1 Add the possibility to create a report from the summary page. Use of right click or a link once clicked on the trail ?
+3.2 Use two maps in ski downhill : one for geolocalisation and one for status of the trails (open and close). On the first one, we need to map the geocoordinate. The second should only be for the trails markers coordinate.
+3.3 In Signalisation: add a filtre view by trails, 
+3.4	Medium-High	Check the new UI at phone width
+3.5	Medium	Add a hint when a trail is "missing" because of the wrong kind selected
+3.6	Medium	Get real feedback on the bike issue checklist
+3.7	Low	Season label wording for bike
+3.8	Low	Accessibility audit pass
 
 
-in parallel :
-
-Step 2
+in parallel... few other points
 - Manage Infraction with different fault type for ski touring, velo and downhill
-- When I click on close all... it add to a "bonne état" state... it should have nothing.
-
-Step 2.5
 - Manage Signalisations for ski touring, velo and downhill
-
-Step 3
 - The network context: a network field on the collections, a network.js with the current network and a query helper, and the header switcher, remembered like orford-theme and defaulting by season	The step you're describing
-
-Step 5
 - Documentation / README & deployment guide
+- looks like the login on the new website site address is not working...
 
-Step 6: Migration Support
-will need to migrate database and potentially all the site to another host and account... to be validated
-6.1 Firebase rules updateIf needed for new structure
+To do with the customer :
+- Validate that the paiement method is not my personal data
+
+
 
 
 
@@ -50,27 +45,19 @@ will need to migrate database and potentially all the site to another host and a
 
 
 
-Objectif :
-Livraison pour vélo fin Mars up and running
 
-
-signalisation et obstable:
-- état, localisation, maintenance ?
-
-filtre signalisation par sentier, geolocaliser les signalisations et obstables
-
-Log de trail builder:
-- date, trail builder responsable(approbation etc...), trail builder support, volontaire, photos, travails, trail,
-- Code QR pour enregistrer un volontaire pour la saison
+Bike :
+- Objectif to deliver this part for end of March 2027
+- while including the new app called Maintenance
 
 
 
-Outcome of the meeting
-Agreed on European data server
+
+
+Outcome of the meeting of the 28th of sept
+Info shared : data server is US-EAST1.
 Agreed on data imported and inclusion of some personal data
 Created a Regis@orford.com account to manage the data (regis is the owner)
 Regis has a github account
 
-To Do
-Duplicate the website from the same local folder
-Remove vincent.varaldi as owner of the data
+

@@ -1,0 +1,378 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Gestion de l'entretien">
+  <meta name="theme-color" content="#166534">
+  <title>Gestion de l'entretien</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🔧</text></svg>">
+  <link rel="stylesheet" href="../css/main.css">
+  <style>
+    /* Filters row */
+    .filters-row { display: flex; flex-wrap: wrap; gap: 1rem; align-items: center; margin-bottom: 1rem; }
+    .filters-row .form-group { margin-bottom: 0; min-width: 140px; }
+    .filters-row .form-check { display: flex; align-items: center; gap: 0.5rem; }
+
+    /* Table */
+    .table-container { overflow-x: auto; }
+    .data-table { width: 100%; border-collapse: collapse; font-size: 0.875rem; }
+    .data-table th, .data-table td { padding: 0.75rem; text-align: left; border-bottom: 1px solid var(--theme-border); }
+    .data-table th { background: var(--theme-surface-alt); font-weight: 600; color: var(--theme-text-secondary); white-space: nowrap; }
+    .data-table tbody tr { cursor: pointer; transition: background 0.15s; }
+    .data-table tbody tr:hover { background: var(--theme-surface-alt); }
+
+    /* Status badges */
+    .status-active { background: #dcfce7; color: #166534; padding: 0.25rem 0.5rem; border-radius: 4px; font-size: 0.75rem; }
+    .status-archived { background: #f3f4f6; color: #6b7280; padding: 0.25rem 0.5rem; border-radius: 4px; font-size: 0.75rem; }
+
+    /* Modal detail sections */
+    .detail-section { margin-bottom: 1.5rem; }
+    .detail-section:last-child { margin-bottom: 0; }
+    .detail-section h4 { font-size: 0.8rem; font-weight: 600; color: var(--theme-text-secondary); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 0.5rem; }
+    .detail-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 0.75rem; }
+    .detail-item { font-size: 0.875rem; }
+    .detail-item strong { color: var(--theme-text-secondary); font-weight: 500; }
+    .detail-description { background: var(--theme-surface-alt); padding: 1rem; border-radius: var(--radius-md); white-space: pre-wrap; font-size: 0.875rem; }
+    .detail-photo { max-width: 100%; max-height: 300px; border-radius: var(--radius-md); border: 1px solid var(--theme-border); cursor: pointer; }
+
+    /* One job entry, in the detail view */
+    .entry-card { border: 1px solid var(--theme-border); border-radius: var(--radius-md); padding: 0.75rem; margin-bottom: 0.75rem; background: var(--theme-surface-alt); }
+    .entry-card__title { font-weight: 600; margin-bottom: 0.4rem; }
+
+    /* Photo location links */
+    .photo-location { margin-top: 0.5rem; font-size: 0.8rem; }
+    .photo-location a { color: var(--theme-accent); margin-right: 1rem; }
+
+    @media (max-width: 768px) {
+      .filters-row { flex-direction: column; align-items: stretch; }
+      .data-table { font-size: 0.8rem; }
+      .data-table th, .data-table td { padding: 0.5rem; }
+    }
+  </style>
+</head>
+<body data-theme="light" data-module="maintenance" data-nav="maintenance" data-page="maintenance-admin">
+  <script src="../js/core/config.js"></script>
+  <script src="../js/core/network.js"></script>
+  <script src="../js/core/layout.js"></script>
+  <!-- Loading -->
+  <div id="loading" class="page-loading"><div class="loading-spinner"></div><p class="loading-text">Chargement...</p></div>
+
+  <!-- Main Content -->
+  <main id="main-content" class="main" style="display: none;">
+    <div class="page-header"><div class="page-header__content"><h1 class="page-title">Gestion de l'entretien</h1><p class="page-subtitle">Consulter les journaux de travail des artisans de sentiers</p></div></div>
+
+    <section class="content-section">
+      <div class="section-card">
+        <div class="section-card__header">
+          <h2 class="section-card__title">📋 Liste des journaux</h2>
+        </div>
+        <div class="section-card__body">
+          <!-- Filters -->
+          <div class="filters-row">
+            <div class="form-group">
+              <label class="form-label" for="sort-by">Trier par</label>
+              <select class="form-select" id="sort-by">
+                <option value="date">Date</option>
+                <option value="builder">Artisan responsable</option>
+              </select>
+            </div>
+            <div class="form-check">
+              <input type="checkbox" id="show-archived">
+              <label for="show-archived">Afficher les archivées</label>
+            </div>
+            <button class="btn btn-secondary btn-sm" id="refresh-btn">🔄 Actualiser</button>
+          </div>
+
+          <!-- Table -->
+          <div class="table-container">
+            <table class="data-table" id="logs-table">
+              <thead>
+                <tr>
+                  <th>Date</th>
+                  <th>Responsable</th>
+                  <th>Support</th>
+                  <th>Bénévoles</th>
+                  <th>Travaux</th>
+                  <th>Statut</th>
+                </tr>
+              </thead>
+              <tbody id="logs-tbody">
+                <tr><td colspan="6" style="text-align:center;">Chargement...</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <!-- Detail Modal -->
+  <div class="modal" id="detail-modal">
+    <div class="modal__container" style="max-width: 700px;">
+      <div class="modal__header">
+        <h3 class="modal__title">Détails du journal</h3>
+        <button class="modal__close" id="modal-close">&times;</button>
+      </div>
+      <div class="modal__body" id="modal-body">
+        <!-- Loaded dynamically -->
+      </div>
+      <div class="modal__footer">
+        <button class="btn btn-warning" id="archive-btn">Archiver</button>
+        <button class="btn btn-secondary" id="close-btn">Fermer</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Footer -->
+  <footer class="footer footer--simple"><div class="footer__content"><p class="footer__copyright">© 2026 Regis for Mont Orford</p></div></footer>
+
+  <!-- Scripts -->
+  <script src="../js/core/utils.js"></script>
+  <script src="../js/core/theme.js"></script>
+  <script src="../js/core/ui.js"></script>
+  <script src="../js/core/firebase-loader.js"></script>
+  <script src="../js/core/auth.js"></script>
+  <script src="../js/services/photo-service.js"></script>
+  <script src="../js/services/map-service.js"></script>
+  <script src="../js/services/photo-map-modal.js"></script>
+  <script src="../js/services/sector-service.js"></script>
+
+  <script>
+    let logsData = [];
+    let showArchived = false;
+    let sortBy = 'date';
+    let currentLogId = null;
+    let sectors = []; // every sector (names), from Firestore (SectorService)
+
+    // Logs store the sector id only. If the sectors cannot be loaded the page falls back to the id.
+    const sectorNameOf = (sectorId, fallback) => SectorService.nameOf(sectors, sectorId, fallback);
+
+    function initMaintenanceAdmin() {
+      checkAuthStatus({
+        requireAuth: true,
+        requireAdmin: true,
+        onAuthenticated: async () => {
+          bindEvents();
+          try {
+            sectors = await SectorService.loadAll();
+          } catch (e) {
+            console.error('Error loading sectors:', e);
+          }
+          loadLogs();
+        }
+      });
+    }
+
+    function bindEvents() {
+      document.getElementById('sort-by').addEventListener('change', (e) => {
+        sortBy = e.target.value;
+        renderLogs();
+      });
+
+      document.getElementById('show-archived').addEventListener('change', (e) => {
+        showArchived = e.target.checked;
+        loadLogs();
+      });
+
+      document.getElementById('refresh-btn').addEventListener('click', loadLogs);
+
+      // Modal
+      document.getElementById('modal-close').addEventListener('click', closeModal);
+      document.getElementById('close-btn').addEventListener('click', closeModal);
+      document.getElementById('archive-btn').addEventListener('click', toggleArchive);
+      document.getElementById('detail-modal').addEventListener('click', (e) => {
+        if (e.target.id === 'detail-modal') closeModal();
+      });
+      document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeModal(); });
+    }
+
+    async function loadLogs() {
+      const tbody = document.getElementById('logs-tbody');
+      tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;">Chargement...</td></tr>';
+
+      try {
+        let query = db.collection('maintenance_logs').orderBy('createdAt', 'desc');
+
+        if (!showArchived) {
+          query = query.where('archived', '==', false);
+        }
+
+        const snap = await query.get();
+        logsData = [];
+        snap.forEach(doc => {
+          const data = { id: doc.id, ...doc.data() };
+          // Every log is network:'bike' - shown regardless of the admin's currently selected
+          // network (unlike infraction/signalisation admin, there is no other network to filter out).
+          logsData.push(data);
+        });
+
+        renderLogs();
+      } catch (e) {
+        console.error('Error loading maintenance logs:', e);
+        tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:var(--color-danger);">Erreur de chargement</td></tr>';
+      }
+    }
+
+    function renderLogs() {
+      const tbody = document.getElementById('logs-tbody');
+
+      if (logsData.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;">Aucun journal trouvé</td></tr>';
+        return;
+      }
+
+      let sorted = [...logsData];
+      if (sortBy === 'date') {
+        sorted.sort((a, b) => {
+          const dateA = a.date?.toDate?.() || a.createdAt?.toDate?.() || new Date(0);
+          const dateB = b.date?.toDate?.() || b.createdAt?.toDate?.() || new Date(0);
+          return dateB - dateA;
+        });
+      } else if (sortBy === 'builder') {
+        sorted.sort((a, b) => (a.builderName || '').localeCompare(b.builderName || '', 'fr'));
+      }
+
+      tbody.innerHTML = sorted.map(log => {
+        const date = log.date?.toDate?.() || log.createdAt?.toDate?.();
+        const dateStr = date ? date.toLocaleDateString('fr-CA') : '-';
+        const status = log.archived ? '<span class="status-archived">Archivée</span>' : '<span class="status-active">Active</span>';
+        const entryCount = (log.entries || []).length;
+
+        return `
+          <tr data-id="${log.id}">
+            <td>${dateStr}</td>
+            <td>${escapeHtml(log.builderName || '-')}</td>
+            <td>${escapeHtml(log.supportBuilderName || '-')}</td>
+            <td>${(log.volunteerNames || []).length}</td>
+            <td>${entryCount}</td>
+            <td>${status}</td>
+          </tr>
+        `;
+      }).join('');
+
+      tbody.querySelectorAll('tr[data-id]').forEach(row => {
+        row.addEventListener('click', () => openDetail(row.dataset.id));
+      });
+    }
+
+    function entryHtml(entry, index) {
+      const trailLabel = entry.trailName || sectorNameOf(entry.sector, entry.sector) || '-';
+      const sectorLabel = sectorNameOf(entry.sector, '');
+
+      let photoHtml = '<p style="color:var(--theme-text-secondary);font-size:0.8rem;">Aucune photo</p>';
+      const photos = PhotoService.photosFrom({ photos: entry.photos });
+      if (photos.length > 0) {
+        photoHtml = '<div class="photo-gallery" style="display:flex;flex-wrap:wrap;gap:0.5rem;">';
+        photos.forEach((photo, idx) => {
+          let locationHtml = '';
+          if (photo.coordinates && photo.coordinates.latitude && photo.coordinates.longitude) {
+            const lat = photo.coordinates.latitude;
+            const lon = photo.coordinates.longitude;
+            locationHtml = `<div class="photo-location"><a href="#" onclick="window.openPhotoLocationModal(${lat},${lon});return false;">📍 Carte</a><a href="https://www.google.com/maps?q=${lat},${lon}" target="_blank" rel="noopener noreferrer">🗺️</a></div>`;
+          }
+          photoHtml += `<div class="photo-gallery-item" style="position:relative;">
+            <img src="${photo.url}" class="detail-photo" alt="Photo ${idx + 1}" onclick="window.open('${photo.url}', '_blank')" style="max-width:150px;max-height:150px;">
+            ${locationHtml}
+          </div>`;
+        });
+        photoHtml += '</div>';
+      }
+
+      return `
+        <div class="entry-card">
+          <div class="entry-card__title">Travail #${index + 1} — ${escapeHtml(trailLabel)}${sectorLabel ? ` (${escapeHtml(sectorLabel)})` : ''}</div>
+          <div class="detail-description" style="margin-bottom:0.5rem;">${escapeHtml(entry.jobText || '')}</div>
+          ${photoHtml}
+        </div>
+      `;
+    }
+
+    function openDetail(id) {
+      currentLogId = id;
+      const log = logsData.find(l => l.id === id);
+      if (!log) return;
+
+      const dateStr = log.date?.toDate?.()?.toLocaleDateString('fr-CA', { year: 'numeric', month: 'long', day: 'numeric' }) || '-';
+      const createdStr = log.createdAt?.toDate?.()?.toLocaleDateString('fr-CA', { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) || '-';
+      const modifiedStr = log.modifiedAt?.toDate?.()?.toLocaleDateString('fr-CA', { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) || '';
+      const volunteers = (log.volunteerNames || []).join(', ') || 'Aucun';
+      const entries = log.entries || [];
+
+      const modalBody = document.getElementById('modal-body');
+      modalBody.innerHTML = `
+        <div class="detail-section">
+          <h4>Informations générales</h4>
+          <div class="detail-grid">
+            <div class="detail-item"><strong>Date:</strong> ${dateStr}</div>
+            <div class="detail-item"><strong>Responsable:</strong> ${escapeHtml(log.builderName || '-')}</div>
+            <div class="detail-item"><strong>Support:</strong> ${escapeHtml(log.supportBuilderName || 'Aucun')}</div>
+            <div class="detail-item"><strong>Statut:</strong> ${log.archived ? 'Archivée' : 'Active'}</div>
+          </div>
+          <p style="font-size:0.75rem;color:var(--theme-text-secondary);margin-top:0.5rem;">
+            Créé le: ${createdStr}${modifiedStr ? ` • Modifié le: ${modifiedStr}` : ''}
+          </p>
+        </div>
+
+        <div class="detail-section">
+          <h4>Bénévoles présents</h4>
+          <div class="detail-item">${escapeHtml(volunteers)}</div>
+        </div>
+
+        <div class="detail-section">
+          <h4>Travaux effectués (${entries.length})</h4>
+          ${entries.map((entry, i) => entryHtml(entry, i)).join('') || '<p style="color:var(--theme-text-secondary);">Aucun travail enregistré</p>'}
+        </div>
+      `;
+
+      const archiveBtn = document.getElementById('archive-btn');
+      if (log.archived) {
+        archiveBtn.textContent = 'Désarchiver';
+        archiveBtn.classList.remove('btn-warning');
+        archiveBtn.classList.add('btn-secondary');
+      } else {
+        archiveBtn.textContent = 'Archiver';
+        archiveBtn.classList.remove('btn-secondary');
+        archiveBtn.classList.add('btn-warning');
+      }
+
+      document.getElementById('detail-modal').classList.add('is-active');
+      document.body.style.overflow = 'hidden';
+    }
+
+    function closeModal() {
+      document.getElementById('detail-modal').classList.remove('is-active');
+      document.body.style.overflow = '';
+      currentLogId = null;
+    }
+
+    async function toggleArchive() {
+      if (!currentLogId) return;
+
+      const log = logsData.find(l => l.id === currentLogId);
+      if (!log) return;
+
+      const newStatus = !log.archived;
+
+      try {
+        await db.collection('maintenance_logs').doc(currentLogId).update({
+          archived: newStatus,
+          modifiedAt: firebase.firestore.FieldValue.serverTimestamp()
+        });
+
+        showToast(newStatus ? 'Journal archivé' : 'Journal désarchivé', 'success');
+        closeModal();
+        loadLogs();
+      } catch (e) {
+        console.error('Error archiving:', e);
+        showToast('Erreur lors de l\'archivage', 'error');
+      }
+    }
+
+    // escapeHtml and showToast are provided by utils.js
+    // PhotoMapModal (the location pop-up, with its map switch) lives in js/services/photo-map-modal.js
+
+    onFirebaseReady( initMaintenanceAdmin);
+  </script>
+</body>
+</html>

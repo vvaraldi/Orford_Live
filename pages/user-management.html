@@ -56,7 +56,12 @@
       background: rgba(217, 119, 6, 0.15);
       border-color: #d97706;
     }
-    
+
+    .access-badge--clickable.is-active.access-badge--maintenance {
+      background: rgba(22, 101, 52, 0.15);
+      border-color: #166534;
+    }
+
     /* Activity (network) badges: icon + name, same on/off look as the app badges */
     .access-badge--clickable.access-badge--network {
       width: auto;
@@ -635,7 +640,7 @@
         </div>
         <p class="data-export-section__description">
           Importez plusieurs utilisateurs à partir d'un fichier CSV. Le fichier doit contenir les colonnes: 
-          <strong>name, email, password, role</strong> (optionnel: phone, allowInspection, allowInfraction, allowSignalisation, networks).
+          <strong>name, email, password, role</strong> (optionnel: phone, allowInspection, allowInfraction, allowSignalisation, allowMaintenance, networks).
           <strong>networks</strong> : activités séparées par « | », par exemple <code>ski|bike</code>. Sans cette colonne, l'utilisateur reçoit l'activité par défaut (ski).
         </p>
 
@@ -874,6 +879,10 @@
               <input type="checkbox" class="form-check-input" id="access-signalisation">
               <label class="form-check-label" for="access-signalisation">🚧 Signalisation</label>
             </div>
+            <div class="form-check">
+              <input type="checkbox" class="form-check-input" id="access-maintenance">
+              <label class="form-check-label" for="access-maintenance">🔧 Entretien</label>
+            </div>
           </div>
 
           <div class="form-group" id="password-group" style="display: none;">
@@ -1059,6 +1068,7 @@
               ${appBadge(user, manageable, 'allowInspection', 'inspection', '🔍', 'Inspection')}
               ${appBadge(user, manageable, 'allowInfraction', 'infraction', '🚨', 'Infraction')}
               ${appBadge(user, manageable, 'allowSignalisation', 'signalisation', '🚧', 'Signalisation')}
+              ${appBadge(user, manageable, 'allowMaintenance', 'maintenance', '🔧', 'Entretien')}
             </div>
           </td>
           <td data-label="Statut">
@@ -1078,7 +1088,7 @@
       `}).join('');
     }
 
-    // App permission badge (inspection / infraction / signalisation)
+    // App permission badge (inspection / infraction / signalisation / maintenance)
     function appBadge(user, manageable, field, cls, icon, label) {
       const on = user[field] === true;
       const attrs = manageable
@@ -1146,7 +1156,7 @@
         filterAndRenderUsers();
         
         const user = users.find(u => u.id === userId);
-        const fieldNames = { allowInspection: 'Inspection', allowInfraction: 'Infraction', allowSignalisation: 'Signalisation' };
+        const fieldNames = { allowInspection: 'Inspection', allowInfraction: 'Infraction', allowSignalisation: 'Signalisation', allowMaintenance: 'Entretien' };
         showMessage(`${fieldNames[field]} ${newValue ? 'activé' : 'désactivé'} pour ${user?.name || 'utilisateur'}.`, 'success');
       } catch (error) {
         console.error('Error toggling access:', error);
@@ -1233,6 +1243,7 @@
       document.getElementById('access-inspection').checked = user.allowInspection === true;
       document.getElementById('access-infraction').checked = user.allowInfraction === true;
       document.getElementById('access-signalisation').checked = user.allowSignalisation === true;
+      document.getElementById('access-maintenance').checked = user.allowMaintenance === true;
       
       document.getElementById('password-group').style.display = 'none';
       document.getElementById('user-password').required = false;
@@ -1286,7 +1297,8 @@
         networks: selectedNetworks(),
         allowInspection: document.getElementById('access-inspection').checked,
         allowInfraction: document.getElementById('access-infraction').checked,
-        allowSignalisation: document.getElementById('access-signalisation').checked
+        allowSignalisation: document.getElementById('access-signalisation').checked,
+        allowMaintenance: document.getElementById('access-maintenance').checked
       };
 
       if (userData.networks.length === 0) {
@@ -1374,7 +1386,8 @@
           Statut: u.status === 'active' ? 'Actif' : 'Inactif',
           Inspection: u.allowInspection === true ? 'Oui' : 'Non',
           Infraction: u.allowInfraction === true ? 'Oui' : 'Non',
-          Signalisation: u.allowSignalisation === true ? 'Oui' : 'Non'
+          Signalisation: u.allowSignalisation === true ? 'Oui' : 'Non',
+          Entretien: u.allowMaintenance === true ? 'Oui' : 'Non'
         };
       });
 
@@ -1623,6 +1636,7 @@
         user.allowInspection = user.allowinspection !== 'false' && user.allowinspection !== '0';
         user.allowInfraction = user.allowinfraction === 'true' || user.allowinfraction === '1';
         user.allowSignalisation = user.allowsignalisation === 'true' || user.allowsignalisation === '1';
+        user.allowMaintenance = user.allowmaintenance === 'true' || user.allowmaintenance === '1';
 
         // Activities: "ski|bike". A system admin gets all of them; anyone else only gets
         // activities the importing admin holds. Empty column = default activity.
@@ -1676,6 +1690,7 @@
             <span class="access-badge--clickable access-badge--inspection ${user.allowInspection ? 'is-active' : ''}" style="width:24px;height:24px;font-size:0.875rem;">🔍</span>
             <span class="access-badge--clickable access-badge--infraction ${user.allowInfraction ? 'is-active' : ''}" style="width:24px;height:24px;font-size:0.875rem;">🚨</span>
             <span class="access-badge--clickable access-badge--signalisation ${user.allowSignalisation ? 'is-active' : ''}" style="width:24px;height:24px;font-size:0.875rem;">🚧</span>
+            <span class="access-badge--clickable access-badge--maintenance ${user.allowMaintenance ? 'is-active' : ''}" style="width:24px;height:24px;font-size:0.875rem;">🔧</span>
           </td>
         </tr>
       `}).join('');
@@ -1755,6 +1770,7 @@
             allowInspection: user.allowInspection,
             allowInfraction: user.allowInfraction,
             allowSignalisation: user.allowSignalisation,
+            allowMaintenance: user.allowMaintenance,
             createdAt: firebase.firestore.FieldValue.serverTimestamp(),
             createdBy: currentUser.uid,
             importedVia: 'bulk_import'
@@ -1823,9 +1839,9 @@
     }
 
     function downloadCsvTemplate() {
-      const template = `name,email,password,role,phone,allowInspection,allowInfraction,allowSignalisation,networks
-Jean Dupont,jean.dupont@example.com,MotDePasse123,inspector,514-555-1234,true,false,false,ski
-Marie Tremblay,marie.tremblay@example.com,MotDePasse456,admin,,true,true,true,ski|bike`;
+      const template = `name,email,password,role,phone,allowInspection,allowInfraction,allowSignalisation,allowMaintenance,networks
+Jean Dupont,jean.dupont@example.com,MotDePasse123,inspector,514-555-1234,true,false,false,false,ski
+Marie Tremblay,marie.tremblay@example.com,MotDePasse456,admin,,true,true,true,false,ski|bike`;
       
       downloadFile('\uFEFF' + template, 'modele_import_utilisateurs.csv', 'text/csv;charset=utf-8');
       showMessage('Modèle CSV téléchargé.', 'success');

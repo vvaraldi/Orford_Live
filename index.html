@@ -94,6 +94,17 @@
         actionText: 'Accéder à l\'application'
       },
       {
+        id: 'maintenance',
+        title: 'Entretien',
+        icon: '🔧',
+        description: 'Journal de travail quotidien des artisans de sentiers (réseau vélo).',
+        url: 'pages/maintenance-report.html',
+        permission: 'allowMaintenance',
+        permissionDefault: false,
+        network: 'bike',
+        actionText: 'Accéder à l\'application'
+      },
+      {
         id: 'support',
         title: 'Support',
         icon: '📋',
@@ -151,6 +162,9 @@
             hasAccess = userData[app.permission] === true;
           }
         }
+
+        // Some apps only apply to one network (e.g. Entretien is bike-only)
+        if (app.network && Network.current() !== app.network) hasAccess = false;
 
         // Skip card entirely if user doesn't have access (instead of showing disabled)
         if (!hasAccess) return;

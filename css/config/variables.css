@@ -93,6 +93,12 @@
   --color-inspection-rando-dark: #14532d;
   --color-inspection-rando-rgb: 22, 101, 52;
 
+  /* Entretien (Maintenance) - Emerald */
+  --color-maintenance: #059669;
+  --color-maintenance-light: #6ee7b7;
+  --color-maintenance-dark: #047857;
+  --color-maintenance-rgb: 5, 150, 105;
+
   /* ===== TRAIL DIFFICULTY COLORS ===== */
   --color-difficulty-easy: #22c55e;
   --color-difficulty-medium: #3b82f6;

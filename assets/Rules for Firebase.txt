@@ -183,6 +183,41 @@ service cloud.firestore {
       allow delete: if isAdmin() && canWorkIn(recordNetwork(resource.data));
     }
     
+    // MAINTENANCE LOGS: a trail builder's own daily work log (bike network). One doc per
+    // builder per day, editable by its owner throughout the day, same shape as infractions/
+    // signalisations. builderId must be the writer's own uid (this is explicitly "my log",
+    // unlike infractions/signalisations which don't enforce who patrolId/inspectorId names).
+    match /maintenance_logs/{logId} {
+      allow read: if request.auth != null;
+      allow create: if request.auth != null &&
+          get(/databases/$(database)/documents/inspectors/$(request.auth.uid)).data.allowMaintenance == true &&
+          canWorkIn(recordNetwork(request.resource.data)) &&
+          request.resource.data.builderId == request.auth.uid;
+      allow update: if request.auth != null &&
+          (request.auth.uid == resource.data.builderId || isAdmin()) &&
+          canWorkIn(recordNetwork(resource.data)) && sameNetwork();
+      allow delete: if isAdmin() && canWorkIn(recordNetwork(resource.data));
+    }
+
+    // VOLUNTEERS: self-registration from the standalone QR page (maintenance-volunteer-register.html).
+    // No login there, so this is the app's only public write - deliberately narrow: create-only,
+    // closed field set, typed/bounded, agreement must be accepted, createdAt must be the server
+    // clock (blocks a scripted client from backdating/spoofing). Read is limited to signed-in
+    // users so the maintenance log's volunteer picker can list names; nobody can update/delete
+    // a registration through the app.
+    match /volunteers/{volunteerId} {
+      allow read: if request.auth != null;
+      allow update, delete: if false;
+      allow create: if
+          request.resource.data.keys().hasOnly(['nom', 'prenom', 'network', 'agreementAccepted', 'createdAt']) &&
+          request.resource.data.keys().hasAll(['nom', 'prenom', 'network', 'agreementAccepted', 'createdAt']) &&
+          request.resource.data.nom is string && request.resource.data.nom.size() > 0 && request.resource.data.nom.size() <= 100 &&
+          request.resource.data.prenom is string && request.resource.data.prenom.size() > 0 && request.resource.data.prenom.size() <= 100 &&
+          request.resource.data.network == 'bike' &&
+          request.resource.data.agreementAccepted == true &&
+          request.resource.data.createdAt == request.time;
+    }
+
     // REQUESTS
     match /requests/{requestId} {
       allow read: if request.auth != null && 
@@ -229,6 +264,9 @@ service firebase.storage {
       allow delete: if request.auth != null && request.auth.uid == userId;
     }
     match /signalisations/{userId}/{file=**} {
+      allow delete: if request.auth != null && request.auth.uid == userId;
+    }
+    match /maintenance/{userId}/{file=**} {
       allow delete: if request.auth != null && request.auth.uid == userId;
     }
   }

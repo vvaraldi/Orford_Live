@@ -55,6 +55,10 @@ const APP_CONFIG = {
     // Infraction module
     infractionReport: '/pages/infraction-report.html',
     infractionAdmin: '/pages/infraction-admin.html',
+    // Maintenance module (bike network)
+    maintenanceReport: '/pages/maintenance-report.html',
+    maintenanceAdmin: '/pages/maintenance-admin.html',
+    maintenanceVolunteerRegister: '/pages/maintenance-volunteer-register.html',
     // Signalisation module
     signalisationReport: '/pages/signalisation-report.html',
     signalisationResume: '/pages/signalisation-resume.html',
@@ -100,6 +104,13 @@ const APP_CONFIG = {
       icon: '🎫',
       color: 'request',
       permission: null  // Accessible to all authenticated users
+    },
+    maintenance: {
+      id: 'maintenance',
+      name: 'Entretien',
+      icon: '🔧',
+      color: 'maintenance',
+      permission: 'allowMaintenance'
     }
   },
 
@@ -287,6 +298,13 @@ const APP_CONFIG = {
         { id: 'signalisation-report', label: 'Rapport', icon: '📝', href: 'pages/signalisation-report.html' },
         { id: 'signalisation-resume', label: 'Résumé', icon: '🗺️', href: 'pages/signalisation-resume.html' },
         { id: 'signalisation-admin', label: 'Gestion', icon: '📋', href: 'pages/signalisation-admin.html', admin: true }
+      ]
+    },
+    maintenance: {
+      title: 'Entretien',
+      items: [
+        { id: 'maintenance-report', label: 'Journal', icon: '📝', href: 'pages/maintenance-report.html' },
+        { id: 'maintenance-admin', label: 'Gestion', icon: '📋', href: 'pages/maintenance-admin.html', admin: true }
       ]
     },
     support: {

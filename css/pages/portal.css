@@ -101,6 +101,10 @@
   background: linear-gradient(135deg, var(--color-request) 0%, var(--color-request-dark) 100%);
 }
 
+.app-card--maintenance .app-card__header {
+  background: linear-gradient(135deg, var(--color-maintenance) 0%, var(--color-maintenance-dark) 100%);
+}
+
 .app-card__icon {
   display: flex;
   align-items: center;

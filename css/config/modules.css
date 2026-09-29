@@ -127,6 +127,21 @@
   --theme-gradient-hover: linear-gradient(135deg, var(--color-admin-module-dark) 0%, var(--color-admin-module) 100%);
 }
 
+/* ===== ENTRETIEN (MAINTENANCE) MODULE ===== */
+[data-module="maintenance"] {
+  --theme-accent: var(--color-maintenance);
+  --theme-accent-light: var(--color-maintenance-light);
+  --theme-accent-dark: var(--color-maintenance-dark);
+  --theme-accent-rgb: var(--color-maintenance-rgb);
+
+  --theme-gradient: linear-gradient(135deg, var(--color-maintenance) 0%, var(--color-maintenance-dark) 100%);
+
+  --theme-header-from: var(--color-maintenance);
+
+  --theme-header-to: var(--color-maintenance-dark);
+  --theme-gradient-hover: linear-gradient(135deg, var(--color-maintenance-dark) 0%, var(--color-maintenance) 100%);
+}
+
 /* ===== INSPECTION RANDONNÉE MODULE ===== */
 [data-module="inspection-rando"] {
   --theme-accent: var(--color-inspection-rando);
@@ -238,6 +253,19 @@
   --theme-header-from: #a855f7;
   
   --theme-header-to: #7e22ce;
+}
+
+[data-theme="dark"][data-module="maintenance"] {
+  --theme-accent: #34d399;
+  --theme-accent-light: #6ee7b7;
+  --theme-accent-dark: #10b981;
+  --theme-accent-rgb: 52, 211, 153;
+
+  --theme-gradient: linear-gradient(135deg, #10b981 0%, #047857 100%);
+
+  --theme-header-from: #10b981;
+
+  --theme-header-to: #047857;
 }
 
 [data-theme="dark"][data-module="inspection-rando"] {
