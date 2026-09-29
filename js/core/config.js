@@ -126,7 +126,7 @@ const APP_CONFIG = {
     'ski':              { name: 'Ski - Montée',   icon: '⛷️', image: 'assets/map/Ski-Touring_Map.png',              width: 800,  height: 700 },
     // Status-only: trail markers (open/closed) placed on it (trailKinds.downhill/lift.map).
     // No longer used for GPS - see 'ski-downhill-geo' below.
-    'ski-downhill':     { name: 'Ski - Descente', icon: '🎿', image: 'assets/map/Ski-Downhill_Map_web.jpg',         width: 1670, height: 736 },
+    'ski-downhill':     { name: 'Ski - Descente (statut)', icon: '🎿', image: 'assets/map/Ski-Downhill_Map_web.jpg', width: 1670, height: 736 },
     // GPS-calibrated only: report/photo locations for downhill and lifts (trailKinds.downhill/lift.geoMap).
     // Never has trail status markers placed on it.
     // Ski-Downhill_Geolocalisation-map_web.jpg is Ski-Downhill_Geolocalisation-map.png (same 1404 x 932 px) as a lighter JPG.
