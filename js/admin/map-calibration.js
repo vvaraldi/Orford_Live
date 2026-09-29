@@ -1,7 +1,7 @@
 /**
  * map-calibration.js - Administration > Cartes (system admin)
  * ============================================================
- * Calibrates the GPS <-> pixel conversion of each map (ski, ski-downhill, bike), with 3 points
+ * Calibrates the GPS <-> pixel conversion of each map (ski, ski-downhill, ski-downhill-geo, bike), with 3 points
  * (flat map, "affine") or 4 points (map in perspective). A control point is a spot
  * you click on the map plus its GPS position (long-press it in Google Maps).
  *

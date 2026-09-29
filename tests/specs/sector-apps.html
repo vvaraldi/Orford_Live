@@ -126,18 +126,18 @@
       ok('bike: one map, no switch', document.getElementById('map-switch').hidden === true && img.src.endsWith('assets/map/Bike_Map_web.jpg'), img.src);
       ok('bike map loads: no missing flag', !document.getElementById('map-wrapper').classList.contains('is-missing'));
     } else {
-      ok('ski: no map is calibrated yet -> the default is the downhill map (first of the activity\'s report maps)', img.src.endsWith('assets/map/Ski-Downhill_Map_web.jpg'), img.src);
-      ok('ski: a switch with both maps (downhill, touring); no markers without a calibration', document.getElementById('map-switch').hidden === false && J(swBtns().map(b => b.textContent)) === J(['🎿 Ski - Descente', '⛷️ Ski - Montée']) && document.querySelectorAll('.map-marker').length === 0 && /Carte non calibrée/.test(document.getElementById('map-count').textContent), swBtns().map(b => b.textContent));
+      ok('ski: no map is calibrated yet -> the default is the downhill geolocalisation map (first of the activity\'s report maps)', img.src.endsWith('assets/map/Ski-Downhill_Geolocalisation-map.png'), img.src);
+      ok('ski: a switch with both maps (downhill geo, touring); no markers without a calibration', document.getElementById('map-switch').hidden === false && J(swBtns().map(b => b.textContent)) === J(['📍 Ski - Descente (géolocalisation)', '⛷️ Ski - Montée']) && document.querySelectorAll('.map-marker').length === 0 && /Carte non calibrée/.test(document.getElementById('map-count').textContent), swBtns().map(b => b.textContent));
 
       // the touring map gets calibrated (as the system admin does in Administration > Cartes)
       window.__data.maps = [{ id: 'ski', mode: 'affine', width: 800, height: 700, points: [
         { x: 0, y: 0, lat: 45.296611, lon: -72.243361 }, { x: 800, y: 0, lat: 45.325861, lon: -72.249972 }, { x: 0, y: 700, lat: 45.299444, lon: -72.205667 }] }];
       await MapService.load(true);
-      ok('reportMaps: the default is the DOWNHILL map even though only the touring map is calibrated', MapService.reportMaps().default === 'ski-downhill' && J(MapService.reportMaps().usable) === J(['ski']) && J(MapService.reportMaps().all) === J(['ski-downhill', 'ski']), MapService.reportMaps());
+      ok('reportMaps: the default is the DOWNHILL GEO map even though only the touring map is calibrated', MapService.reportMaps().default === 'ski-downhill-geo' && J(MapService.reportMaps().usable) === J(['ski']) && J(MapService.reportMaps().all) === J(['ski-downhill-geo', 'ski']), MapService.reportMaps());
       swBtns().find(b => /Montée/.test(b.textContent)).click(); await wait(500);
       ok('switch to the touring map: image, active button and the report marker (SIG2 has a GPS position)', img.src.endsWith('assets/map/Ski-Touring_Map.png') && swBtns().find(b => /Montée/.test(b.textContent)).classList.contains('btn-primary') && document.querySelectorAll('.map-marker').length === 1 && /1 rapport\(s\) avec localisation/.test(document.getElementById('map-count').textContent), [img.src, document.querySelectorAll('.map-marker').length, document.getElementById('map-count').textContent]);
       swBtns().find(b => /Descente/.test(b.textContent)).click(); await wait(500);
-      ok('switch back to the downhill map (not calibrated): no marker, explanation shown', img.src.endsWith('assets/map/Ski-Downhill_Map_web.jpg') && document.querySelectorAll('.map-marker').length === 0 && /Carte non calibrée/.test(document.getElementById('map-count').textContent));
+      ok('switch back to the downhill geo map (not calibrated): no marker, explanation shown', img.src.endsWith('assets/map/Ski-Downhill_Geolocalisation-map.png') && document.querySelectorAll('.map-marker').length === 0 && /Carte non calibrée/.test(document.getElementById('map-count').textContent));
 
       // ---- the location pop-up (shared module) ----
       const opened = []; const realOpen = window.open; window.open = (...a) => { opened.push(a[0]); };
@@ -150,22 +150,22 @@
       openPhotoLocationModal(45.31, -72.23);
       const modal = document.getElementById('photo-map-modal'); const mimg = document.getElementById('photo-map-img');
       const mBtns = () => [...document.querySelectorAll('#photo-map-switch button')];
-      ok('pop-up: opens on the DOWNHILL map (default) although it is not calibrated; both buttons of the switch can be clicked', !!modal && modal.classList.contains('show') && mimg.getAttribute('src').endsWith('Ski-Downhill_Map_web.jpg') && mBtns().length === 2 && mBtns().every(b => !b.disabled) && mBtns()[0].classList.contains('btn-primary'), [mimg.getAttribute('src'), mBtns().map(b => b.textContent + ':' + b.disabled)]);
+      ok('pop-up: opens on the DOWNHILL GEO map (default) although it is not calibrated; both buttons of the switch can be clicked', !!modal && modal.classList.contains('show') && mimg.getAttribute('src').endsWith('Ski-Downhill_Geolocalisation-map.png') && mBtns().length === 2 && mBtns().every(b => !b.disabled) && mBtns()[0].classList.contains('btn-primary'), [mimg.getAttribute('src'), mBtns().map(b => b.textContent + ':' + b.disabled)]);
       ok('pop-up on an uncalibrated map: no marker, an explanation, the Google Maps link stays', document.getElementById('photo-marker').style.display === 'none' && /ne peut pas être placée sur cette carte/.test(document.getElementById('photo-coords').textContent) && /google\.com\/maps\?q=45\.31,-72\.23/.test(document.getElementById('photo-google-link').href), [document.getElementById('photo-marker').style.display, document.getElementById('photo-coords').textContent]);
       mBtns()[1].click();
       ok('switching to the touring map (calibrated): marker placed with the GPS position, note gone', mimg.getAttribute('src').endsWith('Ski-Touring_Map.png') && document.getElementById('photo-marker').style.display === '' && /^\d+px$/.test(document.getElementById('photo-marker').style.left) && /45\.310000/.test(document.getElementById('photo-coords').textContent) && !/ne peut pas être placée/.test(document.getElementById('photo-coords').textContent), [document.getElementById('photo-marker').style.left, document.getElementById('photo-coords').textContent]);
       PhotoMapModal.close();
-      // calibrate the downhill map too: the switch works both ways
-      window.__data.maps.push({ id: 'ski-downhill', mode: 'affine', width: 1670, height: 736, points: [
-        { x: 0, y: 0, lat: 45.33, lon: -72.26 }, { x: 1670, y: 0, lat: 45.33, lon: -72.20 }, { x: 0, y: 736, lat: 45.29, lon: -72.26 }] });
+      // calibrate the downhill geo map too: the switch works both ways
+      window.__data.maps.push({ id: 'ski-downhill-geo', mode: 'affine', width: 1404, height: 932, points: [
+        { x: 0, y: 0, lat: 45.33, lon: -72.26 }, { x: 1404, y: 0, lat: 45.33, lon: -72.20 }, { x: 0, y: 932, lat: 45.29, lon: -72.26 }] });
       await MapService.load(true);
       PhotoMapModal.close(); openPhotoLocationModal(45.31, -72.23);
       ok('both calibrated: the touring choice made earlier with the switch is kept (pinned)', mimg.getAttribute('src').endsWith('Ski-Touring_Map.png') && mBtns().every(b => !b.disabled), [mimg.getAttribute('src'), mBtns().map(b => b.disabled)]);
       const touringLeft = document.getElementById('photo-marker').style.left;
       mBtns()[0].click();
-      ok('pop-up switch to the downhill map (now calibrated): the marker sits at ITS position on that map', mimg.getAttribute('src').endsWith('Ski-Downhill_Map_web.jpg') && document.getElementById('photo-marker').style.display === '' && document.getElementById('photo-marker').style.left !== touringLeft && mBtns()[0].classList.contains('btn-primary'), [mimg.getAttribute('src'), touringLeft, document.getElementById('photo-marker').style.left]);
+      ok('pop-up switch to the downhill geo map (now calibrated): the marker sits at ITS position on that map', mimg.getAttribute('src').endsWith('Ski-Downhill_Geolocalisation-map.png') && document.getElementById('photo-marker').style.display === '' && document.getElementById('photo-marker').style.left !== touringLeft && mBtns()[0].classList.contains('btn-primary'), [mimg.getAttribute('src'), touringLeft, document.getElementById('photo-marker').style.left]);
       PhotoMapModal.close(); openPhotoLocationModal(45.312, -72.231);
-      ok('the map picked with the switch is kept for the next position', mimg.getAttribute('src').endsWith('Ski-Downhill_Map_web.jpg'), mimg.getAttribute('src'));
+      ok('the map picked with the switch is kept for the next position', mimg.getAttribute('src').endsWith('Ski-Downhill_Geolocalisation-map.png'), mimg.getAttribute('src'));
       window.open = realOpen;
     }
   }

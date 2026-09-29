@@ -58,15 +58,16 @@
       ok('downhill: stats count both downhill trails, even the one without a position', document.getElementById('stat-total').textContent === '2', document.getElementById('stat-total').textContent);
       ok('downhill: the downhill map is shown', img.src.endsWith('assets/map/Ski-Downhill_Map_web.jpg'), img.src);
 
-      // 1.9 regression: the photo-location popup must use the DOWNHILL map while viewing Descente,
-      // not the network's default (touring) map - was a real bug, found while discussing consolidation.
-      window.__data.maps = [{ id: 'ski-downhill', mode: 'affine', width: 1670, height: 736, points: [
-        { x: 0, y: 0, lat: 45.33, lon: -72.26 }, { x: 1670, y: 0, lat: 45.33, lon: -72.20 }, { x: 0, y: 736, lat: 45.29, lon: -72.26 }] }];
+      // 1.9 regression: the photo-location popup must use the DOWNHILL GEO map while viewing
+      // Descente, not the network's default (touring) map - was a real bug, found while discussing
+      // consolidation. Since the downhill/status and downhill-geo/GPS split, this is the geo map.
+      window.__data.maps = [{ id: 'ski-downhill-geo', mode: 'affine', width: 1404, height: 932, points: [
+        { x: 0, y: 0, lat: 45.33, lon: -72.26 }, { x: 1404, y: 0, lat: 45.33, lon: -72.20 }, { x: 0, y: 932, lat: 45.29, lon: -72.26 }] }];
       await MapService.load(true);
       openPhotoLocationModal(45.31, -72.23);
       await wait(200);
       const photoImg = document.querySelector('#photo-map-wrap img');
-      ok('1.9: photo location on Descente uses the downhill map, not the touring one', photoImg && photoImg.getAttribute('src').endsWith('Ski-Downhill_Map_web.jpg'), photoImg && photoImg.getAttribute('src'));
+      ok('1.9: photo location on Descente uses the downhill geo map, not the touring one', photoImg && photoImg.getAttribute('src').endsWith('Ski-Downhill_Geolocalisation-map.png'), photoImg && photoImg.getAttribute('src'));
       PhotoMapModal.close();
     }
 

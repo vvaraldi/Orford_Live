@@ -1,7 +1,7 @@
 /**
  * map-service.js - The map images and GPS positions
  * ==================================================
- * Each map (APP_CONFIG.maps: ski, ski-downhill, bike) has its own image and a GPS
+ * Each map (APP_CONFIG.maps: ski, ski-downhill, ski-downhill-geo, bike) has its own image and a GPS
  * calibration: 3 or 4 control points (a pixel on the image + the GPS position of
  * that spot). From them this converts a GPS position to a pixel on the image and
  * back. An activity's own map is APP_CONFIG.networks[id].map; the functions below
@@ -139,7 +139,7 @@ const MapService = (function () {
 
   // ---- The calibration of each activity ---------------------------------------------------
 
-  // Every function below takes a map id ('ski', 'ski-downhill', 'bike'), or an activity id
+  // Every function below takes a map id ('ski', 'ski-downhill', 'ski-downhill-geo', 'bike'), or an activity id
   // (that activity's main map), or nothing (the current activity's main map).
   function keyOf(id) {
     const key = id || Network.current();

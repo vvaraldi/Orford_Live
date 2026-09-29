@@ -472,7 +472,7 @@
           const d = data.date?.toDate?.();
           const dateStr = d ? d.toLocaleDateString('fr-CA') : 'Date inconnue';
           const count = (data.entries || []).length;
-          const label = `${dateStr} - ${count} travail${count > 1 ? 'x' : ''}`;
+          const label = `${dateStr} - ${count} ${count > 1 ? 'travaux' : 'travail'}`;
 
           const opt = document.createElement('option');
           opt.value = doc.id;

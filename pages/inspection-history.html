@@ -690,12 +690,13 @@
         html += `<div class="detail-section"><div class="detail-section__title">📝 Notes</div><div class="detail-notes">${escapeHtml(insp.notes)}</div></div>`;
       }
 
-      // Photos - already normalised by PhotoService at load time. A photo belongs on the one map
-      // of its own trail's kind, or the network's main map for a shelter (shelters are not kind-
-      // specific) - never necessarily Kind.current(), even though every trail entry shown here
-      // happens to match it today (history filters trails by it too).
+      // Photos - already normalised by PhotoService at load time. A photo belongs on its own
+      // trail kind's GPS map (geoMapIdOf - may differ from the kind's status-marker map), or the
+      // network's main map for a shelter (shelters are not kind-specific) - never necessarily
+      // Kind.current(), even though every trail entry shown here happens to match it today
+      // (history filters trails by it too).
       if (insp.photos && insp.photos.length > 0) {
-        const photoMapId = insp.type === 'trail' ? TrailService.mapIdOf(trails.get(insp.locationId)) : Network.config().map;
+        const photoMapId = insp.type === 'trail' ? TrailService.geoMapIdOf(trails.get(insp.locationId)) : Network.config().map;
         html += `<div class="detail-section"><div class="detail-section__title">📷 Photos (${insp.photos.length})</div><div class="detail-photos">${insp.photos.map(p => {
           const coords = p.coordinates;
           let loc = '';

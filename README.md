@@ -16,10 +16,8 @@
 
 3. Improve the user experience
 #	Priority	Item
-3.0 when I click on close all... it add to a "bonne état" state... it should have nothing.
-3.1 Add the possibility to create a report from the summary page. Use of right click or a link once clicked on the trail ?
-3.2 Use two maps in ski downhill : one for geolocalisation and one for status of the trails (open and close). On the first one, we need to map the geocoordinate. The second should only be for the trails markers coordinate.
-3.3 In Signalisation: add a filtre view by trails, 
+3.2 when I click on close all the trails... it does it (which is great) but it adds to a "bonne état" state... Could this field be blanked ?
+3.3 Add the possibility to create a report from the summary page. Use of right click or a link once clicked on the trail ?
 3.4	Medium-High	Check the new UI at phone width
 3.5	Medium	Add a hint when a trail is "missing" because of the wrong kind selected
 3.6	Medium	Get real feedback on the bike issue checklist

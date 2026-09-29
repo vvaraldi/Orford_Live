@@ -22,7 +22,7 @@
   }
   const sk = APP_CONFIG.maps.ski;
   const c = { topLeft: { lat: 45.296611, lon: -72.243361 }, topRight: { lat: 45.325861, lon: -72.249972 }, bottomLeft: { lat: 45.299444, lon: -72.205667 } }; // the corners that used to be in config.js
-  ok('config.js no longer holds a calibration; 3 maps: ski, ski-downhill, bike', !Object.values(APP_CONFIG.maps).some(m => 'calibration' in m) && J(Object.keys(APP_CONFIG.maps)) === J(['ski', 'ski-downhill', 'bike']));
+  ok('config.js no longer holds a calibration; 4 maps: ski, ski-downhill, ski-downhill-geo, bike', !Object.values(APP_CONFIG.maps).some(m => 'calibration' in m) && J(Object.keys(APP_CONFIG.maps)) === J(['ski', 'ski-downhill', 'ski-downhill-geo', 'bike']));
   ok('map ids: an activity id resolves to its main map, a map id to itself', MapService.keyOf('ski') === 'ski' && MapService.keyOf('bike') === 'bike' && MapService.keyOf('ski-downhill') === 'ski-downhill' && MapService.mapOf('ski-downhill').width === 1670 && MapService.mapOf('ski-downhill').height === 736);
   const docs = {};
   const writes = [];

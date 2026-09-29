@@ -71,6 +71,18 @@ const TrailService = (function () {
     return (APP_CONFIG.trailKinds[kind] || {}).map || null;
   }
 
+  /**
+   * The id of the map (APP_CONFIG.maps) that a kind of trail's GPS-derived photo pins are placed
+   * on (inspection dashboard/history) - a kind can use a separate, GPS-calibrated map for this
+   * from the one its status markers are placed on (trailKinds.<kind>.geoMap), falling back to
+   * mapIdOf when it has none.
+   */
+  function geoMapIdOf(kindOrTrail) {
+    const kind = typeof kindOrTrail === 'string' ? kindOrTrail : kindOf(kindOrTrail);
+    const conf = APP_CONFIG.trailKinds[kind] || {};
+    return conf.geoMap || conf.map || null;
+  }
+
   /** The checklist of common issues (APP_CONFIG.trailKinds.<kind>.issues) for a kind of trail, or a trail. */
   function issuesOf(kindOrTrail) {
     const kind = typeof kindOrTrail === 'string' ? kindOrTrail : kindOf(kindOrTrail);
@@ -131,6 +143,6 @@ const TrailService = (function () {
     return `${prefix}_${Math.max(0, ...used) + 1}`;
   }
 
-  return { kindOf, kindLabel, scaleOf, difficultyOf, difficultyLabel, isInspected, isArchived, isActive, mapIdOf, issuesOf, statusOf, statusText, conditionText, conditionIcon, markerLabel, describe, compare, nextId };
+  return { kindOf, kindLabel, scaleOf, difficultyOf, difficultyLabel, isInspected, isArchived, isActive, mapIdOf, geoMapIdOf, issuesOf, statusOf, statusText, conditionText, conditionIcon, markerLabel, describe, compare, nextId };
 })();
 window.TrailService = TrailService;

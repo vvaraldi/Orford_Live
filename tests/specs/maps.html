@@ -21,7 +21,7 @@
 
   switchTab('maps');
   await wait(700);
-  ok('map list: ski (touring), ski-downhill, bike', J([...$('cal-network').options].map(o => o.value)) === J(['ski', 'ski-downhill', 'bike']) && /Descente/.test($('cal-network').options[1].textContent), [...$('cal-network').options].map(o => o.textContent));
+  ok('map list: ski (touring), ski-downhill, ski-downhill-geo, bike', J([...$('cal-network').options].map(o => o.value)) === J(['ski', 'ski-downhill', 'ski-downhill-geo', 'bike']) && /Descente/.test($('cal-network').options[1].textContent), [...$('cal-network').options].map(o => o.textContent));
 
   // ---- Ski: nothing in the database yet -> empty; then a saved calibration shows up as 3 points ----
   ok('ski: first activity, method 3 points (affine)', $('cal-network').value === 'ski' && $('cal-mode').value === 'affine');
@@ -59,6 +59,13 @@
   await wait(900);
   ok('downhill map: own image (1670 px), no size warning, no calibration yet, save disabled', $('cal-image').naturalWidth === 1670 && $('cal-size-warning').hidden === true && /Aucune calibration/.test($('cal-source').textContent) && $('cal-save').disabled === true, [$('cal-image').naturalWidth, $('cal-source').textContent]);
   ok('downhill map: the overlay has the downhill map size', $('cal-overlay').getAttribute('width') === '1670' && $('cal-overlay').getAttribute('height') === '736');
+
+  // ---- Ski downhill geolocalisation map: its own image and calibration, separate from the status map ----
+  choose($('cal-network'), 'ski-downhill-geo');
+  await wait(900);
+  ok('downhill geo map: own image (1404 px), no size warning, no calibration yet, save disabled', $('cal-image').naturalWidth === 1404 && $('cal-size-warning').hidden === true && /Aucune calibration/.test($('cal-source').textContent) && $('cal-save').disabled === true, [$('cal-image').naturalWidth, $('cal-source').textContent]);
+  ok('downhill geo map: the overlay has its own size (1404x932), independent of the status map', $('cal-overlay').getAttribute('width') === '1404' && $('cal-overlay').getAttribute('height') === '932');
+
   // ---- Bike: nothing yet ----
   choose($('cal-network'), 'bike');
   await wait(700);

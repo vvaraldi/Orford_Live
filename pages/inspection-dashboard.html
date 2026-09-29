@@ -600,7 +600,7 @@
         if (insp.notes && insp.notes.trim()) {
           html += `<div class="detail-section"><div class="detail-section__title">📝 Notes</div><div class="notes-box">${escapeHtml(insp.notes).replace(/\n/g, '<br>')}</div></div>`;
         }
-        html += renderPhotosSection(insp, TrailService.mapIdOf(trail));
+        html += renderPhotosSection(insp, TrailService.geoMapIdOf(trail));
         body.innerHTML = html;
       }
       document.getElementById('inspection-modal').classList.add('show');
