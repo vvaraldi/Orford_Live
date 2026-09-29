@@ -73,6 +73,9 @@
             <select class="form-select" id="filter-sector">
               <option value="">Tous les secteurs</option><!-- filled by SectorService -->
             </select>
+            <select class="form-select" id="filter-trail">
+              <option value="">Toutes les pistes</option>
+            </select>
             <select class="form-select" id="sort-by">
               <option value="date">Trier par date</option>
               <option value="sector">Trier par secteur</option>
@@ -156,8 +159,12 @@
     let showResolved = false;
     let showArchived = false;
     let filterSector = '';
+    let filterTrail = '';
     let sortBy = 'date';
     let sectors = []; // every sector (names), from Firestore (SectorService)
+
+    // A trail identifies a report by id when it has one, else by name (old reports)
+    const reportTrailKey = r => r.trailId || ('name:' + (r.trail || ''));
 
     // escapeHtml is now provided by utils.js
 
@@ -186,8 +193,30 @@
 
     const sectorNameOf = r => SectorService.nameOf(sectors, r.sector, r.sectorDisplayName);
 
+    // The trail dropdown narrows to filterSector's trails when one is chosen. Options are built
+    // from what's actually in reportsData, so a choice always narrows to something non-empty.
+    function updateTrailFilterOptions() {
+      const trailSelect = document.getElementById('filter-trail');
+      const trails = new Map(); // reportTrailKey -> name
+      reportsData.forEach(r => {
+        if (filterSector && SectorService.find(sectors, r.sector)?.id !== filterSector) return;
+        const key = reportTrailKey(r);
+        if (!trails.has(key)) trails.set(key, r.trail || key);
+      });
+      const trailOptions = Array.from(trails, ([id, name]) => ({ id, name }))
+        .sort((a, b) => a.name.localeCompare(b.name, 'fr'));
+      trailSelect.replaceChildren(new Option('Toutes les pistes', ''), ...trailOptions.map(t => new Option(t.name, t.id)));
+      trailSelect.value = trailOptions.some(t => t.id === filterTrail) ? filterTrail : '';
+      filterTrail = trailSelect.value;
+    }
+
     function bindEvents() {
-      document.getElementById('filter-sector').addEventListener('change', (e) => { filterSector = e.target.value; renderReports(); });
+      document.getElementById('filter-sector').addEventListener('change', (e) => {
+        filterSector = e.target.value;
+        updateTrailFilterOptions(); // the trail list narrows to this sector's trails
+        renderReports();
+      });
+      document.getElementById('filter-trail').addEventListener('change', (e) => { filterTrail = e.target.value; renderReports(); });
       document.getElementById('sort-by').addEventListener('change', (e) => { sortBy = e.target.value; renderReports(); });
       document.getElementById('show-resolved').addEventListener('change', (e) => { showResolved = e.target.checked; loadReports(); });
       document.getElementById('show-archived').addEventListener('change', (e) => { showArchived = e.target.checked; loadReports(); });
@@ -206,7 +235,8 @@
           if (!showArchived && data.archived === true) return;
           reportsData.push(data);
         });
-        
+
+        updateTrailFilterOptions();
         renderReports();
       } catch (e) {
         console.error('Error loading reports:', e);
@@ -220,6 +250,7 @@
       let filtered = [...reportsData];
       // Compare by current sector id so a record with an older id (alias) still matches
       if (filterSector) filtered = filtered.filter(r => SectorService.find(sectors, r.sector)?.id === filterSector);
+      if (filterTrail) filtered = filtered.filter(r => reportTrailKey(r) === filterTrail);
 
       if (sortBy === 'date') {
         filtered.sort((a, b) => (b.createdAt?.toDate?.() || 0) - (a.createdAt?.toDate?.() || 0));
