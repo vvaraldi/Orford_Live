@@ -16,6 +16,14 @@
 
 3. Improve the user experience
 #	Priority	Item
+3.1 Continue to debug the 2 map issue (geo and trail numbers)
+3.15 Add in the table of Signalisations (tab "gestion") the number of photos (same as in "Inspections")
+3.16 rename "Résumé" tab in Signalisation with "Tableau de bord".
+3.17 when entering signalisation open by default "tableau de bord" by default if on computer and "rapport" if on a mobile device
+3.17 when entering Infractions open by default "Gestion" by default if on computer and "rapport" if on a mobile device
+3.16 rename "Hisotrique" tab in Inspections with "Gestion".
+
+
 3.2 when I click on close all the trails... it does it (which is great) but it adds to a "bonne état" state... Could this field be blanked ?
 3.3 Add the possibility to create a report from the summary page. Use of right click or a link once clicked on the trail ?
 3.4	Medium-High	Check the new UI at phone width
@@ -57,5 +65,4 @@ Info shared : data server is US-EAST1.
 Agreed on data imported and inclusion of some personal data
 Created a Regis@orford.com account to manage the data (regis is the owner)
 Regis has a github account
-
 

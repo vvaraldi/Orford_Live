@@ -1,27 +1,36 @@
 /**
  * photo-map-modal.js - "Localisation de la photo" pop-up
  * ========================================================
- * Shows where a photo was taken on a map.
+ * Shows where a photo was taken on a map. Every caller offers the same switch, between the
+ * activity's report maps (APP_CONFIG.networks[id].reportMaps - for ski the downhill and touring
+ * geolocalisation maps; for bike, just the one, so no switch shows there), since a report or an
+ * inspection photo can in principle be anywhere on the mountain.
  *
- *   PhotoMapModal.open(lat, lon)          infractions/signalisations: a switch between the
- *                                         activity's report maps (APP_CONFIG.networks[id].
- *                                         reportMaps - for ski the downhill and touring maps),
- *                                         since a report can be anywhere on the mountain.
- *   PhotoMapModal.open(lat, lon, mapIds)  inspection dashboard/history: a photo belongs to one
- *                                         specific trail of one specific kind, so mapIds fixes
- *                                         the map to that kind's own (TrailService.mapIdOf) -
- *                                         no switch shown (there is nothing to switch to).
+ *   PhotoMapModal.open(lat, lon)              opens on the network's default report map
+ *                                             (reportMaps' first entry).
+ *   PhotoMapModal.open(lat, lon, preferred)   opens on `preferred` instead, when it is one of the
+ *                                             offered maps - e.g. inspection dashboard/history
+ *                                             pass the photo's own trail kind's map
+ *                                             (TrailService.geoMapIdOf), infraction/signalisation
+ *                                             pages pass the report's resolved kind when one can
+ *                                             be inferred (its trail, or its sector when every
+ *                                             trail of that sector shares one kind). Falls back to
+ *                                             the network default when `preferred` isn't offered.
  *   PhotoMapModal.close()
  *
- * Either way: opens Google Maps instead when no offered map can place the position at all. The
- * map shown first is the default one (mapIds[0], or reportMaps' default - for ski the downhill
- * map); when there is a choice, the one picked with the switch is kept while the page stays open.
- * Every map can be picked: one with no GPS calibration yet (Administration > Cartes) is shown
- * without the marker, with a note.
+ * Either way: opens Google Maps instead when no offered map can place the position at all (none
+ * calibrated - a calibrated map's gpsToPixel always returns a pixel, clamped to the image edges,
+ * even for a position outside its coverage, so this is never about being "out of bounds").
+ * Once the switch has been used, the picked map is kept (pinned) for subsequent photos while the
+ * page stays open, taking priority over any `preferred` passed later. Every map can be picked:
+ * one with no GPS calibration yet (Administration > Cartes) is shown without the marker, with a
+ * note.
  *
  * Uses the .detail-modal markup (infraction-admin, signalisation-admin, signalisation-resume,
- * inspection-history already have it; inspection-dashboard has its own copy of the same rules).
- * Requires config.js, network.js and map-service.js (also trail-service.js when passing mapIds).
+ * maintenance-admin, inspection-history already have it; inspection-dashboard has its own copy of
+ * the same rules).
+ * Requires config.js, network.js and map-service.js (also trail-service.js for callers that pass
+ * a `preferred` derived from TrailService).
  */
 const PhotoMapModal = (function () {
   'use strict';
@@ -29,11 +38,9 @@ const PhotoMapModal = (function () {
   let chosen = null;      // map id being shown
   let pinned = null;      // map id the user picked with the switch (kept while the page stays open)
   let position = null;    // { lat, lon } being shown
-  let forcedMaps = null;  // set by open(lat, lon, mapIds): offer only these, no reportMaps switch
 
   const $ = id => document.getElementById(id);
-  const mapsOffered = () => forcedMaps || MapService.reportMaps().all;
-  const defaultMap = () => forcedMaps ? forcedMaps[0] : MapService.reportMaps().default;
+  const mapsOffered = () => MapService.reportMaps().all;
 
   function build() {
     document.body.insertAdjacentHTML('beforeend', `
@@ -94,15 +101,17 @@ const PhotoMapModal = (function () {
   /**
    * @param {number} lat
    * @param {number} lon
-   * @param {string[]} [mapIds] restrict to exactly these maps, no switch (see file header)
+   * @param {string} [preferred] open on this map instead of the network default, when it is one
+   *   of the offered maps (see file header) - ignored once a map has been pinned by the switch
    */
-  function open(lat, lon, mapIds) {
-    forcedMaps = mapIds || null;
+  function open(lat, lon, preferred) {
     const all = mapsOffered();
     // No map on offer can place the position at all (none calibrated): Google Maps instead
     if (!all.some(id => MapService.gpsToPixel(lat, lon, id))) { window.open(`https://www.google.com/maps?q=${lat},${lon}`, '_blank', 'noopener'); return; }
 
-    chosen = (!forcedMaps && pinned && all.includes(pinned)) ? pinned : defaultMap();
+    chosen = (pinned && all.includes(pinned)) ? pinned
+      : (preferred && all.includes(preferred)) ? preferred
+      : MapService.reportMaps().default;
     position = { lat, lon };
     if (!$('photo-map-modal')) build();
     render();

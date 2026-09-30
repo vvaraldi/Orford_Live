@@ -21,7 +21,7 @@
 
   switchTab('maps');
   await wait(700);
-  ok('map list: ski (touring), ski-downhill, ski-downhill-geo, bike', J([...$('cal-network').options].map(o => o.value)) === J(['ski', 'ski-downhill', 'ski-downhill-geo', 'bike']) && /Descente/.test($('cal-network').options[1].textContent), [...$('cal-network').options].map(o => o.textContent));
+  ok('map list: ski, ski-geo, ski-downhill, ski-downhill-geo, bike, bike-geo', J([...$('cal-network').options].map(o => o.value)) === J(['ski', 'ski-geo', 'ski-downhill', 'ski-downhill-geo', 'bike', 'bike-geo']) && /Descente/.test($('cal-network').options[2].textContent), [...$('cal-network').options].map(o => o.textContent));
 
   // ---- Ski: nothing in the database yet -> empty; then a saved calibration shows up as 3 points ----
   ok('ski: first activity, method 3 points (affine)', $('cal-network').value === 'ski' && $('cal-mode').value === 'affine');
@@ -53,6 +53,12 @@
   const wSki = window.__writes.find(w => w[0] === 'maps');
   ok('ski: save writes maps/ski (affine, 3 points, size 800x700, user)', !!wSki && wSki[1] === 'ski' && wSki[3].mode === 'affine' && wSki[3].points.length === 3 && wSki[3].width === 800 && wSki[3].height === 700 && wSki[3].updatedBy === 'u1', wSki);
   ok('ski: still saved after saving again', /Calibration enregistrée/.test($('cal-source').textContent), $('cal-source').textContent);
+
+  // ---- Ski touring geolocalisation map: its own image and calibration, separate from the status map ----
+  choose($('cal-network'), 'ski-geo');
+  await wait(900);
+  ok('touring geo map: own image (800 px), no size warning, no calibration yet, save disabled', $('cal-image').naturalWidth === 800 && $('cal-size-warning').hidden === true && /Aucune calibration/.test($('cal-source').textContent) && $('cal-save').disabled === true, [$('cal-image').naturalWidth, $('cal-source').textContent]);
+  ok('touring geo map: same size as the status map (800x700) but its own image and calibration', $('cal-overlay').getAttribute('width') === '800' && $('cal-overlay').getAttribute('height') === '700');
 
   // ---- Ski downhill map: its own calibration, nothing saved yet ----
   choose($('cal-network'), 'ski-downhill');
@@ -116,6 +122,13 @@
   // back to 3 points: only 3 rows and 3 saved
   choose($('cal-mode'), 'affine');
   ok('switching to 3 points shows 3 rows and keeps the first 3 points', rows().length === 3 && field(rows()[1], 'x').value === '1500');
+
+  // ---- Bike geolocalisation map: its own image and calibration, separate from the status map ----
+  choose($('cal-network'), 'bike-geo');
+  await wait(900);
+  ok('bike geo map: own image, same size as the status map (1600x919) but its own calibration, none saved yet', $('cal-image').naturalWidth === 1600 && $('cal-size-warning').hidden === true && /Aucune calibration/.test($('cal-source').textContent) && $('cal-save').disabled === true, [$('cal-image').naturalWidth, $('cal-source').textContent]);
+  ok('bike geo map: independent of the bike status map just calibrated', MapService.canLocate('bike-geo') === false && MapService.canLocate('bike') === true);
+
   choose($('cal-network'), 'ski'); // dirty -> confirm() is asked; auto-accept
   await wait(200);
   ok('no script errors at the end', window.__errs.length === 0, window.__errs);

@@ -174,6 +174,7 @@
   <script src="../js/services/map-service.js"></script>
   <script src="../js/services/photo-map-modal.js"></script>
   <script src="../js/services/sector-service.js"></script>
+  <script src="../js/services/trail-service.js"></script>
 
   <script>
     const STATUS_LABELS = {
@@ -196,7 +197,7 @@
 
     let reportsData = [];
     let currentReportId = null;
-    let sectors = []; // every sector (names), from Firestore (SectorService)
+    let sectors = []; // this activity's sectors, with their trails (SectorService.load)
     // Filters: options are built from what's actually in reportsData, so a choice always
     // narrows to something non-empty. Apply to both the map markers and the table.
     let filterSector = '';
@@ -206,6 +207,21 @@
     const sectorNameOf = r => SectorService.nameOf(sectors, r.sector, r.sectorDisplayName);
     // A trail identifies a report by id when it has one, else by name (old reports)
     const reportTrailKey = r => r.trailId || ('name:' + (r.trail || ''));
+
+    // Which map a record's photos should default to: its own trail's kind, else its sector's kind
+    // when every trail of that sector shares one (e.g. a sector used only for backcountry/
+    // randonnée alpine reports, with no specific trail selected) - else null (network default).
+    // See js/services/photo-map-modal.js for how `preferred` is used.
+    function geoMapFor(record) {
+      const sector = SectorService.find(sectors, record.sector);
+      const trail = sector && sector.items.find(i => i.id === record.trailId);
+      if (trail) return TrailService.geoMapIdOf(trail.kind);
+      if (sector && sector.items.length) {
+        const kinds = new Set(sector.items.map(i => i.kind));
+        if (kinds.size === 1) return TrailService.geoMapIdOf([...kinds][0]);
+      }
+      return null;
+    }
 
     function visibleReports() {
       let list = reportsData;
@@ -264,7 +280,7 @@
             document.querySelectorAll('.nav__link--admin, .mobile-nav__link--admin').forEach(el => el.style.display = '');
           }
           try {
-            sectors = await SectorService.loadAll();
+            sectors = await SectorService.load();
           } catch (e) {
             console.error('Error loading sectors:', e);
           }
@@ -434,13 +450,14 @@
       const photos = r.photos || (r.photoUrl ? [{ url: r.photoUrl, coordinates: r.coordinates }] : []);
       
       if (photos.length > 0) {
+        const preferredMap = geoMapFor(r);
         photoHtml = '<div class="photo-gallery" style="display:flex;flex-wrap:wrap;gap:0.5rem;">';
         photos.forEach((photo, idx) => {
           let locationHtml = '';
           if (photo.coordinates && photo.coordinates.latitude && photo.coordinates.longitude) {
             const lat = photo.coordinates.latitude;
             const lon = photo.coordinates.longitude;
-            locationHtml = `<div class="photo-location"><a href="#" onclick="openPhotoLocationModal(${lat},${lon});return false;">📍 Carte</a><a href="https://www.google.com/maps?q=${lat},${lon}" target="_blank" rel="noopener noreferrer">🗺️</a></div>`;
+            locationHtml = `<div class="photo-location"><a href="#" onclick="openPhotoLocationModal(${lat},${lon}${preferredMap ? `,'${preferredMap}'` : ''});return false;">📍 Carte</a><a href="https://www.google.com/maps?q=${lat},${lon}" target="_blank" rel="noopener noreferrer">🗺️</a></div>`;
           }
           photoHtml += `<div class="photo-gallery-item" style="position:relative;">
             <img src="${photo.url}" class="detail-photo" alt="Photo ${idx + 1}" onclick="window.open('${photo.url}', '_blank')" style="max-width:150px;max-height:150px;">

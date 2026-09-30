@@ -122,17 +122,22 @@ const APP_CONFIG = {
   // The ids 'ski' and 'bike' are also the ids of the calibrations saved before there were
   // several maps: do not rename them.
   //   Ski-Downhill_Map_web.jpg is Ski-Downhill_Map.png (same 1670 x 736 px) as a lighter JPG.
+  // Every kind of trail has a status map (trailKinds.<kind>.map: trail markers, open/closed) and
+  // a geolocalisation map (trailKinds.<kind>.geoMap: GPS-calibrated, report/photo locations only -
+  // never has trail status markers placed on it). The two are always separate images, even where
+  // they show the same area, so a geolocalisation map's calibration is never disturbed by trail
+  // marker edits and vice versa.
   maps: {
-    'ski':              { name: 'Ski - Montée',   icon: '⛷️', image: 'assets/map/Ski-Touring_Map.png',              width: 800,  height: 700 },
-    // Status-only: trail markers (open/closed) placed on it (trailKinds.downhill/lift.map).
-    // No longer used for GPS - see 'ski-downhill-geo' below.
-    'ski-downhill':     { name: 'Ski - Descente (statut)', icon: '🎿', image: 'assets/map/Ski-Downhill_Map_web.jpg', width: 1670, height: 736 },
-    // GPS-calibrated only: report/photo locations for downhill and lifts (trailKinds.downhill/lift.geoMap).
-    // Never has trail status markers placed on it.
+    'ski':              { name: 'Ski - Montée (statut)',   icon: '⛷️', image: 'assets/map/Ski-Touring_Map.png',                          width: 800,  height: 700 },
+    // Ski-Touring_geolocalisation_Map_web.jpg is Ski-Touring_geolocalisation_Map.png (same 800 x 700 px) as a lighter JPG.
+    'ski-geo':          { name: 'Ski - Montée (géolocalisation)', icon: '📍', image: 'assets/map/Ski-Touring_geolocalisation_Map_web.jpg', width: 800,  height: 700 },
+    // Ski-Downhill_Map_web.jpg is Ski-Downhill_Map.png (same 1670 x 736 px) as a lighter JPG.
+    'ski-downhill':     { name: 'Ski - Descente (statut)', icon: '🎿', image: 'assets/map/Ski-Downhill_Map_web.jpg',                       width: 1670, height: 736 },
     // Ski-Downhill_Geolocalisation-map_web.jpg is Ski-Downhill_Geolocalisation-map.png (same 1404 x 932 px) as a lighter JPG.
     'ski-downhill-geo': { name: 'Ski - Descente (géolocalisation)', icon: '📍', image: 'assets/map/Ski-Downhill_Geolocalisation-map_web.jpg', width: 1404, height: 932 },
     // The illustrated map (Bike_Map.jpg, not to scale) resized to 1600 px wide
-    'bike':             { name: 'Vélo',           icon: '🚵', image: 'assets/map/Bike_Map_web.jpg',                 width: 1600, height: 919 }
+    'bike':             { name: 'Vélo (statut)',            icon: '🚵', image: 'assets/map/Bike_Map_web.jpg',                             width: 1600, height: 919 },
+    'bike-geo':         { name: 'Vélo (géolocalisation)',   icon: '📍', image: 'assets/map/Bike_Geolocalisation_Map_web.jpg',              width: 1600, height: 919 }
   },
 
   // ===== NETWORKS (activities) =====
@@ -163,7 +168,7 @@ const APP_CONFIG = {
       id: 'ski', name: 'Ski', icon: '⛷️',
       map: 'ski',
       trailKinds: ['uphill', 'downhill', 'lift'],
-      reportMaps: ['ski-downhill-geo', 'ski'],
+      reportMaps: ['ski-downhill-geo', 'ski-geo'],
       inspectionKinds: ['uphill', 'downhill'],
       features: { shelters: true, snowCondition: true },
       publicTitle: 'État des sentiers de randonnée alpine',
@@ -187,7 +192,7 @@ const APP_CONFIG = {
       seasonMonths: [5, 6, 7, 8, 9, 10], // 1 May to 31 October
       map: 'bike',
       trailKinds: ['bike'],
-      reportMaps: ['bike'],
+      reportMaps: ['bike-geo'],
       inspectionKinds: ['bike'],
       features: { shelters: false, snowCondition: false },
       publicTitle: 'État des sentiers de vélo de montagne',
@@ -226,11 +231,11 @@ const APP_CONFIG = {
   // inspector can also type a free-text "other" issue on top of it). No entry = no checklist
   // (lift: never inspected, see inspectionKinds).
   trailKinds: {
-    uphill:   { label: 'Montée',   idPrefix: 'trail', map: 'ski',
+    uphill:   { label: 'Montée',   idPrefix: 'trail', map: 'ski', geoMap: 'ski-geo',
       issues: ['Glace sur le sentier', 'Érosion du sentier', 'Arbres/branches tombés', 'Obstacles sur le sentier', 'Signalisation manquante/endommagée'] },
     downhill: { label: 'Descente', idPrefix: 'run',   map: 'ski-downhill', geoMap: 'ski-downhill-geo',
       issues: ['Plaques de glace / verglas', 'Manque de neige / roches exposées', 'Arbres/branches tombés sur la piste', 'Filet de sécurité endommagé', 'Balisage de piste manquant/endommagé'] },
-    bike:     { label: 'Vélo',     idPrefix: 'bike',  map: 'bike',
+    bike:     { label: 'Vélo',     idPrefix: 'bike',  map: 'bike', geoMap: 'bike-geo',
       issues: ['Ornières / érosion importante', 'Arbres/branches tombés sur le sentier', 'Pont/passerelle endommagé', 'Obstacle technique endommagé (saut, module, virage relevé)', 'Signalisation manquante/endommagée', 'Boue excessive / sentier détrempé'] },
     // Lifts (Remontées mécaniques): listed so reports can be filed against them; no difficulty,
     // never inspected (see inspectionKinds)
