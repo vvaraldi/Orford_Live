@@ -241,7 +241,10 @@
       el('error').hidden = false;
     }
 
-    // Markers need the image's natural size to convert pixel coordinates to percentages
+    // Markers need the image's natural size to convert pixel coordinates to percentages. The
+    // listener must stay attached (not just fire once via img.complete) since switchKind() swaps
+    // img.src again later for the same <img> element - each swap needs its own "ready" run once
+    // the new image has loaded, to recompute mapSize and redraw the markers for that map.
     function watchMapImage() {
       const img = el('map-image');
       const ready = () => {
@@ -249,7 +252,8 @@
         mapSize = { width: img.naturalWidth, height: img.naturalHeight };
         render();
       };
-      if (img.complete) ready(); else img.addEventListener('load', ready);
+      img.addEventListener('load', ready);
+      if (img.complete) ready(); // already loaded (e.g. from cache) by the time we got here
     }
 
     function loadScript(src) {
