@@ -14,7 +14,7 @@
 
 3. Improve the user experience
 #	Priority	Item
-3.1 Continue to debug the 2 map issue (geo and trail numbers)
+3.1 The exported one to a different web adress do not allow me to log on... is it normal and what to do to avoid this issue
 3.2 when I click on close all the trails... it does it (which is great) but it adds to a "bonne état" state... Could this field be blanked ?
 3.3 Add the possibility to create a report from the summary page. Use of right click or a link once clicked on the trail ?
 3.4	Medium-High	Check the new UI at phone width
@@ -32,18 +32,11 @@ in parallel... few other points
 - looks like the login on the new website site address is not working...
 
 
-
 - Add/update the estimated time to the log. I go to sleep !
-
-
-
 
 Bike :
 - Objectif to deliver this part for end of March 2027
 - while including the new app called Maintenance
-
-
-
 
 
 Outcome of the meeting of the 28th of sept
