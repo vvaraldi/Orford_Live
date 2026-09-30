@@ -74,15 +74,14 @@
         actionText: 'Accéder à l\'application'
       },
       {
-        id: 'infraction',
-        title: 'Infractions',
-        icon: '🚨',
-        description: 'Enregistrement et gestion des infractions constatées sur le terrain.',
-        url: 'pages/infraction-report.html',       // mobile default, and desktop default for non-admins
-        desktopUrl: 'pages/infraction-admin.html', // desktop default for admins (that page requires admin)
-        desktopUrlRequiresAdmin: true,
-        permission: 'allowInfraction',
+        id: 'maintenance',
+        title: 'Entretien',
+        icon: '🔧',
+        description: 'Journal de travail quotidien des artisans de sentiers (réseau vélo).',
+        url: 'pages/maintenance-report.html',
+        permission: 'allowMaintenance',
         permissionDefault: false,
+        network: 'bike',
         actionText: 'Accéder à l\'application'
       },
       {
@@ -97,14 +96,15 @@
         actionText: 'Accéder à l\'application'
       },
       {
-        id: 'maintenance',
-        title: 'Entretien',
-        icon: '🔧',
-        description: 'Journal de travail quotidien des artisans de sentiers (réseau vélo).',
-        url: 'pages/maintenance-report.html',
-        permission: 'allowMaintenance',
+        id: 'infraction',
+        title: 'Infractions',
+        icon: '🚨',
+        description: 'Enregistrement et gestion des infractions constatées sur le terrain.',
+        url: 'pages/infraction-report.html',       // mobile default, and desktop default for non-admins
+        desktopUrl: 'pages/infraction-admin.html', // desktop default for admins (that page requires admin)
+        desktopUrlRequiresAdmin: true,
+        permission: 'allowInfraction',
         permissionDefault: false,
-        network: 'bike',
         actionText: 'Accéder à l\'application'
       },
       {

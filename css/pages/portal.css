@@ -30,7 +30,7 @@
 .app-grid {
   display: grid;
   gap: var(--space-6);
-  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); /* 80% of the previous 300px, so a notch more fit per row */
 }
 
 /* ===== APP CARD ===== */
