@@ -65,4 +65,3 @@ Info shared : data server is US-EAST1.
 Agreed on data imported and inclusion of some personal data
 Created a Regis@orford.com account to manage the data (regis is the owner)
 Regis has a github account
-

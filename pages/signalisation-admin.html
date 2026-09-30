@@ -9,10 +9,16 @@
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🚧</text></svg>">
   <link rel="stylesheet" href="../css/main.css">
   <style>
-    .filters-bar { display: flex; flex-wrap: wrap; gap: 1rem; align-items: center; }
-    .filters-bar .form-select { width: auto; min-width: 150px; }
-    .filters-bar label { display: flex; align-items: center; gap: 0.5rem; font-size: 0.875rem; cursor: pointer; }
-    
+    /* Filters section (same collapsible layout as inspection-history.html, kept small by default) */
+    .filters-section { background: var(--theme-surface); border: 1px solid var(--theme-border); border-radius: var(--radius-lg); padding: 1rem 1.25rem; margin-bottom: 1.5rem; }
+    .filters-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.75rem; }
+    .filters-title { font-size: 1rem; font-weight: 600; display: flex; align-items: center; gap: 0.5rem; }
+    .filters-toggle { background: none; border: none; color: var(--theme-accent); cursor: pointer; font-size: 0.875rem; }
+    .filters-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 1rem; align-items: end; }
+    .filters-grid .form-group { margin-bottom: 0; }
+    .filters-grid .form-check { display: flex; align-items: center; gap: 0.5rem; height: 2.5rem; }
+    .filters-actions { display: flex; gap: 0.75rem; margin-top: 0.75rem; padding-top: 0.75rem; border-top: 1px solid var(--theme-border); }
+
     .data-table { width: 100%; border-collapse: collapse; }
     .data-table th, .data-table td { padding: 0.75rem; text-align: left; border-bottom: 1px solid var(--theme-border); }
     .data-table th { background: var(--theme-surface-alt); font-weight: 600; font-size: 0.75rem; text-transform: uppercase; }
@@ -65,25 +71,51 @@
   <main id="main-content" class="main" style="display:none;">
     <div class="page-header"><div class="page-header__content"><h1 class="page-title">Gestion des signalisations</h1><p class="page-subtitle">Consulter et gérer tous les rapports</p></div></div>
 
+    <div class="filters-section" id="filters-section">
+      <div class="filters-header">
+        <div class="filters-title">🔍 Filtres</div>
+        <button class="filters-toggle" id="toggle-filters">Masquer</button>
+      </div>
+      <div id="filters-content">
+        <div class="filters-grid">
+          <div class="form-group">
+            <label class="form-label" for="filter-sector">Secteur</label>
+            <select class="form-select" id="filter-sector">
+              <option value="">Tous les secteurs</option><!-- filled by SectorService -->
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="filter-trail">Piste / Sentier</label>
+            <select class="form-select" id="filter-trail">
+              <option value="">Toutes les pistes</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="sort-by">Trier par</label>
+            <select class="form-select" id="sort-by">
+              <option value="date">Date</option>
+              <option value="sector">Secteur</option>
+            </select>
+          </div>
+          <div class="form-check">
+            <input type="checkbox" class="form-check-input" id="show-resolved">
+            <label class="form-check-label" for="show-resolved">Résolus</label>
+          </div>
+          <div class="form-check">
+            <input type="checkbox" class="form-check-input" id="show-archived">
+            <label class="form-check-label" for="show-archived">Archivés</label>
+          </div>
+        </div>
+        <div class="filters-actions">
+          <button class="btn btn-secondary btn-sm" id="refresh-btn">🔄 Actualiser</button>
+        </div>
+      </div>
+    </div>
+
     <section class="content-section">
       <div class="section-card">
         <div class="section-card__header">
           <h2 class="section-card__title">📋 Liste des rapports</h2>
-          <div class="filters-bar">
-            <select class="form-select" id="filter-sector">
-              <option value="">Tous les secteurs</option><!-- filled by SectorService -->
-            </select>
-            <select class="form-select" id="filter-trail">
-              <option value="">Toutes les pistes</option>
-            </select>
-            <select class="form-select" id="sort-by">
-              <option value="date">Trier par date</option>
-              <option value="sector">Trier par secteur</option>
-            </select>
-            <label><input type="checkbox" id="show-resolved"> Résolus</label>
-            <label><input type="checkbox" id="show-archived"> Archivés</label>
-            <button class="btn btn-secondary btn-sm" id="refresh-btn">🔄</button>
-          </div>
         </div>
         <div class="section-card__body" style="padding:0;">
           <div class="table-responsive">
@@ -94,12 +126,13 @@
                   <th>Secteur</th>
                   <th>Piste</th>
                   <th>Statut</th>
+                  <th>Photos</th>
                   <th>Inspecteur</th>
                   <th>État</th>
                 </tr>
               </thead>
               <tbody id="reports-tbody">
-                <tr class="empty-row"><td colspan="6">Chargement...</td></tr>
+                <tr class="empty-row"><td colspan="7">Chargement...</td></tr>
               </tbody>
             </table>
           </div>
@@ -163,6 +196,7 @@
     let filterTrail = '';
     let sortBy = 'date';
     let sectors = []; // this activity's sectors, with their trails (SectorService.load)
+    let filtersVisible = true;
 
     // A trail identifies a report by id when it has one, else by name (old reports)
     const reportTrailKey = r => r.trailId || ('name:' + (r.trail || ''));
@@ -180,6 +214,14 @@
         if (kinds.size === 1) return TrailService.geoMapIdOf([...kinds][0]);
       }
       return null;
+    }
+
+    function toggleFilters() {
+      const content = document.getElementById('filters-content');
+      const btn = document.getElementById('toggle-filters');
+      filtersVisible = !filtersVisible;
+      content.style.display = filtersVisible ? 'block' : 'none';
+      btn.textContent = filtersVisible ? 'Masquer' : 'Afficher';
     }
 
     // escapeHtml is now provided by utils.js
@@ -237,6 +279,7 @@
       document.getElementById('show-resolved').addEventListener('change', (e) => { showResolved = e.target.checked; loadReports(); });
       document.getElementById('show-archived').addEventListener('change', (e) => { showArchived = e.target.checked; loadReports(); });
       document.getElementById('refresh-btn').addEventListener('click', loadReports);
+      document.getElementById('toggle-filters').addEventListener('click', toggleFilters);
     }
 
     async function loadReports() {
@@ -256,7 +299,7 @@
         renderReports();
       } catch (e) {
         console.error('Error loading reports:', e);
-        document.getElementById('reports-tbody').innerHTML = '<tr class="empty-row"><td colspan="6" style="color:#ef4444;">Erreur de chargement</td></tr>';
+        document.getElementById('reports-tbody').innerHTML = '<tr class="empty-row"><td colspan="7" style="color:#ef4444;">Erreur de chargement</td></tr>';
       }
     }
 
@@ -275,7 +318,7 @@
       }
       
       if (filtered.length === 0) {
-        tbody.innerHTML = '<tr class="empty-row"><td colspan="6">Aucun rapport trouvé</td></tr>';
+        tbody.innerHTML = '<tr class="empty-row"><td colspan="7">Aucun rapport trouvé</td></tr>';
         return;
       }
       
@@ -294,8 +337,9 @@
         if (r.resolved) etatBadges.push('<span class="badge badge--resolved">Résolu</span>');
         if (r.archived) etatBadges.push('<span class="badge badge--archived">Archivé</span>');
         const etatHtml = etatBadges.length ? `<div class="status-badges">${etatBadges.join('')}</div>` : '<span style="color:var(--theme-text-secondary);">Actif</span>';
-        
-        return `<tr data-id="${r.id}"><td>${dateStr}</td><td>${escapeHtml(sectorName)}</td><td>${escapeHtml(r.trail || '-')}</td><td>${statusHtml}</td><td>${escapeHtml(r.inspectorName || '-')}</td><td>${etatHtml}</td></tr>`;
+        const photoCount = PhotoService.photosFrom(r).length;
+
+        return `<tr data-id="${r.id}"><td>${dateStr}</td><td>${escapeHtml(sectorName)}</td><td>${escapeHtml(r.trail || '-')}</td><td>${statusHtml}</td><td><span class="badge badge-secondary">📷 ${photoCount}</span></td><td>${escapeHtml(r.inspectorName || '-')}</td><td>${etatHtml}</td></tr>`;
       }).join('');
       
       tbody.querySelectorAll('tr[data-id]').forEach(row => {

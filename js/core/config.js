@@ -294,7 +294,7 @@ const APP_CONFIG = {
         { id: 'inspection-dashboard', label: 'Tableau de bord', icon: '📊', href: 'pages/inspection-dashboard.html' },
         { id: 'inspection-trail-report', label: 'Rapport sentier', icon: '📝', href: 'pages/inspection-trail-report.html' },
         { id: 'inspection-shelter-report', label: 'Rapport abri', icon: '📝', href: 'pages/inspection-shelter-report.html', requires: 'shelters' },
-        { id: 'inspection-history', label: 'Historique', icon: '📋', href: 'pages/inspection-history.html' },
+        { id: 'inspection-history', label: 'Gestion', icon: '📋', href: 'pages/inspection-history.html' },
         { id: 'inspection-admin', label: 'Admin', icon: '⚙️', href: 'pages/inspection-admin.html', admin: true }
       ]
     },
@@ -308,7 +308,7 @@ const APP_CONFIG = {
     signalisation: {
       title: 'Signalisation',
       items: [
-        { id: 'signalisation-resume', label: 'Résumé', icon: '🗺️', href: 'pages/signalisation-resume.html' },
+        { id: 'signalisation-resume', label: 'Tableau de bord', icon: '🗺️', href: 'pages/signalisation-resume.html' },
         { id: 'signalisation-report', label: 'Rapport', icon: '📝', href: 'pages/signalisation-report.html' },
         { id: 'signalisation-admin', label: 'Gestion', icon: '📋', href: 'pages/signalisation-admin.html', admin: true }
       ]

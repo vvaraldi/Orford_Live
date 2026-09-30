@@ -78,7 +78,9 @@
         title: 'Infractions',
         icon: '🚨',
         description: 'Enregistrement et gestion des infractions constatées sur le terrain.',
-        url: 'pages/infraction-report.html',
+        url: 'pages/infraction-report.html',       // mobile default, and desktop default for non-admins
+        desktopUrl: 'pages/infraction-admin.html', // desktop default for admins (that page requires admin)
+        desktopUrlRequiresAdmin: true,
         permission: 'allowInfraction',
         permissionDefault: false,
         actionText: 'Accéder à l\'application'
@@ -88,7 +90,8 @@
         title: 'Signalisation',
         icon: '🚧',
         description: 'Gestion de la signalisation des pistes. Capturez l\'état et signalez les problèmes.',
-        url: 'pages/signalisation-report.html',
+        url: 'pages/signalisation-report.html',        // mobile default
+        desktopUrl: 'pages/signalisation-resume.html', // desktop default (no admin needed)
         permission: 'allowSignalisation',
         permissionDefault: false,
         actionText: 'Accéder à l\'application'
@@ -135,6 +138,21 @@
     ];
 
     /**
+     * The URL an app card lands on: `desktopUrl` on a computer (when the role allows it -
+     * desktopUrlRequiresAdmin guards a desktop target that itself requires admin, e.g.
+     * infraction-admin.html, so a non-admin isn't sent somewhere they'd immediately be bounced
+     * from), `url` on a phone/small screen or otherwise. Same breakpoint as the app's own
+     * responsive CSS (max-width: 768px).
+     */
+    function landingUrl(app, isAdmin) {
+      if (!app.desktopUrl) return app.url;
+      const isMobile = window.matchMedia('(max-width: 768px)').matches;
+      if (isMobile) return app.url;
+      if (app.desktopUrlRequiresAdmin && !isAdmin) return app.url;
+      return app.desktopUrl;
+    }
+
+    /**
      * Generate app cards based on user permissions
      */
     function generateAppCards(userData) {
@@ -171,7 +189,7 @@
 
         // Create card
         const card = document.createElement('a');
-        card.href = app.url;
+        card.href = landingUrl(app, isAdmin);
         card.className = `app-card app-card--${app.id}`;
 
         card.innerHTML = `
