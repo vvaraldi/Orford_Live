@@ -3,27 +3,18 @@
 
 1. Finalize
 #	Priority	Item
-1.4	High	Place remaining downhill run positions/numbers
-1.5	Medium-High	Do one real, logged-in end-to-end pass
-1.6	Medium	Bike content: real fault/practice list, bike sectors
-1.7	Medium	Finalize branding ("Regis" name/logo)
+1.1	Medium-High	Do one real, logged-in end-to-end pass
+1.2	Medium	Bike content: real fault/practice list, bike sectors
 
 2. Improve the code
 #	Priority	Item
-2.3	Low	Rules/site deploy via Firebase CLI (revisit in October)
-2.4	Low-Medium	Watch client-side full-collection reads
-2.5	Low	Trim legacy back-compat branches
+2.1	Low	Rules/site deploy via Firebase CLI (revisit in October)
+2.2	Low-Medium	Watch client-side full-collection reads
+2.3	Low	Trim legacy back-compat branches
 
 3. Improve the user experience
 #	Priority	Item
 3.1 Continue to debug the 2 map issue (geo and trail numbers)
-3.15 Add in the table of Signalisations (tab "gestion") the number of photos (same as in "Inspections")
-3.16 rename "Résumé" tab in Signalisation with "Tableau de bord".
-3.17 when entering signalisation open by default "tableau de bord" by default if on computer and "rapport" if on a mobile device
-3.17 when entering Infractions open by default "Gestion" by default if on computer and "rapport" if on a mobile device
-3.16 rename "Hisotrique" tab in Inspections with "Gestion".
-
-
 3.2 when I click on close all the trails... it does it (which is great) but it adds to a "bonne état" state... Could this field be blanked ?
 3.3 Add the possibility to create a report from the summary page. Use of right click or a link once clicked on the trail ?
 3.4	Medium-High	Check the new UI at phone width
@@ -39,11 +30,6 @@ in parallel... few other points
 - The network context: a network field on the collections, a network.js with the current network and a query helper, and the header switcher, remembered like orford-theme and defaulting by season	The step you're describing
 - Documentation / README & deployment guide
 - looks like the login on the new website site address is not working...
-
-To do with the customer :
-- Validate that the paiement method is not my personal data
-
-
 
 
 

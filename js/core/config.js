@@ -306,7 +306,7 @@ const APP_CONFIG = {
       ]
     },
     signalisation: {
-      title: 'Signalisation',
+      title: 'Signalisations',
       items: [
         { id: 'signalisation-resume', label: 'Tableau de bord', icon: '🗺️', href: 'pages/signalisation-resume.html' },
         { id: 'signalisation-report', label: 'Rapport', icon: '📝', href: 'pages/signalisation-report.html' },
