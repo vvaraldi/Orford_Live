@@ -22,6 +22,14 @@
   --theme-gradient-hover: linear-gradient(135deg, var(--color-portal-dark) 0%, var(--color-portal) 100%);
 }
 
+/* Portal header, bike network: same green as the bike background pattern, instead of the portal
+   blue - the portal has no app colour of its own, so it reflects the current activity. Apps keep
+   their own colour regardless of network (Infractions stays red, Signalisations amber, etc.). */
+[data-module="portal"][data-network="bike"] {
+  --theme-header-from: #3b8f5c;
+  --theme-header-to: #2f724a;
+}
+
 /* ===== INSPECTION MODULE ===== */
 [data-module="inspection"] {
   --theme-accent: var(--color-inspection);
