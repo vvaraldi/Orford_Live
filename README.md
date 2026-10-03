@@ -1,9 +1,7 @@
 # REGIS
 
-
 1. Finalize
 #	Priority	Item
-1.1	Medium-High	Do one real, logged-in end-to-end pass
 1.2	Medium	Bike content: real fault/practice list, bike sectors
 
 2. Improve the code
@@ -18,6 +16,10 @@
 3.6	Medium	Get real feedback on the bike issue checklist
 3.7	Low	Season label wording for bike
 3.8	Low	Accessibility audit pass
+
+
+- Add/update the estimated time to the log. I go to sleep !
+
 
 
 in parallel... few other points

@@ -15,14 +15,19 @@ positions, editing README.md, testing as a real user, etc.).
 | 2026-09-22 | 2026-09-21 23:42 → 2026-09-22 00:30 (~48min) | ~47m32s | ~47m32s |
 | 2026-09-22 (later) | 2026-09-22 00:30 → 2026-09-22 06:56 (~6h26m, almost all of it one overnight gap - you went to sleep after giving the go-ahead) | ~6min | ~6min |
 | 2026-09-22 (evening) | 2026-09-22 06:56 → 2026-09-22 22:55 (~16h, mostly one ~13.4h gap - you were away most of the day) | ~55min | ~1h19m |
+| 2026-09-23 | 2026-09-23 21:51 → 22:44 (~53min, a few short exchanges) | ~5m | ~5m |
 | 2026-09-28 | 2026-09-28 19:47 → 23:39 (~3h53m, one continuous evening block; an ~11.4h gap before it separates it from a 1-2min morning check-in, not counted) | ~1h47m | ~2h09m |
 | 2026-09-29 | 2026-09-29 20:41 → 22:39 (~1h58m, one continuous evening block) | ~1h04m | ~1h34m |
+| 2026-10-02 | 2026-10-02 21:33 → 2026-10-03 00:02 (~2h29m, one continuous evening block running past midnight; a single stray event at 03:30 the same day is not counted) | ~1h22m | ~2h02m |
 
 **Manual addition (not from chat timestamps):** +2h00m - customer/team meetings, morning of 2026-09-28 (before the day's chat activity started; per the Method note above, offline time isn't normally included, but you asked for this one to be logged).
 
-**Running total (active chat time + the meeting addition, all estimates so far): ~12h30m - 15h00m**
+**Running total (active chat time + the meeting addition, all estimates so far): ~14h00m - 17h05m**
 
-**Note:** 2026-09-23 (the Firebase backup/export session) is not yet logged here - flag it if you want it added later.
+**Note:** the 2026-10-02 row is computed up to 2026-10-03 00:02, when this estimate was made; the
+session may have continued after that, and any further time will need a new row. 2026-09-23 (the
+Firebase backup/export session, ~5 min of chat) was missing from earlier estimates and is now
+included. Nothing was logged in the transcript on 2026-09-24 to 2026-09-27, 2026-09-30 or 2026-10-01.
 
 The first 2026-09-22 row covers: renaming "Inspection Randonnée" to "Inspections", moving the
 Montée/Descente toggle from a dashboard-local control to the shared header switcher (`kind.js`, all 5
@@ -53,6 +58,17 @@ Infractions/Signalisations, fixing the `maintenance-admin.html` popup's missing 
 sync bug (stale cached JS), a `public-status.html` kind-switch bug (the image `load` listener only
 attached once), and the bike-mode visual pass (green mountain-pattern background, green portal header,
 narrower portal tiles, reordered portal tiles) - several rounds of back-and-forth but each one short.
+The 2026-09-23 row is the Firebase backup/export session (a handful of short exchanges).
+The 2026-10-02 row covers: logo/name linking to the portal and removing the "Portail" links from the
+menus, the Inspections dashboard (bulk close/open writing "Non inspecté", right-click on trail and
+shelter markers going straight to the matching report with the trail/status/shelter preselected for all
+inspectors in both views, the last-7-days list following the selected Montée/Descente, hint text, subtitle
+removed), the shovel icon and shorter portal descriptions, the Administration changes (new "Liens et
+astuces" tab with the status and volunteer links and a bundled QR code, Sentiers/Cartes/Données reserved
+to the system admin, Sentiers opening on the portal's activity, Import moved into Utilisateurs with its
+CSV template checked against the user profile, Entretien added to the data export), making every link
+independent of where the site is hosted (`siteUrl()` plus a hosting test suite), and the unused-code
+audit and cleanup (dead functions, config blocks, CSS and `modal.css`).
 
 Next time an estimate is added, keep the same method (or note if it changed) so the numbers stay
 comparable across rows.
