@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html><head><meta charset="utf-8"><title>Hosting tests</title></head>
+<body>
+<pre id="out">running...</pre>
+<script src="/js/core/config.js"></script>
+<script>
+// The site must work wherever it is hosted: every link is computed from where config.js was
+// loaded (the site root), never from a guess about the address.
+(() => {
+  const out = []; const J = JSON.stringify;
+  const ok = (n, c, x) => out.push((c ? 'PASS ' : 'FAIL ') + n + (c ? '' : ' :: ' + J(x)));
+
+  // ---- the site root is found from the script itself ----
+  ok('site root = the folder above js/core/ (here the test server\'s root)', SITE_ROOT_URL === location.origin + '/', SITE_ROOT_URL);
+
+  // ---- the same links from every kind of address ----
+  const hosts = {
+    'domain root':                    'https://regis.example.com/',
+    'custom domain, sub-folder':      'https://regis.example.com/orford/',
+    'GitHub Pages project site':      'https://someone.github.io/orford-live/',
+    'a folder that is itself named "pages"': 'https://someone.github.io/pages/',
+    'a deep path containing /pages/': 'https://example.org/clients/pages/site/v2/',
+    'accents and spaces in the path': 'https://example.org/Mont%20Orford/%C3%A9t%C3%A9/',
+    'a local folder':                 'file:///C:/Sites/Orford_Live/',
+    'localhost with a port':          'http://localhost:5500/'
+  };
+  for (const [label, root] of Object.entries(hosts)) {
+    const fromPortal = p => relativeSiteUrl(root, root + 'index.html', p);
+    const fromPage = p => relativeSiteUrl(root, root + 'pages/inspection-dashboard.html?kind=downhill#top', p);
+    const resolved = (page, rel) => new URL(rel, page).href;
+    const portal = root + 'index.html', inspection = root + 'pages/inspection-dashboard.html';
+    ok(label + ': from the portal, links to pages/ and assets/', fromPortal('pages/login.html') === 'pages/login.html' && fromPortal('assets/map/Bike_Map_web.jpg') === 'assets/map/Bike_Map_web.jpg', [fromPortal('pages/login.html'), fromPortal('assets/map/Bike_Map_web.jpg')]);
+    ok(label + ': from a page, the portal and the other pages', fromPage('index.html') === '../index.html' && fromPage('pages/user-profile.html') === 'user-profile.html' && fromPage('assets/a.png') === '../assets/a.png', [fromPage('index.html'), fromPage('pages/user-profile.html'), fromPage('assets/a.png')]);
+    ok(label + ': every link lands on the right file of the same site', resolved(portal, fromPortal('pages/login.html')) === new URL('pages/login.html', root).href && resolved(inspection, fromPage('index.html')) === new URL('index.html', root).href && resolved(inspection, fromPage('assets/map/Bike_Map_web.jpg')) === new URL('assets/map/Bike_Map_web.jpg', root).href);
+  }
+
+  // ---- a path with spaces (the logo) and a query string ----
+  const r = 'https://x.example/app/';
+  ok('a file name with a space still resolves to the same file', new URL(relativeSiteUrl(r, r + 'pages/a.html', 'assets/Logo_Mont-Orford transparent.png'), r + 'pages/a.html').href === new URL('assets/Logo_Mont-Orford transparent.png', r).href);
+  ok('query string and anchor are kept', relativeSiteUrl(r, r + 'pages/a.html', 'pages/b.html?x=1#y') === 'b.html?x=1#y');
+
+  // ---- pages that are not directly under pages/ still work (any depth) ----
+  ok('a page two levels down reaches the portal', relativeSiteUrl(r, r + 'pages/admin/x.html', 'index.html') === '../../index.html');
+
+  document.getElementById('out').textContent = out.join('\n');
+})();
+</script>
+</body></html>

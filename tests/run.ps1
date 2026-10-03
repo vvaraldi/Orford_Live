@@ -61,6 +61,7 @@ $tests = @(
   @{ name = 'trailservice';             type = 'unit'; spec = 'trailservice.html' }
   @{ name = 'mapservice';               type = 'unit'; spec = 'mapservice.html' }
   @{ name = 'kind';                     type = 'unit'; spec = 'kind.html' }
+  @{ name = 'hosting';                  type = 'unit'; spec = 'hosting.html' }
 )
 if ($Only) { $tests = $tests | Where-Object { $Only -contains $_.name } }
 

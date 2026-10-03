@@ -98,8 +98,7 @@ const Network = (function () {
 
   /** A path from the site root ("assets/map/Ski-Touring_Map.png") as a URL valid from the current page. */
   function url(path) {
-    if (!window.location.pathname.includes('/pages/')) return path;
-    return path.startsWith('pages/') ? path.slice('pages/'.length) : '../' + path;
+    return siteUrl(path); // config.js: independent of where the site is hosted
   }
 
   const api = {

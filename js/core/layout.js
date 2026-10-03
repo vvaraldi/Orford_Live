@@ -24,9 +24,8 @@
   if (!nav) return;
   const pageId = body.dataset.page;
 
-  // Config paths are relative to the site root; pages live in /pages/
-  const inPages = window.location.pathname.includes('/pages/');
-  const url = path => (inPages ? (path.startsWith('pages/') ? path.slice('pages/'.length) : '../' + path) : path);
+  // Config paths are written from the site root; siteUrl() (config.js) makes them valid from this page
+  const url = path => siteUrl(path);
 
   // The logo + name (banner and mobile drawer) is the way back to the portal: there is no
   // separate "Portail" link in the menus any more (public-status.html has its own header).

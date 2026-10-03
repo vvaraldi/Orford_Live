@@ -46,9 +46,13 @@
       // right-click on a trail goes straight to the trail report, trail + status to change to preselected
       const openTrail = allTrails.find(t => t.id === (bike ? 'bike_1' : 'trail_1'));    // status open
       const closedTrail = allTrails.find(t => t.id === (bike ? 'bike_2' : 'trail_2'));  // status closed
-      ok('right-click on an open trail: report page with the trail and status=closed', reportUrlForTrail(openTrail) === `inspection-trail-report.html?trail=${openTrail.id}&status=closed`, reportUrlForTrail(openTrail));
-      ok('right-click on a closed trail: report page with the trail and status=open', reportUrlForTrail(closedTrail) === `inspection-trail-report.html?trail=${closedTrail.id}&status=open`, reportUrlForTrail(closedTrail));
-      ok('right-click on a trail of unknown status: the trail only, the status is left to the form', reportUrlForTrail({ id: 'x' }) === 'inspection-trail-report.html?trail=x', reportUrlForTrail({ id: 'x' }));
+      ok('right-click on an open trail: report page with the trail and status=closed', reportUrlForTrail(openTrail, true) === `inspection-trail-report.html?trail=${openTrail.id}&status=closed`, reportUrlForTrail(openTrail, true));
+      ok('right-click on a closed trail: report page with the trail and status=open', reportUrlForTrail(closedTrail, true) === `inspection-trail-report.html?trail=${closedTrail.id}&status=open`, reportUrlForTrail(closedTrail, true));
+      ok('Inspection view: right-click on a trail preselects the trail only, whatever its status', reportUrlForTrail(openTrail) === `inspection-trail-report.html?trail=${openTrail.id}` && reportUrlForTrail(closedTrail) === `inspection-trail-report.html?trail=${closedTrail.id}`);
+      const inspMarker = document.querySelector('.map-marker:not(.map-marker--shelter)');
+      ok('Inspection view: trail markers have the right-click handler too', !!inspMarker && typeof inspMarker.oncontextmenu === 'function');
+      ok('Inspection view: the hint speaks of trails' + (bike ? '' : ' and shelters'), !document.getElementById('map-hint').hidden && /un sentier/.test(document.getElementById('map-hint').textContent) && /ou un abri/.test(document.getElementById('map-hint').textContent) === !bike, document.getElementById('map-hint').textContent);
+      ok('right-click on a trail of unknown status: the trail only, the status is left to the form', reportUrlForTrail({ id: 'x' }, true) === 'inspection-trail-report.html?trail=x', reportUrlForTrail({ id: 'x' }, true));
       ok('the old quick-toggle context menu is gone', !document.getElementById('context-menu') && typeof setTrailStatus === 'undefined');
       if (!bike) {
         // same for a shelter marker: the shelter report with that shelter preselected

@@ -8,6 +8,36 @@
  * - Firebase config should match your project
  */
 
+// ===== WHERE THE SITE IS HOSTED =====
+// Nothing here depends on the address the site is published at (domain, repository sub-folder,
+// local folder...). The site root is derived from where THIS script was loaded from
+// (<root>/js/core/config.js), and siteUrl() turns any path written from the site root
+// ("index.html", "pages/login.html", "assets/map/x.png") into a URL valid from the current page.
+// Moving the site to another address needs no change to the files.
+const SITE_ROOT_URL = (() => {
+  const own = document.currentScript
+    || [...document.scripts].find(s => /\/js\/core\/config\.js(\?|#|$)/.test(s.src));
+  if (own && own.src) return new URL('../../', own.src).href;
+  // Last resort (script injected without a trace): the folder above "pages/", or the current folder
+  return new URL(window.location.pathname.includes('/pages/') ? '../' : './', window.location.href).href;
+})();
+
+// The relative link from the page at pageUrl to `path` (written from the site root at rootUrl)
+function relativeSiteUrl(rootUrl, pageUrl, path) {
+  const target = new URL(path, rootUrl);
+  const there = target.pathname.split('/');
+  const file = there.pop();
+  const here = new URL('./', pageUrl).pathname.split('/');
+  here.pop(); // the empty part after the trailing slash
+  let common = 0;
+  while (common < here.length && common < there.length && here[common] === there[common]) common++;
+  return '../'.repeat(here.length - common) + [...there.slice(common), file].join('/') + target.search + target.hash;
+}
+
+function siteUrl(path) {
+  return relativeSiteUrl(SITE_ROOT_URL, window.location.href, path);
+}
+
 // ===== BRANDING: the ONE place for the portal's name and logo =====
 // The header logo, the browser tab title and description, the favicon and the login page
 // all read this (see "Apply the branding" at the end of this file). Pages only write their
@@ -40,33 +70,34 @@ const APP_CONFIG = {
   version: new Date().toISOString().split('T')[0].replace(/-/g, ''),
   
   // ===== ROUTES =====
+  // Written from the site root, like every path in this file: pass them through siteUrl() to get a link valid from the current page
   routes: {
-    portal: '/index.html',
-    login: '/pages/login.html',
-    forgotPassword: '/pages/forgot-password.html',
-    userProfile: '/pages/user-profile.html',
-    userManagement: '/pages/user-management.html',
+    portal: 'index.html',
+    login: 'pages/login.html',
+    forgotPassword: 'pages/forgot-password.html',
+    userProfile: 'pages/user-profile.html',
+    userManagement: 'pages/user-management.html',
     // Inspection module
-    inspectionDashboard: '/pages/inspection-dashboard.html',
-    inspectionTrailReport: '/pages/inspection-trail-report.html',
-    inspectionShelterReport: '/pages/inspection-shelter-report.html',
-    inspectionHistory: '/pages/inspection-history.html',
-    inspectionAdmin: '/pages/inspection-admin.html',
+    inspectionDashboard: 'pages/inspection-dashboard.html',
+    inspectionTrailReport: 'pages/inspection-trail-report.html',
+    inspectionShelterReport: 'pages/inspection-shelter-report.html',
+    inspectionHistory: 'pages/inspection-history.html',
+    inspectionAdmin: 'pages/inspection-admin.html',
     // Infraction module
-    infractionReport: '/pages/infraction-report.html',
-    infractionAdmin: '/pages/infraction-admin.html',
+    infractionReport: 'pages/infraction-report.html',
+    infractionAdmin: 'pages/infraction-admin.html',
     // Maintenance module (bike network)
-    maintenanceReport: '/pages/maintenance-report.html',
-    maintenanceAdmin: '/pages/maintenance-admin.html',
-    maintenanceVolunteerRegister: '/pages/maintenance-volunteer-register.html',
+    maintenanceReport: 'pages/maintenance-report.html',
+    maintenanceAdmin: 'pages/maintenance-admin.html',
+    maintenanceVolunteerRegister: 'pages/maintenance-volunteer-register.html',
     // Signalisation module
-    signalisationReport: '/pages/signalisation-report.html',
-    signalisationResume: '/pages/signalisation-resume.html',
-    signalisationAdmin: '/pages/signalisation-admin.html',
+    signalisationReport: 'pages/signalisation-report.html',
+    signalisationResume: 'pages/signalisation-resume.html',
+    signalisationAdmin: 'pages/signalisation-admin.html',
     // Support (requests)
-    support: '/pages/support.html',
+    support: 'pages/support.html',
     // Public
-    publicStatus: '/pages/public-status.html'
+    publicStatus: 'pages/public-status.html'
   },
 
   // ===== MODULE DEFINITIONS =====
@@ -366,9 +397,6 @@ Object.freeze(APP_CONFIG.defaults);
 (function applyBranding() {
   if (typeof document === 'undefined') return;
   const brand = APP_CONFIG.branding;
-
-  // A path from the site root, as a URL valid from the current page
-  const siteUrl = path => (window.location.pathname.includes('/pages/') ? '../' + path : path);
 
   const title = document.querySelector('title');
   if (title && !title.hasAttribute('data-no-brand') && !title.textContent.includes(brand.name)) {

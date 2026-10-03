@@ -14,10 +14,6 @@
 
 3. Improve the user experience
 #	Priority	Item
-3.1 The exported one to a different web adress do not allow me to log on... is it normal and what to do to avoid this issue
-3.2 when I click on close all the trails... it does it (which is great) but it adds to a "bonne état" state... Could this field be blanked ?
-3.3 Add the possibility to create a report from the summary page. Use of right click or a link once clicked on the trail ?
-3.4	Medium-High	Check the new UI at phone width
 3.5	Medium	Add a hint when a trail is "missing" because of the wrong kind selected
 3.6	Medium	Get real feedback on the bike issue checklist
 3.7	Low	Season label wording for bike

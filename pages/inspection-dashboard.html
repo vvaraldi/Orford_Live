@@ -353,9 +353,8 @@
         }
         
         marker.onclick = () => openTrailModal(trail.id);
-        if (currentView === 'status') {
-          marker.oncontextmenu = e => { e.preventDefault(); window.location.href = reportUrlForTrail(trail); };
-        }
+        const withStatus = currentView === 'status';
+        marker.oncontextmenu = e => { e.preventDefault(); window.location.href = reportUrlForTrail(trail, withStatus); };
         wrapper.appendChild(marker);
       });
 
@@ -363,11 +362,11 @@
       // are not placed per kind, and their coordinates are pixels on that map specifically)
       const showShelters = currentView === 'inspection' && TrailService.mapIdOf(currentKind) === Network.config().map;
 
-      // Right-click shortcut hint (all inspectors): trails in the Statut view, shelters where drawn
+      // Right-click shortcut hint (all inspectors, both views): trails, and shelters where drawn
       const hint = document.getElementById('map-hint');
-      const target = currentView === 'status' ? 'un sentier' : (showShelters && allShelters.some(s => s.coordinates) ? 'un abri' : '');
-      hint.textContent = target ? `Clic droit sur ${target} pour créer rapidement un rapport` : '';
-      hint.hidden = !target;
+      const withShelters = showShelters && allShelters.some(s => s.coordinates);
+      hint.textContent = `Clic droit sur un sentier${withShelters ? ' ou un abri' : ''} pour créer rapidement un rapport`;
+      hint.hidden = false;
 
       if (showShelters) {
         allShelters.forEach(shelter => {
@@ -417,14 +416,15 @@
       }
     }
 
-    // Right-click on a trail marker (status view, admins): straight to the trail report with that
-    // trail and the status to change to preselected - the opposite of the current one (open ->
-    // closed, closed -> open; an unknown status leaves the choice to the form). The report then
-    // records the real condition, photos, notes... instead of a blind quick toggle.
-    function reportUrlForTrail(trail) {
+    // Right-click on a trail marker (any inspector, in both views): straight to the trail report with
+    // that trail preselected. In the Statut view the status to change to is preselected too - the
+    // opposite of the current one (open -> closed, closed -> open; an unknown status leaves the
+    // choice to the form). The report then records the real condition, photos, notes... instead of
+    // a blind quick toggle. In the Inspection view only the trail is preselected.
+    function reportUrlForTrail(trail, withStatus = false) {
       const params = new URLSearchParams({ trail: trail.id });
-      if (trail.status === 'open') params.set('status', 'closed');
-      else if (trail.status === 'closed') params.set('status', 'open');
+      if (withStatus && trail.status === 'open') params.set('status', 'closed');
+      else if (withStatus && trail.status === 'closed') params.set('status', 'open');
       return `inspection-trail-report.html?${params}`;
     }
 
