@@ -108,7 +108,7 @@ const APP_CONFIG = {
     maintenance: {
       id: 'maintenance',
       name: 'Entretien',
-      icon: '🔧',
+      icon: '🪏',
       color: 'maintenance',
       permission: 'allowMaintenance'
     }

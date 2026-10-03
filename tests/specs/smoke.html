@@ -21,6 +21,46 @@
     const sys = AS === 'system';
     ok('the temporary data initialisation is gone (no section, no function)', !document.getElementById('backfill-section') && typeof backfillDataNetworks === 'undefined');
     ok('export activity list: all + own for system admin, own only for admin', JSON.stringify([...document.getElementById('export-network').options].map(o => o.value)) === JSON.stringify(sys ? ['', 'ski', 'bike'] : (NET === 'both' ? ['ski', 'bike'] : [NET])));
+    const shown = [...document.querySelectorAll('.admin-tabs__btn')].filter(b => b.style.display !== 'none').map(b => b.dataset.tab);
+    ok('Sentiers, Cartes and Données tabs: system admin only', ['trails', 'maps', 'data'].every(t => shown.includes(t) === sys), shown);
+    ok('the Import tab is gone', !document.querySelector('[data-tab="import"]') && !document.getElementById('import-tab'));
+    if (sys) {
+      ok('Sentiers tab starts on the activity chosen in the portal (a system admin has one too)', document.getElementById('trail-network').value === Network.current(), [document.getElementById('trail-network').value, Network.current()]);
+    } else {
+      switchTab('trails');
+      ok('a plain admin cannot open Sentiers even by script', !document.getElementById('trails-tab').classList.contains('is-active'));
+      switchTab('users');
+    }
+    // The bulk import now lives in Utilisateurs, between the user list and the export box
+    const kids = [...document.getElementById('users-tab').children];
+    const at = sel => kids.findIndex(k => k.matches(sel));
+    ok('bulk import block: in Utilisateurs, between the user list and the user export', at('.user-table-section') < at('#import-section') && at('#import-section') < at('.data-export-section:not(#import-section)'), kids.map(k => k.id || k.className));
+    // The downloadable CSV template is coherent with a user profile: every field an import can set is a column, and every row is read back correctly
+    const header = CSV_TEMPLATE.split('\n')[0].split(',');
+    const profileFields = ['name', 'email', 'password', 'role', 'phone', 'allowInspection', 'allowInfraction', 'allowSignalisation', 'allowMaintenance', 'networks'];
+    ok('CSV template: one column per profile field the import can set', J(header) === J(profileFields), header);
+    parseCsv(CSV_TEMPLATE);
+    const got = parsedUsers.map(u => [u.name, u.role, u.phone, u.allowInspection, u.allowInfraction, u.allowSignalisation, u.allowMaintenance, u.networks.join('|')]);
+    if (sys) {
+      ok('CSV template: the 3 example rows are read back as written', J(got) === J([
+        ['Jean Dupont', 'inspector', '514-555-1234', true, false, false, false, 'ski'],
+        ['Sophie Gagnon', 'inspector', '', true, false, false, true, 'bike'],
+        ['Marie Tremblay', 'admin', '', true, true, true, false, 'ski|bike']]), got);
+    } else {
+      ok('CSV template: the 3 example rows are read, activities limited to the importing admin\'s own', got.length === 3 && got.every(g => g[7].split('|').every(id => myNetworks().includes(id)) || g[7] === ''), got);
+    }
+    const tabs = [...document.querySelectorAll('.admin-tabs__btn')];
+    ok('"Liens et astuces" is the last tab, on the far right', tabs[tabs.length - 1].dataset.tab === 'links' && /Liens et astuces/.test(tabs[tabs.length - 1].textContent), tabs.map(t => t.dataset.tab));
+    const pub = document.getElementById('link-public-status');
+    ok('public status link: clear text, same as the clickable address, opens in a new tab', /\/pages\/public-status\.html$/.test(pub.textContent) && pub.href === pub.textContent && pub.target === '_blank', [pub.textContent, pub.href]);
+    const bikeAdmin = sys || NET === 'bike' || NET === 'both';
+    const card = document.getElementById('links-volunteer-card');
+    ok('volunteer registration card only for bike admins', card.hidden === !bikeAdmin, card.hidden);
+    if (bikeAdmin) {
+      const vol = document.getElementById('link-volunteer');
+      ok('volunteer link: clear text and clickable', /\/pages\/maintenance-volunteer-register\.html$/.test(vol.textContent) && vol.href === vol.textContent && vol.target === '_blank', vol.textContent);
+      ok('volunteer QR code is drawn, with a download link', !!document.querySelector('#links-volunteer-qr svg') && document.getElementById('links-volunteer-qr-download').hidden === false, document.getElementById('links-volunteer-qr').innerHTML.slice(0, 80));
+    }
   }
   document.getElementById('out').textContent = out.join('\n');
 })().catch(e => { document.getElementById('out').textContent = 'HARNESS ERROR ' + e.stack; });

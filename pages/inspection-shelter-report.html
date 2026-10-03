@@ -280,6 +280,9 @@
           opt.textContent = s.name;
           shelterSelect.appendChild(opt);
         });
+        // Opened from the dashboard's right-click on a shelter: ?shelter=<id> is preselected
+        const wanted = new URLSearchParams(window.location.search).get('shelter');
+        if (wanted) shelterSelect.value = wanted; // stays empty when it is not one of this activity's shelters
       } catch (e) { console.error('Error loading shelters:', e); showError('Erreur lors du chargement des abris'); }
     }
 

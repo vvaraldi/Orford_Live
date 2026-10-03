@@ -28,7 +28,9 @@
   const inPages = window.location.pathname.includes('/pages/');
   const url = path => (inPages ? (path.startsWith('pages/') ? path.slice('pages/'.length) : '../' + path) : path);
 
-  const HOME = { id: 'portal', label: 'Portail', icon: '🏠', href: 'index.html' };
+  // The logo + name (banner and mobile drawer) is the way back to the portal: there is no
+  // separate "Portail" link in the menus any more (public-status.html has its own header).
+  const PORTAL_HREF = 'index.html';
   const PROFILE = { id: 'user-profile', label: 'Mon profil', icon: '👤', href: 'pages/user-profile.html' };
 
   // Admin-only links start hidden; auth.js shows [data-require-admin] for admins.
@@ -44,17 +46,13 @@
 
   // ---- Desktop nav ----------------------------------------------------------
   function desktopLink(item) {
-    const showIcon = item.id === HOME.id || nav.desktopIcons !== false;
+    const showIcon = nav.desktopIcons !== false;
     const inner = `${showIcon ? `<span>${item.icon}</span>` : ''}<span>${item.label}</span>`;
     if (item.id === pageId) return `<span class="nav__link nav__link--active">${inner}</span>`;
     return `<a href="${url(item.href)}" class="nav__link${item.admin ? ' nav__link--admin' : ''}"${itemAttrs(item)}>${inner}</a>`;
   }
 
-  const desktopLinks = [desktopLink(HOME)];
-  if (nav.items.length) {
-    desktopLinks.push('<div class="nav__divider"></div>');
-    nav.items.forEach(item => desktopLinks.push(desktopLink(item)));
-  }
+  const desktopLinks = nav.items.map(desktopLink);
 
   // ---- Mobile drawer --------------------------------------------------------
   function mobileLink(item) {
@@ -84,14 +82,14 @@
     <a href="#main-content" class="skip-link">Aller au contenu principal</a>
 
     <header class="header">
-      <div class="logo">
+      <a class="logo" href="${url(PORTAL_HREF)}" title="Retour au portail" aria-label="Retour au portail">
         ${logoIcon}
         ${logoText}
-      </div>
+      </a>
 
       <nav class="nav">
-        ${desktopLinks.join('\n        ')}
-        <div class="nav__divider"></div>
+        ${desktopLinks.length ? `${desktopLinks.join('\n        ')}
+        <div class="nav__divider"></div>` : ''}
         <button type="button" class="network-switch" id="network-switch" hidden></button>
         <button type="button" class="network-switch" id="kind-switch" hidden></button>
         <button class="theme-toggle" onclick="window.themeManager.toggle()" aria-label="Changer le thème" title="Changer le thème">
@@ -121,7 +119,7 @@
     <div class="mobile-nav__backdrop" id="mobile-nav-backdrop"></div>
     <nav class="mobile-nav" id="mobile-nav">
       <div class="mobile-nav__header">
-        <div class="mobile-nav__logo">${logoIcon}${logoText}</div>
+        <a class="mobile-nav__logo" href="${url(PORTAL_HREF)}" title="Retour au portail" aria-label="Retour au portail">${logoIcon}${logoText}</a>
         <button class="mobile-nav__close" id="mobile-nav-close" aria-label="Fermer">${closeIcon}</button>
       </div>
 
@@ -138,11 +136,7 @@
         <div class="mobile-nav__section-title">Vue</div>
       </div>
 
-      <div class="mobile-nav__section">
-        ${mobileLink(HOME)}
-      </div>
-      ${mobileItems.length ? `<div class="mobile-nav__divider"></div>
-      <div class="mobile-nav__section">
+      ${mobileItems.length ? `<div class="mobile-nav__section">
         ${mobileItems.join('\n        ')}
       </div>` : ''}
       <div class="mobile-nav__divider"></div>

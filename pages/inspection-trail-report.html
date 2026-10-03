@@ -255,6 +255,28 @@
         showError('Impossible de charger les secteurs. Rechargez la page.');
       }
       updateTrailPicker();
+      await applyPreselection();
+    }
+
+    // Opened from the dashboard's right-click on a trail: ?trail=<id>&status=open|closed. Selects
+    // the sector + trail (through the sector step, or straight in the flat list when it is
+    // skipped), then the status to change to. The status comes last on purpose: picking a trail
+    // ticks that trail's current status, which would otherwise override the requested one.
+    async function applyPreselection() {
+      const params = new URLSearchParams(window.location.search);
+      const trailId = params.get('trail');
+      if (!trailId) return;
+      if (!sectorGroup.hidden) {
+        const sector = kindSectors().find(s => s.items.some(i => i.id === trailId));
+        if (!sector) return;
+        sectorSelect.value = sector.id;
+        populateTrails();
+      }
+      trailSelect.value = trailId;
+      if (trailSelect.value !== trailId) return; // not a trail of the kind shown
+      await updateStatusOptionsForTrail();
+      const status = params.get('status');
+      if (status === 'open' || status === 'closed') document.getElementById(`status-${status}`).checked = true;
     }
 
     // The sectors that actually hold a trail of the kind currently shown

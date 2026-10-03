@@ -720,7 +720,11 @@ const TrailAdmin = (function () {
     $('sector-new-add').addEventListener('click', addSector);
 
     await loadSectors();
-    selectNetwork(networkIds[0]);
+    // Start on the activity chosen in the portal when this admin manages it, else their first one
+    const portalNetwork = (window.Network && Network.current && Network.current()) || null;
+    const first = networkIds.includes(portalNetwork) ? portalNetwork : networkIds[0];
+    $('trail-network').value = first;
+    selectNetwork(first);
     load();
   }
 

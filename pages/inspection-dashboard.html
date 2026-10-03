@@ -15,7 +15,10 @@
     .map-header__title { font-size: 1.125rem; font-weight: 600; display: flex; align-items: center; gap: 0.5rem; }
     .map-controls { display: flex; align-items: center; gap: 1rem; flex-wrap: wrap; margin-left: auto; }
     .bulk-actions { display: none; gap: 0.5rem; }
-    .bulk-actions.show { display: flex; }
+    .bulk-actions.show { display: flex; align-items: center; }
+    .map-hint { font-size: 0.8125rem; color: var(--theme-text-secondary); margin-right: 0.5rem; }
+    .map-hint[hidden] { display: none; }
+    @media (hover: none) { .map-hint { display: none; } } /* touch screens have no right-click */
     .view-toggle { display: flex; align-items: center; gap: 0.5rem; font-size: 0.875rem; }
     .view-toggle__label { color: var(--theme-text-secondary); }
     .view-toggle__label.is-active { color: var(--theme-accent); font-weight: 600; }
@@ -118,12 +121,6 @@
     .photo-location { font-size: 0.7rem; margin-top: 0.25rem; display: flex; gap: 0.5rem; justify-content: center; }
     .photo-location a { color: var(--theme-accent); }
 
-    /* Context menu */
-    .context-menu { position: fixed; background: var(--theme-surface); border: 1px solid var(--theme-border); border-radius: var(--radius-md); box-shadow: var(--shadow-lg); z-index: 1001; min-width: 160px; display: none; }
-    .context-menu.show { display: block; }
-    .context-menu__item { padding: 0.5rem 1rem; cursor: pointer; transition: background 0.15s; }
-    .context-menu__item:hover { background: var(--theme-surface-alt); }
-
     @media (max-width: 768px) {
       .map-header { flex-direction: column; align-items: stretch; }
       .map-controls { justify-content: center; }
@@ -153,6 +150,7 @@
       <div class="map-header">
         <h2 class="map-header__title">🗺️ Carte des sentiers</h2>
         <div class="map-controls">
+          <span class="map-hint" id="map-hint" hidden></span>
           <div class="bulk-actions" id="bulk-actions">
             <button class="btn btn-sm btn-success" onclick="bulkSetStatus('open')">Tout ouvrir</button>
             <button class="btn btn-sm btn-danger" onclick="bulkSetStatus('closed')">Tout fermer</button>
@@ -208,12 +206,6 @@
     </div>
   </div>
 
-  <!-- Context Menu -->
-  <div class="context-menu" id="context-menu">
-    <div class="context-menu__item" onclick="setTrailStatus('open')">🟢 Ouvrir le sentier</div>
-    <div class="context-menu__item" onclick="setTrailStatus('closed')">🔴 Fermer le sentier</div>
-  </div>
-
   <footer class="footer footer--simple"><div class="footer__content"><p class="footer__copyright">© 2026 Regis for Mont Orford</p></div></footer>
 
   <script src="../js/core/utils.js"></script>
@@ -235,7 +227,6 @@
     let inspectorsMap = new Map();
     let currentView = 'inspection'; // 'inspection' or 'status'
     let currentKind = null; // which inspectionKind the map/stats show (null = the activity has only one)
-    let contextTrailId = null;
     let isAdmin = false;
 
     // Init
@@ -256,8 +247,7 @@
           await loadDashboardData();
         }
       });
-      document.addEventListener('click', () => hideContextMenu());
-      document.addEventListener('keydown', e => { if (e.key === 'Escape') { closeInspectionModal(); hideContextMenu(); } });
+      document.addEventListener('keydown', e => { if (e.key === 'Escape') closeInspectionModal(); });
       document.getElementById('inspection-modal').addEventListener('click', e => { if (e.target.id === 'inspection-modal') closeInspectionModal(); });
     }
 
@@ -363,15 +353,23 @@
         }
         
         marker.onclick = () => openTrailModal(trail.id);
-        if (currentView === 'status' && isAdmin) {
-          marker.oncontextmenu = e => { e.preventDefault(); showContextMenu(e, trail.id); };
+        if (currentView === 'status') {
+          marker.oncontextmenu = e => { e.preventDefault(); window.location.href = reportUrlForTrail(trail); };
         }
         wrapper.appendChild(marker);
       });
 
       // Shelter markers (only in inspection view, and only on the network's own main map: shelters
       // are not placed per kind, and their coordinates are pixels on that map specifically)
-      if (currentView === 'inspection' && TrailService.mapIdOf(currentKind) === Network.config().map) {
+      const showShelters = currentView === 'inspection' && TrailService.mapIdOf(currentKind) === Network.config().map;
+
+      // Right-click shortcut hint (all inspectors): trails in the Statut view, shelters where drawn
+      const hint = document.getElementById('map-hint');
+      const target = currentView === 'status' ? 'un sentier' : (showShelters && allShelters.some(s => s.coordinates) ? 'un abri' : '');
+      hint.textContent = target ? `Clic droit sur ${target} pour créer rapidement un rapport` : '';
+      hint.hidden = !target;
+
+      if (showShelters) {
         allShelters.forEach(shelter => {
           if (!shelter.coordinates) return;
           const marker = document.createElement('div');
@@ -385,6 +383,7 @@
           marker.classList.add('map-marker--' + cond);
           
           marker.onclick = () => openShelterModal(shelter.id);
+          marker.oncontextmenu = e => { e.preventDefault(); window.location.href = reportUrlForShelter(shelter); };
           wrapper.appendChild(marker);
         });
       }
@@ -418,69 +417,28 @@
       }
     }
 
-    // Context menu
-    function showContextMenu(e, trailId) {
-      contextTrailId = trailId;
-      const menu = document.getElementById('context-menu');
-      menu.style.left = e.clientX + 'px';
-      menu.style.top = e.clientY + 'px';
-      menu.classList.add('show');
+    // Right-click on a trail marker (status view, admins): straight to the trail report with that
+    // trail and the status to change to preselected - the opposite of the current one (open ->
+    // closed, closed -> open; an unknown status leaves the choice to the form). The report then
+    // records the real condition, photos, notes... instead of a blind quick toggle.
+    function reportUrlForTrail(trail) {
+      const params = new URLSearchParams({ trail: trail.id });
+      if (trail.status === 'open') params.set('status', 'closed');
+      else if (trail.status === 'closed') params.set('status', 'open');
+      return `inspection-trail-report.html?${params}`;
     }
-    function hideContextMenu() { document.getElementById('context-menu').classList.remove('show'); contextTrailId = null; }
 
-    async function setTrailStatus(status) {
-      if (!contextTrailId) return;
-      try {
-        const trail = allTrails.find(t => t.id === contextTrailId);
-        const lastInsp = trailInspections[contextTrailId] || {};
-        const now = new Date();
-        
-        // Create inspection record for history
-        const inspectionData = {
-          network: Network.current(),
-          trail_id: contextTrailId,
-          inspector_id: currentUser.uid,
-          inspector_name: window.currentUserData?.name || currentUser.email,
-          date: firebase.firestore.Timestamp.fromDate(now),
-          trail_status: status,
-          condition: lastInsp.condition || 'good',
-          snow_condition: Network.feature('snowCondition') ? (lastInsp.snow_condition || null) : null,
-          issues: lastInsp.issues || [],
-          notes: "Changement de statut rapide suite à évènement (météo ou autre)",
-          photos: [],
-          createdAt: firebase.firestore.FieldValue.serverTimestamp(),
-          isQuickToggle: true
-        };
-        
-        // Batch: create inspection + update trail
-        const batch = db.batch();
-        const inspRef = db.collection('trail_inspections').doc();
-        batch.set(inspRef, inspectionData);
-        batch.update(db.collection('trails').doc(contextTrailId), {
-          status: status,
-          lastUpdated: firebase.firestore.FieldValue.serverTimestamp(),
-          lastInspectionId: inspRef.id
-        });
-        await batch.commit();
-        
-        // Update local state
-        if (trail) trail.status = status;
-        trailInspections[contextTrailId] = { id: inspRef.id, ...inspectionData };
-        
-        // Refresh all views
-        updateStatistics();
-        renderMapMarkers();
-        updateLegend();
-        loadRecentInspections();
-        hideContextMenu();
-      } catch (e) { console.error('Error:', e); alert('Erreur: ' + e.message); }
+    // Same for a shelter marker (inspection view, where shelters are drawn): the shelter report
+    // with that shelter preselected. Shelters have no open/closed status, so nothing else to pass.
+    function reportUrlForShelter(shelter) {
+      return `inspection-shelter-report.html?${new URLSearchParams({ shelter: shelter.id })}`;
     }
 
     async function bulkSetStatus(status) {
       const trails = visibleTrails();
       const action = status === 'open' ? 'ouvrir' : 'fermer';
       const kindNote = currentKind ? ` (${TrailService.kindLabel(currentKind)})` : '';
-      if (!confirm(`Êtes-vous sûr de vouloir ${action} tous les ${trails.length} sentiers${kindNote}?\n\nCette action créera une inspection pour chaque sentier.`)) return;
+      if (!confirm(`Êtes-vous sûr de vouloir ${action} tous les ${trails.length} sentiers${kindNote}?\n\nCette action créera une inspection pour chaque sentier, avec l'état général « Non inspecté ».`)) return;
 
       try {
         const now = new Date();
@@ -509,7 +467,8 @@
               inspector_name: window.currentUserData?.name || currentUser.email,
               date: firebase.firestore.Timestamp.fromDate(now),
               trail_status: status,
-              condition: lastInsp.condition || 'good',
+              // A mass open/close says nothing about the trail's actual condition
+              condition: 'not-inspected',
               snow_condition: Network.feature('snowCondition') ? (lastInsp.snow_condition || null) : null,
               issues: lastInsp.issues || [],
               notes: comment,
@@ -660,16 +619,19 @@
       
       try {
         const recent = [];
-        // Trail inspections
+        // Trail inspections - of the kind shown (Montée / Descente), like the map and the stats
+        const kindTrails = visibleTrails();
         const trailSnap = await db.collection('trail_inspections').where('date', '>=', firebase.firestore.Timestamp.fromDate(sevenDaysAgo)).orderBy('date', 'desc').limit(50).get();
         trailSnap.forEach(doc => {
           const d = doc.data();
-          const trail = allTrails.find(t => t.id === d.trail_id);
-          if (!trail) return; // another activity's trail
+          const trail = kindTrails.find(t => t.id === d.trail_id);
+          if (!trail) return; // another activity's trail, or the other kind's
           recent.push({ id: doc.id, type: 'trail', name: trail.name || d.trail_id, ...d });
         });
-        // Shelter inspections (only activities that have shelters)
-        if (allShelters.length) {
+        // Shelter inspections (only activities that have shelters). Shelters are not kind-specific:
+        // they sit on the activity's main map only, so - like their map markers - they belong to
+        // the kind shown on that map (Montée), not to the other one.
+        if (allShelters.length && TrailService.mapIdOf(currentKind) === Network.config().map) {
           const shelterSnap = await db.collection('shelter_inspections').where('date', '>=', firebase.firestore.Timestamp.fromDate(sevenDaysAgo)).orderBy('date', 'desc').limit(50).get();
           shelterSnap.forEach(doc => {
             const d = doc.data();

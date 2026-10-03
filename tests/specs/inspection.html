@@ -43,13 +43,30 @@
       ok('map image is this activity\'s', img.src.endsWith(bike ? 'assets/map/Bike_Map_web.jpg' : 'assets/map/Ski-Touring_Map.png'), img.src);
       ok((bike ? 'bike' : 'ski') + ' map loads: no missing flag', !document.getElementById('map-wrapper').classList.contains('is-missing'));
 
-      // quick status change writes the network and keeps snow only for ski
-      contextTrailId = bike ? 'bike_1' : 'trail_1';
-      if (!bike) trailInspections['trail_1'].snow_condition = 'good';
-      await setTrailStatus('closed');
-      const w = writesOf('trail_inspections');
-      ok('quick status inspection carries the network', w.length === 1 && w[0].network === (bike ? 'bike' : 'ski'), w);
-      ok('snow condition kept for ski, always null for bike', bike ? w[0].snow_condition === null : w[0].snow_condition === 'good', w[0] && w[0].snow_condition);
+      // right-click on a trail goes straight to the trail report, trail + status to change to preselected
+      const openTrail = allTrails.find(t => t.id === (bike ? 'bike_1' : 'trail_1'));    // status open
+      const closedTrail = allTrails.find(t => t.id === (bike ? 'bike_2' : 'trail_2'));  // status closed
+      ok('right-click on an open trail: report page with the trail and status=closed', reportUrlForTrail(openTrail) === `inspection-trail-report.html?trail=${openTrail.id}&status=closed`, reportUrlForTrail(openTrail));
+      ok('right-click on a closed trail: report page with the trail and status=open', reportUrlForTrail(closedTrail) === `inspection-trail-report.html?trail=${closedTrail.id}&status=open`, reportUrlForTrail(closedTrail));
+      ok('right-click on a trail of unknown status: the trail only, the status is left to the form', reportUrlForTrail({ id: 'x' }) === 'inspection-trail-report.html?trail=x', reportUrlForTrail({ id: 'x' }));
+      ok('the old quick-toggle context menu is gone', !document.getElementById('context-menu') && typeof setTrailStatus === 'undefined');
+      if (!bike) {
+        // same for a shelter marker: the shelter report with that shelter preselected
+        const shelterMarker = document.querySelector('.map-marker--shelter');
+        ok('right-click on a shelter: shelter report with the shelter preselected', reportUrlForShelter(allShelters[0]) === 'inspection-shelter-report.html?shelter=shelter_1', reportUrlForShelter(allShelters[0]));
+        ok('the shelter marker has the right-click handler', !!shelterMarker && typeof shelterMarker.oncontextmenu === 'function');
+        ok('Inspection view: the hint speaks of shelters', !document.getElementById('map-hint').hidden && /un abri/.test(document.getElementById('map-hint').textContent), document.getElementById('map-hint').textContent);
+      }
+      // Statut view as a plain inspector (not admin): right-click on trails still works, the bulk buttons stay hidden
+      isAdmin = false;
+      const viewToggle = document.getElementById('view-toggle'); viewToggle.checked = true; toggleMapView();
+      const statusMarker = document.querySelector('.map-marker:not(.map-marker--shelter)');
+      ok('Statut view, non-admin: trail markers have the right-click handler', !!statusMarker && typeof statusMarker.oncontextmenu === 'function');
+      ok('Statut view, non-admin: the hint speaks of trails and is visible', !document.getElementById('map-hint').hidden && /un sentier/.test(document.getElementById('map-hint').textContent), document.getElementById('map-hint').textContent);
+      ok('Statut view, non-admin: the "Tout ouvrir / Tout fermer" buttons stay hidden', !document.getElementById('bulk-actions').classList.contains('show'));
+      isAdmin = true; toggleMapView();
+      ok('Statut view, admin: the bulk buttons are shown', document.getElementById('bulk-actions').classList.contains('show'));
+      viewToggle.checked = false; toggleMapView();
     } else {
       // ---- ski, started on Descente (?kind=downhill): Kind.current() is read once at load ----
       const trailMarkers = [...document.querySelectorAll('.map-marker:not(.map-marker--shelter)')].map(m => m.textContent).sort();
@@ -57,6 +74,7 @@
       ok('downhill: no shelter marker (shelters are on the touring map only)', document.querySelectorAll('.map-marker--shelter').length === 0);
       ok('downhill: stats count both downhill trails, even the one without a position', document.getElementById('stat-total').textContent === '2', document.getElementById('stat-total').textContent);
       ok('downhill: the downhill map is shown', img.src.endsWith('assets/map/Ski-Downhill_Map_web.jpg'), img.src);
+      ok('downhill: the last-7-days list is the downhill\'s own - none of the Montée trails\' or the shelter\'s inspections (none exist for the runs in this mock)', document.querySelectorAll('#recent-inspections .inspection-row').length === 0 && /Aucune inspection/.test(document.getElementById('recent-inspections').textContent), document.getElementById('recent-inspections').textContent);
 
       // 1.9 regression: the photo-location popup must use the DOWNHILL GEO map while viewing
       // Descente, not the network's default (touring) map - was a real bug, found while discussing
@@ -89,7 +107,32 @@
     }
   }
 
-  if (PAGE === 'inspection-trail-report' && !downhill) {
+  // Opened from the dashboard's right-click (?trail=<id>&status=open|closed): trail + status preselected
+  if (PAGE === 'inspection-trail-report' && Q.get('trail')) {
+    const wantTrail = Q.get('trail'), wantStatus = Q.get('status');
+    const checkedStatus = () => (form.querySelector('input[name="trail-status"]:checked') || {}).value;
+    if (!downhill) {
+      // Montée / bike: one sector, so the sector step is skipped and the trail is picked in the flat list
+      await wait(300);
+      ok('preselection (flat list): the trail is selected', trailSelect.value === wantTrail, trailSelect.value);
+      ok('preselection: the status to change to is ticked - not the trail\'s current one', checkedStatus() === wantStatus, checkedStatus());
+      ok('preselection: that trail\'s issue checklist is shown', document.getElementById('issues-hint').hidden === true && document.getElementById('issues-group').hidden === false);
+      ok('preselection: nothing else is filled in for the inspector (the general condition is still to choose)', !form.querySelector('input[name="condition"]:checked'));
+    } else {
+      // Descente: make it span two sectors (as the downhill test below), re-run the page's own load
+      window.__data.sectors.push({ id: 'test-extra-sector', name: 'Secteur test', network: 'ski', order: 99, aliases: [] });
+      window.__data.trails.push({ id: 'run_extra', name: 'Piste test', kind: 'downhill', network: 'ski', sector: 'test-extra-sector', status: 'open' });
+      await SectorService.loadAll(true);
+      await SectorService.loadTrails(true);
+      await loadSectors();
+      await wait(300);
+      ok('preselection (sector step): the trail\'s sector is selected', document.getElementById('sector-group').hidden === false && sectorSelect.value === 'test-extra-sector', sectorSelect.value);
+      ok('preselection (sector step): the trail is selected', trailSelect.value === wantTrail, trailSelect.value);
+      ok('preselection (sector step): the status to change to is ticked', checkedStatus() === wantStatus, checkedStatus());
+    }
+  }
+
+  if (PAGE === 'inspection-trail-report' && !downhill && !Q.get('trail')) {
     // Montée (and bike) each have exactly one sector in this mock ("Randonnée alpine" in
     // production, "mont-orford"/"sentiers-velo" here): a sector step would never narrow anything
     // down, so it is skipped - flat, alphabetical list instead, orphans included (La tortue,
@@ -115,7 +158,7 @@
     ok('snow condition saved for ski, ignored for bike', bike ? w[0].snow_condition === null : w[0].snow_condition === 'good', w[0] && w[0].snow_condition);
   }
 
-  if (PAGE === 'inspection-trail-report' && downhill) {
+  if (PAGE === 'inspection-trail-report' && downhill && !Q.get('trail')) {
     // Started on Descente (?kind=downhill): today's mock also gives downhill only one sector
     // (mont-orford), so it is ALSO the flat-list case here, same reasoning as Montée above -
     // just happens to list the same 2 runs as the old sector-agnostic assertion did.
@@ -144,7 +187,14 @@
     ok('downhill: issue checklist is the downhill list', J(shownIssues) === J(APP_CONFIG.trailKinds.downhill.issues), shownIssues);
   }
 
-  if (PAGE === 'inspection-shelter-report') {
+  // Opened from the dashboard's right-click on a shelter (?shelter=<id>): the shelter is preselected
+  if (PAGE === 'inspection-shelter-report' && Q.get('shelter')) {
+    await wait(300);
+    ok('preselection: the shelter is selected', shelterSelect.value === Q.get('shelter'), shelterSelect.value);
+    ok('preselection: nothing else is filled in for the inspector', !form.querySelector('input[name="condition"]:checked'));
+  }
+
+  if (PAGE === 'inspection-shelter-report' && !Q.get('shelter')) {
     if (bike) {
       ok('bike: form replaced by a notice', document.getElementById('shelter-inspection-form').style.display === 'none' && document.body.textContent.includes("Il n'y a pas d'abris"));
       ok('bike: shelters are never read', !reads().includes('shelters'), reads());

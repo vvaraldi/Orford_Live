@@ -77,6 +77,13 @@
   font-weight: 700;
 }
 
+/* The logo is a link to the portal: keep the title colour on hover (the global a:hover would
+   turn it into the module's accent colour) */
+.logo:hover,
+.mobile-nav__logo:hover {
+  color: var(--header-title-color);
+}
+
 .logo:hover {
   opacity: 0.9;
 }

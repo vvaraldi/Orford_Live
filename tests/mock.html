@@ -89,7 +89,8 @@
     allowInspection: true, allowInfraction: true, allowSignalisation: true
   };
   // two-activity user: pick the current one like the header switcher would have
-  if (NET === 'both' && Q.get('choice')) { try { localStorage.setItem('orford-network', JSON.stringify({ id: Q.get('choice'), season: Network.ofSeason() })); } catch (e) {} }
+  // (a system admin works in every activity whatever ?net says, so ?choice also applies to them)
+  if (Q.get('choice')) { try { localStorage.setItem('orford-network', JSON.stringify({ id: Q.get('choice'), season: Network.ofSeason() })); } catch (e) {} }
   else { try { localStorage.removeItem('orford-network'); } catch (e) {} }
   // never start a test carrying over a kind choice made by a previous test in the same browser profile
   try { localStorage.removeItem('orford-kind'); } catch (e) {}
