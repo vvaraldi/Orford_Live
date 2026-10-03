@@ -46,6 +46,13 @@
       { id: 'INF4', patrolId: 'u1', patrolName: 'Test', offenderName: 'Bob', fault: 'downhill', sector: 'mont-orford', trail: 'Ancien nom', offPiste: false, archived: false, photos: [], network: 'ski', createdAt: ago(6), offenceTimestamp: ago(6) },   // old format: a trail that no longer exists
       { id: 'INFB', patrolId: 'u1', patrolName: 'Test', offenderName: 'Bike Guy', fault: 'autres', sector: 'sentiers-velo', trail: 'Piste verte', offPiste: false, archived: false, photos: [], network: 'bike', createdAt: ago(2), offenceTimestamp: ago(2) }
     ],
+    maintenance_logs: [
+      { id: 'ML1', network: 'bike', date: ago(2), builderId: 'u1', builderName: 'Test', supportBuilderIds: ['u2'], supportBuilderNames: ['Luc'], volunteerIds: ['v1', 'v2'], volunteerNames: ['Ann', 'Bob'], archived: false, createdAt: ago(2), modifiedAt: ago(1),
+        entries: [
+          { sector: 'sentiers-velo', trailId: 'bike_1', trailName: 'Piste verte', jobText: 'Drainage, ajout de dalots', photos: [{ url: 'https://example.test/1.jpg', filename: '1.jpg', coordinates: { lat: 45.3, lon: -72.2 }, timestamp: ago(2) }, { url: 'https://example.test/2.jpg', filename: '2.jpg', coordinates: null, timestamp: ago(2) }] },
+          { sector: 'sentiers-velo', trailId: 'bike_2', trailName: 'Descente', jobText: 'Reprofilage', photos: [] }
+        ] }
+    ],
     signalisations: [
       { id: 'SIG1', inspectorId: 'u1', inspectorName: 'Test', status: 'ouverte', sector: 'giroux-nord', sectorDisplayName: 'Mont Giroux Nord', trail: 'Magog', comments: 'c', resolved: false, archived: false, network: 'ski', createdAt: ago(3), photos: [] },   // old format: name only, no trail record named "Magog" any more
       { id: 'SIG2', inspectorId: 'u1', inspectorName: 'Test', status: 'fermee', sector: 'mont-orford', sectorDisplayName: 'Mont-Orford', trail: 'Maxi', trailId: 'run_2', comments: '', resolved: false, archived: false, network: 'ski', createdAt: ago(4), photos: [], coordinates: { latitude: 45.31, longitude: -72.23 } },

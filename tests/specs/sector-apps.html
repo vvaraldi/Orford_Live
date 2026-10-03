@@ -9,7 +9,7 @@
   const bike = NET === 'bike' || (NET === 'both' && Q.get('choice') === 'bike');
   await wait(800);
   ok('current activity is ' + (bike ? 'bike' : 'ski'), Network.current() === (bike ? 'bike' : 'ski'), Network.current());
-  ok('confirm() and alert() are the browser\'s own synchronous ones (ui.js must not replace them with Promise-returning dialogs)', /\[native code\]/.test(Function.prototype.toString.call(window.confirm)) && /\[native code\]/.test(Function.prototype.toString.call(window.alert)) && typeof confirmDialog === 'function' && typeof alertDialog === 'function');
+  ok('confirm() and alert() are the browser\'s own synchronous ones (ui.js must not replace them with Promise-returning dialogs)', /\[native code\]/.test(Function.prototype.toString.call(window.confirm)) && /\[native code\]/.test(Function.prototype.toString.call(window.alert)) && typeof confirmDialog === 'function');
   const SKI_SECTORS = ['', 'mont-orford', 'mont-giroux-nord'];
 
   if (PAGE === 'infraction-report') {

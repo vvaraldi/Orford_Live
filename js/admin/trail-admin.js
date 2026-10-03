@@ -1,13 +1,13 @@
 /**
- * trail-admin.js - Administration > Sentiers (admins) and its sectors (system admins)
- * ====================================================================================
+ * trail-admin.js - Administration > Sentiers and its sectors (system admin only)
+ * ===============================================================================
  * Lists, creates and edits the trails of an activity (Firestore trails/{id}): name, number
  * (shown on the map markers), kind (uphill / downhill / lift / bike), sector, difficulty (the
  * scale of that kind), length (optional, information), and the position on the map, pinpointed
  * by clicking on it. The status (open / closed) is set by inspections, not here.
  *
  * Sectors (the areas the infraction and signalisation forms group trails under) are managed
- * here too, by system admins only: they add, rename and order sectors, assign the sector of
+ * here too: the system admin adds, renames and orders sectors, assigns the sector of
  * trails (one by one or several at once). A trail without a sector is highlighted: the forms
  * cannot offer it.
  *
@@ -42,7 +42,6 @@ const TrailAdmin = (function () {
     position: null     // { left, top } of the trail being edited
   };
   let userId = null;
-  let isSystemAdmin = false;
 
   const kindsOfNetwork = () => APP_CONFIG.networks[state.network].trailKinds;
   const inNetwork = () => state.trails.filter(t => Network.of(t) === state.network);
@@ -124,15 +123,14 @@ const TrailAdmin = (function () {
     const banner = $('trail-orphan-banner');
     banner.hidden = count === 0;
     if (!count) return;
-    $('trail-orphan-text').textContent = `${count} sentier${count > 1 ? 's' : ''} sans secteur : ${count > 1 ? 'ils ne sont pas proposés' : 'il n\'est pas proposé'} dans les formulaires d'infractions et de signalisations.` +
-      (isSystemAdmin ? '' : ' Un system admin doit leur attribuer un secteur.');
+    $('trail-orphan-text').textContent = `${count} sentier${count > 1 ? 's' : ''} sans secteur : ${count > 1 ? 'ils ne sont pas proposés' : 'il n\'est pas proposé'} dans les formulaires d'infractions et de signalisations.`;
   }
 
   function renderList() {
     const body = $('trail-rows');
     body.replaceChildren();
     const rows = visibleRows();
-    const columns = isSystemAdmin ? 10 : 9;
+    const columns = 10;
 
     $('trail-count').textContent = `(${rows.length})`;
     updateSelectedCount();
@@ -162,16 +160,14 @@ const TrailAdmin = (function () {
 
       const archived = TrailService.isArchived(t);
       const row = el('tr', 'trail-row' + (archived ? ' is-archived' : '') + (sector ? '' : ' is-orphan') + (state.editing && state.editing.id === t.id ? ' is-selected' : ''));
-      if (isSystemAdmin) {
-        const box = el('td');
-        const check = document.createElement('input');
-        check.type = 'checkbox';
-        check.checked = state.selected.has(t.id);
-        check.setAttribute('aria-label', `Cocher ${t.name || t.id}`);
-        check.addEventListener('change', () => { check.checked ? state.selected.add(t.id) : state.selected.delete(t.id); updateSelectedCount(); });
-        box.appendChild(check);
-        row.appendChild(box);
-      }
+      const box = el('td');
+      const check = document.createElement('input');
+      check.type = 'checkbox';
+      check.checked = state.selected.has(t.id);
+      check.setAttribute('aria-label', `Cocher ${t.name || t.id}`);
+      check.addEventListener('change', () => { check.checked ? state.selected.add(t.id) : state.selected.delete(t.id); updateSelectedCount(); });
+      box.appendChild(check);
+      row.appendChild(box);
 
       // The number can be typed straight in the list
       const numberCell = el('td');
@@ -386,8 +382,6 @@ const TrailAdmin = (function () {
     } else {
       select.value = '';
     }
-    select.disabled = !isSystemAdmin;
-    $('tr-sector-hint').hidden = isSystemAdmin;
   }
 
   function statusLine(trail) {
@@ -414,7 +408,7 @@ const TrailAdmin = (function () {
     $('tr-kind').value = kind;
     fillDifficulty(kind, trail ? TrailService.difficultyOf(trail) : '');
     fillSectorSelect(trail);
-    if (!trail && state.sectorFilter && state.sectorFilter !== NO_SECTOR && isSystemAdmin) $('tr-sector').value = state.sectorFilter;
+    if (!trail && state.sectorFilter && state.sectorFilter !== NO_SECTOR) $('tr-sector').value = state.sectorFilter;
     $('tr-length').value = trail && trail.length != null ? trail.length : '';
     $('tr-status').textContent = statusLine(trail);
     // Hide / restore only exist for a saved trail
@@ -507,7 +501,7 @@ const TrailAdmin = (function () {
           coordinates: state.position ? { left: state.position.left, top: state.position.top } : del,
           modifiedAt: stamp, modifiedBy: userId
         };
-        if (isSystemAdmin) update.sector = sector === '' ? del : sector; // only a system admin sets the sector
+        update.sector = sector === '' ? del : sector;
         await window.db.collection('trails').doc(editingId).update(update);
       } else {
         savedId = TrailService.nextId(kind, state.trails.map(t => t.id));
@@ -515,7 +509,7 @@ const TrailAdmin = (function () {
         if (number !== '') data.number = number;
         if (difficulty !== '') data.difficulty = difficulty;
         if (length !== null) data.length = length;
-        if (isSystemAdmin && sector !== '') data.sector = sector;
+        if (sector !== '') data.sector = sector;
         if (state.position) data.coordinates = { left: state.position.left, top: state.position.top };
         await window.db.collection('trails').doc(savedId).set(data);
       }
@@ -688,15 +682,10 @@ const TrailAdmin = (function () {
   }
 
   /**
-   * @param networkIds the activities the current admin manages
-   * @param options    { isSystemAdmin }: sectors and sector assignment are system admin only
+   * @param networkIds the activities offered (the system admin's)
    */
-  async function init(uid, networkIds, options) {
+  async function init(uid, networkIds) {
     userId = uid;
-    isSystemAdmin = !!(options && options.isSystemAdmin);
-
-    // System admin only: sector column of the editor, bulk bar, sector panel
-    ['trail-bulk', 'sector-panel', 'trail-th-select'].forEach(id => { $(id).hidden = !isSystemAdmin; });
 
     $('trail-network').innerHTML = networkIds.map(id => `<option value="${id}">${APP_CONFIG.networks[id].icon} ${APP_CONFIG.networks[id].name}</option>`).join('');
     $('trail-network').addEventListener('change', event => selectNetwork(event.target.value));

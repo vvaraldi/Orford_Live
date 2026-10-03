@@ -9,7 +9,7 @@
   await wait(900);
   ok('no script errors on load', window.__errs.length === 0, window.__errs);
   ok('header rendered', !!document.querySelector('header.header') && !!document.getElementById('mobile-nav'));
-  ok('confirm() and alert() are the browser\'s own synchronous ones (ui.js must not replace them with Promise-returning dialogs)', /\[native code\]/.test(Function.prototype.toString.call(window.confirm)) && /\[native code\]/.test(Function.prototype.toString.call(window.alert)) && typeof confirmDialog === 'function' && typeof alertDialog === 'function');
+  ok('confirm() and alert() are the browser\'s own synchronous ones (ui.js must not replace them with Promise-returning dialogs)', /\[native code\]/.test(Function.prototype.toString.call(window.confirm)) && /\[native code\]/.test(Function.prototype.toString.call(window.alert)) && typeof confirmDialog === 'function');
   ok('current activity set (' + Network.current() + ')', !!Network.current());
 
   if (PAGE === 'index') {
@@ -20,7 +20,7 @@
   if (PAGE === 'user-management') {
     const sys = AS === 'system';
     ok('the temporary data initialisation is gone (no section, no function)', !document.getElementById('backfill-section') && typeof backfillDataNetworks === 'undefined');
-    ok('export activity list: all + own for system admin, own only for admin', JSON.stringify([...document.getElementById('export-network').options].map(o => o.value)) === JSON.stringify(sys ? ['', 'ski', 'bike'] : (NET === 'both' ? ['ski', 'bike'] : [NET])));
+    ok('export activity list (Données is system admin only): all, then the activities', JSON.stringify([...document.getElementById('export-network').options].map(o => o.value)) === JSON.stringify(['', ...(sys || NET === 'both' ? ['ski', 'bike'] : [NET])]));
     const shown = [...document.querySelectorAll('.admin-tabs__btn')].filter(b => b.style.display !== 'none').map(b => b.dataset.tab);
     ok('Sentiers, Cartes and Données tabs: system admin only', ['trails', 'maps', 'data'].every(t => shown.includes(t) === sys), shown);
     ok('the Import tab is gone', !document.querySelector('[data-tab="import"]') && !document.getElementById('import-tab'));
@@ -48,6 +48,20 @@
         ['Marie Tremblay', 'admin', '', true, true, true, false, 'ski|bike']]), got);
     } else {
       ok('CSV template: the 3 example rows are read, activities limited to the importing admin\'s own', got.length === 3 && got.every(g => g[7].split('|').every(id => myNetworks().includes(id)) || g[7] === ''), got);
+    }
+    if (sys) {
+      // Données: the Entretien logs are exported too (JSON keeps the logs; CSV has one row per work entry)
+      const files = {}; downloadFile = (content, name) => { files[name] = content; };
+      ['trail-inspections', 'shelter-inspections', 'infractions', 'signalisations'].forEach(id => { document.getElementById('export-' + id).checked = false; });
+      document.getElementById('export-start-date').value = '2020-01-01';
+      document.getElementById('export-data-format').value = 'json'; await exportData(); await wait(300);
+      const json = JSON.parse(Object.entries(files).find(([n]) => /\.json$/.test(n))[1]);
+      ok('export: Entretien option exists and is ticked by default', !!document.getElementById('export-maintenance'));
+      ok('export JSON: the Entretien log with its 2 work entries, people and readable dates', json.maintenanceLogs.length === 1 && json.maintenanceLogs[0].entries.length === 2 && json.maintenanceLogs[0].volunteerNames.join() === 'Ann,Bob' && typeof json.maintenanceLogs[0].date === 'string' && typeof json.maintenanceLogs[0].entries[0].photos[0].timestamp === 'string' && json.summary.maintenanceLogsCount === 1 && json.trailInspections === undefined, json.summary);
+      document.getElementById('export-data-format').value = 'csv'; await exportData(); await wait(2800); // the CSV files are written 0.5 s apart
+      const csvName = Object.keys(files).find(n => /_Entretien\.csv$/.test(n));
+      const rows = csvName ? files[csvName].replace('﻿', '').split('\n') : [];
+      ok('export CSV: one row per work entry, photo links, people joined', rows.length === 3 && /photoUrls/.test(rows[0]) && /Drainage, ajout de dalots/.test(rows[1]) && /1\.jpg \| https:\/\/example\.test\/2\.jpg/.test(rows[1]) && /Ann \| Bob/.test(rows[1]) && /Reprofilage/.test(rows[2]), rows);
     }
     const tabs = [...document.querySelectorAll('.admin-tabs__btn')];
     ok('"Liens et astuces" is the last tab, on the far right', tabs[tabs.length - 1].dataset.tab === 'links' && /Liens et astuces/.test(tabs[tabs.length - 1].textContent), tabs.map(t => t.dataset.tab));

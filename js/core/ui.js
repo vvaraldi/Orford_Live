@@ -269,57 +269,6 @@ function confirmDialog(options) {
 }
 
 /**
- * Create and show a delete confirmation modal
- * @param {string} itemName - Name of item being deleted
- * @returns {Promise<boolean>} User's choice
- */
-function confirmDelete(itemName) {
-  return confirmDialog({
-    title: 'Confirmer la suppression',
-    icon: '🗑️',
-    iconType: 'danger',
-    message: `Voulez-vous vraiment supprimer ${itemName}?`,
-    description: 'Cette action est irréversible.',
-    confirmText: 'Supprimer',
-    confirmClass: 'btn-danger'
-  });
-}
-
-/**
- * Show an alert modal (not called alert(): see confirmDialog)
- * @param {Object} options - Alert options
- * @returns {Promise<void>}
- */
-function alertDialog(options) {
-  return new Promise((resolve) => {
-    const modal = new Modal({
-      title: options.title || 'Information',
-      content: `
-        ${options.icon ? `<div class="modal__icon modal__icon--${options.iconType || 'info'}">${options.icon}</div>` : ''}
-        <p class="modal__message">${options.message}</p>
-      `,
-      size: 'sm',
-      onClose: () => {
-        resolve();
-        modal.destroy();
-      }
-    });
-
-    // Add OK button
-    const footer = document.createElement('div');
-    footer.className = 'modal__footer';
-    footer.innerHTML = `<button class="btn btn-primary">OK</button>`;
-    footer.querySelector('button').addEventListener('click', () => {
-      resolve();
-      modal.destroy();
-    });
-    
-    modal.element.querySelector('.modal__container').appendChild(footer);
-    modal.open();
-  });
-}
-
-/**
  * User Menu Dropdown
  */
 class UserMenu {
@@ -434,8 +383,6 @@ if (typeof module !== 'undefined' && module.exports) {
     Modal,
     UserMenu,
     confirmDialog,
-    confirmDelete,
-    alertDialog,
     initUI
   };
 }

@@ -12,7 +12,7 @@
   const writesOf = name => window.__writes.flatMap(w => w[0] === 'batch' ? w[1].filter(op => op[0] === name && op[2] === 'set').map(op => op[3]) : (w[0] === name && w[2] === 'set' ? [w[3]] : []));
   await wait(900);
   ok('current activity is ' + (bike ? 'bike' : 'ski'), Network.current() === (bike ? 'bike' : 'ski'), Network.current());
-  ok('confirm() and alert() are the browser\'s own synchronous ones (ui.js must not replace them with Promise-returning dialogs)', /\[native code\]/.test(Function.prototype.toString.call(window.confirm)) && /\[native code\]/.test(Function.prototype.toString.call(window.alert)) && typeof confirmDialog === 'function' && typeof alertDialog === 'function');
+  ok('confirm() and alert() are the browser\'s own synchronous ones (ui.js must not replace them with Promise-returning dialogs)', /\[native code\]/.test(Function.prototype.toString.call(window.confirm)) && /\[native code\]/.test(Function.prototype.toString.call(window.alert)) && typeof confirmDialog === 'function');
 
   // ---------- header: switcher + feature-gated nav (any page) ----------
   const sw = document.getElementById('network-switch');

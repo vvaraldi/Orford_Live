@@ -94,7 +94,7 @@
 
   // ---- edit: sector, kinds, lift ----
   edit('La tortue'); await wait(300);
-  ok('editor: sector list = activity\'s sectors; only a system admin can change it', J([...$('tr-sector').options].map(o => o.value).slice(0, 3)) === J(['', 'mont-orford', 'mont-giroux-nord']) && $('tr-sector').disabled === !AS_SYS && $('tr-sector-hint').hidden === AS_SYS, [$('tr-sector').disabled, $('tr-sector-hint').hidden]);
+  ok('editor: sector list = activity\'s sectors; only a system admin can change it', J([...$('tr-sector').options].map(o => o.value).slice(0, 3)) === J(['', 'mont-orford', 'mont-giroux-nord']) && $('tr-sector').disabled === false && !$('tr-sector-hint'), [$('tr-sector').disabled]);
   ok('editor: kinds are uphill, downhill, lift', J([...$('tr-kind').options].map(o => o.value)) === J(['uphill', 'downhill', 'lift']));
   if (AS_SYS) change($('tr-sector'), 'mont-giroux-nord');
   window.__writes.length = 0;

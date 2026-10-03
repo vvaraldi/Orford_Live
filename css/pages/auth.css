@@ -104,24 +104,6 @@
   text-decoration: underline;
 }
 
-/* ===== AUTH DIVIDER ===== */
-.auth-divider {
-  display: flex;
-  align-items: center;
-  gap: var(--space-3);
-  margin: var(--space-4) 0;
-  color: var(--theme-text-lighter);
-  font-size: var(--text-sm);
-}
-
-.auth-divider::before,
-.auth-divider::after {
-  content: '';
-  flex: 1;
-  height: 1px;
-  background-color: var(--theme-border);
-}
-
 /* ===== AUTH MESSAGE ===== */
 .auth-message {
   padding: var(--space-3) var(--space-4);

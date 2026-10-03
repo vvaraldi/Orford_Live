@@ -651,7 +651,7 @@
         </div>
 
         <!-- System admin: sectors -->
-        <details class="trail-panel" id="sector-panel" hidden>
+        <details class="trail-panel" id="sector-panel">
           <summary>Secteurs de cette activité</summary>
           <div class="trail-table-wrap">
             <table class="trail-table">
@@ -666,7 +666,7 @@
         </details>
 
         <!-- System admin: assign a sector to the ticked trails -->
-        <div class="trail-bulk" id="trail-bulk" hidden>
+        <div class="trail-bulk" id="trail-bulk">
           <select class="form-select" id="trail-bulk-sector" aria-label="Secteur à attribuer"></select>
           <button type="button" class="btn btn-secondary btn-sm" id="trail-bulk-apply">Attribuer aux sentiers cochés</button>
           <span id="trail-selected-count" class="cal-source" style="margin: 0;"></span>
@@ -674,7 +674,7 @@
 
         <div class="trail-table-wrap" style="margin-top: var(--space-md);">
           <table class="trail-table">
-            <thead><tr><th id="trail-th-select" hidden><input type="checkbox" id="trail-select-all" aria-label="Tout cocher"></th><th>N°</th><th>Nom</th><th>Secteur</th><th>Type</th><th>Difficulté</th><th>Longueur</th><th>Statut</th><th>Position</th><th></th></tr></thead>
+            <thead><tr><th id="trail-th-select"><input type="checkbox" id="trail-select-all" aria-label="Tout cocher"></th><th>N°</th><th>Nom</th><th>Secteur</th><th>Type</th><th>Difficulté</th><th>Longueur</th><th>Statut</th><th>Position</th><th></th></tr></thead>
             <tbody id="trail-rows"></tbody>
           </table>
         </div>
@@ -697,7 +697,6 @@
             <div class="form-group">
               <label class="form-label" for="tr-sector">Secteur</label>
               <select class="form-select" id="tr-sector"></select>
-              <span class="form-hint" id="tr-sector-hint">Attribué par un system admin</span>
             </div>
             <div class="form-group" id="tr-difficulty-group">
               <label class="form-label" for="tr-difficulty">Difficulté</label>
@@ -810,7 +809,7 @@
           <h3>Exporter les données d'activité</h3>
         </div>
         <p class="data-export-section__description">
-          Exportez les données du système (inspections, infractions, signalisations) à partir d'une date de début.
+          Exportez les données du système (inspections, infractions, signalisations, entretien) à partir d'une date de début.
         </p>
 
         <h4 style="font-size: 0.875rem; font-weight: 600; margin-bottom: 0.75rem;">
@@ -843,6 +842,13 @@
             <div class="export-option-label">
               <span class="export-option-name">🚧 Signalisations</span>
               <span class="export-option-desc">signalisations</span>
+            </div>
+          </label>
+          <label class="export-option">
+            <input type="checkbox" id="export-maintenance" checked>
+            <div class="export-option-label">
+              <span class="export-option-name">🪏 Entretien</span>
+              <span class="export-option-desc">maintenance_logs (CSV : une ligne par travail)</span>
             </div>
           </label>
         </div>
@@ -1707,6 +1713,30 @@
       return result;
     }
 
+    // CSV of the Entretien logs: one row per work entry (a day's log holds several), the log's own
+    // fields repeated on each row; people and photo links joined with " | ". JSON keeps the nested logs.
+    function maintenanceCsvRows(logs) {
+      return logs.flatMap(log => {
+        const base = {
+          id: log.id, date: log.date, network: log.network,
+          builderName: log.builderName || '',
+          supportBuilderNames: (log.supportBuilderNames || []).join(' | '),
+          volunteerNames: (log.volunteerNames || []).join(' | '),
+          archived: log.archived ? 'Oui' : 'Non',
+          createdAt: log.createdAt, modifiedAt: log.modifiedAt
+        };
+        const entries = log.entries && log.entries.length ? log.entries : [{}];
+        return entries.map((entry, i) => ({
+          ...base,
+          entry: i + 1,
+          sector: entry.sector || '', trailId: entry.trailId || '', trailName: entry.trailName || '',
+          jobText: entry.jobText || '',
+          photoCount: (entry.photos || []).length,
+          photoUrls: (entry.photos || []).map(p => p.url).join(' | ')
+        }));
+      });
+    }
+
     async function exportData() {
       const btn = document.getElementById('export-data-btn');
       const format = document.getElementById('export-data-format').value;
@@ -1715,10 +1745,11 @@
         trail: document.getElementById('export-trail-inspections').checked,
         shelter: document.getElementById('export-shelter-inspections').checked,
         infraction: document.getElementById('export-infractions').checked,
-        signalisation: document.getElementById('export-signalisations').checked
+        signalisation: document.getElementById('export-signalisations').checked,
+        maintenance: document.getElementById('export-maintenance').checked
       };
-      
-      if (!opts.trail && !opts.shelter && !opts.infraction && !opts.signalisation) {
+
+      if (!opts.trail && !opts.shelter && !opts.infraction && !opts.signalisation && !opts.maintenance) {
         showExportStatus('Sélectionnez au moins un type de données.', 'error');
         return;
       }
@@ -1803,6 +1834,21 @@
           } catch(e) { exportResult.signalisations = []; exportResult.summary.signalisationsCount = 0; }
         }
 
+        if (opts.maintenance) {
+          showExportStatus('Chargement entretien...', 'info');
+          try {
+            // By day worked ("date"); the photos inside each work entry get readable timestamps too
+            const snap = await db.collection('maintenance_logs').where('date', '>=', startTimestamp).orderBy('date', 'desc').get();
+            const data = snap.docs.map(doc => {
+              const log = formatDocumentDates(doc.data());
+              log.entries = (log.entries || []).map(entry => ({ ...entry, photos: (entry.photos || []).map(formatDocumentDates) }));
+              return { id: doc.id, ...log };
+            }).filter(inNetwork);
+            exportResult.maintenanceLogs = data;
+            exportResult.summary.maintenanceLogsCount = data.length;
+          } catch(e) { exportResult.maintenanceLogs = []; exportResult.summary.maintenanceLogsCount = 0; }
+        }
+
         const fromStr = startDate.toISOString().split('T')[0];
         const toStr = new Date().toISOString().split('T')[0];
         const baseName = `Orford_Live-Export-${fromStr}-to-${toStr}`;
@@ -1812,10 +1858,11 @@
             { key: 'trailInspections', label: 'Inspections-Sentiers' },
             { key: 'shelterInspections', label: 'Inspections-Abris' },
             { key: 'infractions', label: 'Infractions' },
-            { key: 'signalisations', label: 'Signalisations' }
+            { key: 'signalisations', label: 'Signalisations' },
+            { key: 'maintenanceLogs', label: 'Entretien', rows: maintenanceCsvRows }
           ];
           types.forEach((t, i) => {
-            const records = exportResult[t.key];
+            const records = t.rows ? t.rows(exportResult[t.key] || []) : exportResult[t.key];
             if (!records || !records.length) return;
             const headers = [...new Set(records.flatMap(Object.keys))];
             const csv = '\uFEFF' + [headers.join(','), ...records.map(r => headers.map(h => `"${String(r[h] ?? '').replace(/"/g, '""')}"`).join(','))].join('\n');
@@ -1826,7 +1873,8 @@
         }
 
         const total = (exportResult.summary.trailInspectionsCount || 0) + (exportResult.summary.shelterInspectionsCount || 0) + 
-                      (exportResult.summary.infractionsCount || 0) + (exportResult.summary.signalisationsCount || 0);
+                      (exportResult.summary.infractionsCount || 0) + (exportResult.summary.signalisationsCount || 0) +
+                      (exportResult.summary.maintenanceLogsCount || 0);
         showExportStatus(`✓ Export réussi! ${total} enregistrements.`, 'success');
 
       } catch (error) {
@@ -2138,14 +2186,14 @@ Marie Tremblay,marie.tremblay@example.com,MotDePasse456,admin,,true,true,true,fa
           }
 
           buildNetworkCheckboxes();
-          // Data export: an admin exports their own activities; only a system admin can export all at once
+          // Data export (system admin only): every activity at once, or one of them
           document.getElementById('export-network').innerHTML =
-            (isCurrentUserSystemAdmin ? '<option value="">Toutes les activités</option>' : '') +
+            '<option value="">Toutes les activités</option>' +
             myNetworks().map(id => `<option value="${id}">${APP_CONFIG.networks[id].icon} ${APP_CONFIG.networks[id].name}</option>`).join('');
           // System admin only: Sentiers (trails and sectors), Cartes (GPS calibration of the maps) and Données (export)
           if (isCurrentUserSystemAdmin) {
             SYSTEM_ADMIN_TABS.forEach(tab => { document.getElementById(`${tab}-tab-btn`).style.display = ''; });
-            TrailAdmin.init(currentUser.uid, myNetworks(), { isSystemAdmin: true });
+            TrailAdmin.init(currentUser.uid, myNetworks());
             MapCalibration.init(currentUser.uid);
           }
           // Volunteers (bike network only): shown to a system admin or an admin who works in bike

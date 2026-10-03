@@ -155,14 +155,6 @@
   text-decoration: underline;
 }
 
-.app-card__badge {
-  font-size: var(--text-xs);
-  padding: var(--space-1) var(--space-2);
-  background-color: var(--color-warning-light);
-  color: var(--color-warning-dark);
-  border-radius: var(--border-radius-full);
-}
-
 /* ===== QUICK STATS ===== */
 .quick-stats {
   display: grid;

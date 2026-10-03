@@ -69,82 +69,6 @@ const APP_CONFIG = {
   // ===== VERSION =====
   version: new Date().toISOString().split('T')[0].replace(/-/g, ''),
   
-  // ===== ROUTES =====
-  // Written from the site root, like every path in this file: pass them through siteUrl() to get a link valid from the current page
-  routes: {
-    portal: 'index.html',
-    login: 'pages/login.html',
-    forgotPassword: 'pages/forgot-password.html',
-    userProfile: 'pages/user-profile.html',
-    userManagement: 'pages/user-management.html',
-    // Inspection module
-    inspectionDashboard: 'pages/inspection-dashboard.html',
-    inspectionTrailReport: 'pages/inspection-trail-report.html',
-    inspectionShelterReport: 'pages/inspection-shelter-report.html',
-    inspectionHistory: 'pages/inspection-history.html',
-    inspectionAdmin: 'pages/inspection-admin.html',
-    // Infraction module
-    infractionReport: 'pages/infraction-report.html',
-    infractionAdmin: 'pages/infraction-admin.html',
-    // Maintenance module (bike network)
-    maintenanceReport: 'pages/maintenance-report.html',
-    maintenanceAdmin: 'pages/maintenance-admin.html',
-    maintenanceVolunteerRegister: 'pages/maintenance-volunteer-register.html',
-    // Signalisation module
-    signalisationReport: 'pages/signalisation-report.html',
-    signalisationResume: 'pages/signalisation-resume.html',
-    signalisationAdmin: 'pages/signalisation-admin.html',
-    // Support (requests)
-    support: 'pages/support.html',
-    // Public
-    publicStatus: 'pages/public-status.html'
-  },
-
-  // ===== MODULE DEFINITIONS =====
-  modules: {
-    portal: {
-      id: 'portal',
-      name: 'Portail',
-      icon: '🏠',
-      color: 'portal'
-    },
-    inspection: {
-      id: 'inspection',
-      name: 'Inspection',
-      icon: '🔍',
-      color: 'inspection',
-      permission: 'allowInspection'
-    },
-    infraction: {
-      id: 'infraction',
-      name: 'Infraction',
-      icon: '🚨',
-      color: 'infraction',
-      permission: 'allowInfraction'
-    },
-    signalisation: {
-      id: 'signalisation',
-      name: 'Signalisation',
-      icon: '🚧',
-      color: 'signalisation',
-      permission: 'allowSignalisation'
-    },
-    request: {
-      id: 'request',
-      name: 'Demandes',
-      icon: '🎫',
-      color: 'request',
-      permission: null  // Accessible to all authenticated users
-    },
-    maintenance: {
-      id: 'maintenance',
-      name: 'Entretien',
-      icon: '🪏',
-      color: 'maintenance',
-      permission: 'allowMaintenance'
-    }
-  },
-
   // ===== MAPS =====
   // Each map: image (path from the site root) and its size in pixels. Trail coordinates are
   // pixels on that image, so keep its size once trails are placed on it. The GPS calibration
@@ -364,12 +288,6 @@ const APP_CONFIG = {
       mobileProfile: true,
       items: []
     }
-  },
-
-  // ===== DEFAULT SETTINGS =====
-  defaults: {
-    theme: 'light',
-    itemsPerPage: 25
   }
 };
 
@@ -377,8 +295,6 @@ const APP_CONFIG = {
 Object.freeze(APP_CONFIG);
 Object.freeze(APP_CONFIG.branding);
 Object.freeze(APP_CONFIG.firebase);
-Object.freeze(APP_CONFIG.routes);
-Object.freeze(APP_CONFIG.modules);
 Object.freeze(APP_CONFIG.nav);
 Object.freeze(APP_CONFIG.maps);
 Object.freeze(APP_CONFIG.networks);
@@ -387,7 +303,6 @@ Object.freeze(APP_CONFIG.trailKinds);
 Object.freeze(APP_CONFIG.difficulties);
 Object.freeze(APP_CONFIG.difficultyScales);
 Object.freeze(APP_CONFIG.labels);
-Object.freeze(APP_CONFIG.defaults);
 
 // ===== Apply the branding to the page (browser only) =====
 // - <title>: "<name> - <page's own text>"; <meta name="description">: "<page's own text> - <name>"

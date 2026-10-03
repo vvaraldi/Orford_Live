@@ -83,7 +83,6 @@ const Network = (function () {
 
   const current = () => currentId;
   const config = () => APP_CONFIG.networks[currentId] || null;
-  const list = () => allowed.slice();
 
   /** Does the current network have a feature (shelters, snowCondition, ...)? */
   function feature(name) {
@@ -103,7 +102,7 @@ const Network = (function () {
 
   const api = {
     ids, ofSeason, setUser, usePublic, set,
-    current, config, list, feature,
+    current, config, feature,
     of, matches, filter, url,
     // Replaceable in tests
     now: () => new Date(),

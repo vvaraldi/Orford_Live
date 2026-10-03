@@ -84,37 +84,6 @@ function formatDateTime(date) {
 }
 
 /**
- * Format a relative time (e.g., "il y a 2 heures")
- * @param {Object|Date} date - Date to format
- * @returns {string} Relative time string
- */
-function formatRelativeTime(date) {
-  if (!date) return '-';
-
-  let dateObj;
-  if (date.toDate) dateObj = date.toDate();
-  else if (date.seconds) dateObj = new Date(date.seconds * 1000);
-  else if (date instanceof Date) dateObj = date;
-  else dateObj = new Date(date);
-
-  if (isNaN(dateObj.getTime())) return '-';
-
-  const now = new Date();
-  const diff = now - dateObj;
-  const seconds = Math.floor(diff / 1000);
-  const minutes = Math.floor(seconds / 60);
-  const hours = Math.floor(minutes / 60);
-  const days = Math.floor(hours / 24);
-
-  if (seconds < 60) return 'À l\'instant';
-  if (minutes < 60) return `Il y a ${minutes} minute${minutes > 1 ? 's' : ''}`;
-  if (hours < 24) return `Il y a ${hours} heure${hours > 1 ? 's' : ''}`;
-  if (days < 7) return `Il y a ${days} jour${days > 1 ? 's' : ''}`;
-  
-  return formatDate(dateObj);
-}
-
-/**
  * Show a status message/notification
  * @param {string} message - Message to display
  * @param {string} type - Message type: 'success', 'error', 'warning', 'info'
@@ -323,14 +292,6 @@ function compressImage(file, quality = 0.7, maxWidth = 1200) {
 }
 
 /**
- * Check if the browser is online
- * @returns {boolean} Online status
- */
-function isOnline() {
-  return navigator.onLine !== false;
-}
-
-/**
  * Setup offline detection with user notification
  * @param {Object} options - Configuration options
  */
@@ -387,51 +348,6 @@ function debounce(func, wait = 300) {
 }
 
 /**
- * Throttle function execution
- * @param {Function} func - Function to throttle
- * @param {number} limit - Time limit in ms
- * @returns {Function} Throttled function
- */
-function throttle(func, limit = 300) {
-  let inThrottle;
-  return function executedFunction(...args) {
-    if (!inThrottle) {
-      func(...args);
-      inThrottle = true;
-      setTimeout(() => inThrottle = false, limit);
-    }
-  };
-}
-
-/**
- * Generate a unique ID
- * @param {string} prefix - Optional prefix
- * @returns {string} Unique ID
- */
-function generateId(prefix = '') {
-  const timestamp = Date.now().toString(36);
-  const random = Math.random().toString(36).substr(2, 9);
-  return prefix ? `${prefix}_${timestamp}${random}` : `${timestamp}${random}`;
-}
-
-/**
- * Copy text to clipboard
- * @param {string} text - Text to copy
- * @returns {Promise<boolean>} Success status
- */
-async function copyToClipboard(text) {
-  try {
-    await navigator.clipboard.writeText(text);
-    showToast('Copié dans le presse-papiers', 'success', 2000);
-    return true;
-  } catch (error) {
-    console.error('Failed to copy:', error);
-    showToast('Impossible de copier', 'error', 2000);
-    return false;
-  }
-}
-
-/**
  * Get user initials from name
  * @param {string} name - Full name
  * @returns {string} Initials (max 2 characters)
@@ -457,36 +373,6 @@ function isValidEmail(email) {
 }
 
 /**
- * Format phone number for display
- * @param {string} phone - Phone number
- * @returns {string} Formatted phone
- */
-function formatPhone(phone) {
-  if (!phone) return '-';
-  // Remove all non-digits
-  const digits = phone.replace(/\D/g, '');
-  
-  // Format as XXX-XXX-XXXX
-  if (digits.length === 10) {
-    return `${digits.slice(0, 3)}-${digits.slice(3, 6)}-${digits.slice(6)}`;
-  }
-  return phone;
-}
-
-/**
- * Parse URL parameters
- * @returns {Object} URL parameters
- */
-function getUrlParams() {
-  const params = {};
-  const searchParams = new URLSearchParams(window.location.search);
-  for (const [key, value] of searchParams) {
-    params[key] = value;
-  }
-  return params;
-}
-
-/**
  * Set URL parameter without page reload
  * @param {string} key - Parameter key
  * @param {string} value - Parameter value
@@ -507,23 +393,16 @@ if (typeof module !== 'undefined' && module.exports) {
     formatDate,
     formatTime,
     formatDateTime,
-    formatRelativeTime,
     showMessage,
     showToast,
     escapeHtml,
     setButtonLoading,
     compressImage,
-    isOnline,
     setupOfflineDetection,
     getLocalDateTime,
     debounce,
-    throttle,
-    generateId,
-    copyToClipboard,
     getInitials,
     isValidEmail,
-    formatPhone,
-    getUrlParams,
     setUrlParam
   };
 }

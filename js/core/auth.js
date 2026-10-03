@@ -326,20 +326,6 @@ async function login(email, password) {
 }
 
 /**
- * Send password reset email
- * @param {string} email - User email
- */
-async function sendPasswordReset(email) {
-  try {
-    await auth.sendPasswordResetEmail(email);
-    return true;
-  } catch (error) {
-    console.error('Password reset error:', error);
-    throw error;
-  }
-}
-
-/**
  * Update user password
  * @param {string} currentPassword - Current password
  * @param {string} newPassword - New password
@@ -395,7 +381,6 @@ if (typeof module !== 'undefined' && module.exports) {
     checkAuthStatus,
     login,
     handleLogout,
-    sendPasswordReset,
     updatePassword,
     getAuthErrorMessage,
     redirectToLogin,
