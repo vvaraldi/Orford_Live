@@ -361,8 +361,6 @@
       const date = r.createdAt?.toDate?.();
       const dateStr = date ? date.toLocaleDateString('fr-CA', { year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '-';
       const modifiedStr = r.modifiedAt?.toDate?.()?.toLocaleDateString('fr-CA', { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) || '';
-      const sectorName = sectorNameOf(r);
-
       let statusHtml = '<span style="color:var(--theme-text-secondary);">Non spécifié</span>';
       if (r.status) {
         const badgeClass = STATUS_BADGE_CLASS[r.status] || '';
@@ -380,12 +378,7 @@
         const preferredMap = geoMapFor(r);
         photoHtml = '<div class="photo-gallery" style="display:flex;flex-wrap:wrap;gap:0.5rem;">';
         photos.forEach((photo, idx) => {
-          let locationHtml = '';
-          if (photo.coordinates && photo.coordinates.latitude && photo.coordinates.longitude) {
-            const lat = photo.coordinates.latitude;
-            const lon = photo.coordinates.longitude;
-            locationHtml = `<div class="photo-location"><a href="#" onclick="openPhotoLocationModal(${lat},${lon}${preferredMap ? `,'${preferredMap}'` : ''});return false;">📍 Carte</a><a href="https://www.google.com/maps?q=${lat},${lon}" target="_blank" rel="noopener noreferrer">🗺️</a></div>`;
-          }
+          const locationHtml = PhotoMapModal.locationLinks(photo, { collection: 'signalisations', docId: r.id, record: r, preferredMap, onChanged: async () => { await loadReports(); openDetail(r.id); } });
           photoHtml += `<div class="photo-gallery-item" style="position:relative;">
             <img src="${photo.url}" class="detail-photo" alt="Photo ${idx + 1}" onclick="window.open('${photo.url}', '_blank')" style="max-width:150px;max-height:150px;">
             ${locationHtml}
@@ -398,9 +391,10 @@
         <div class="detail-section">
           <h4>📍 Localisation</h4>
           <div class="detail-grid">
-            <div class="detail-item"><strong>Secteur</strong>${escapeHtml(sectorName)}</div>
-            <div class="detail-item"><strong>Piste</strong>${escapeHtml(r.trail || '-')}</div>
+            <div class="detail-item"><strong>Secteur</strong><select class="form-select" id="admin-sector" aria-label="Secteur"></select></div>
+            <div class="detail-item"><strong>Piste</strong><select class="form-select" id="admin-trail" aria-label="Piste"></select></div>
           </div>
+          <p class="form-hint" style="margin-top:0.5rem;">Corriger le secteur ou la piste d'un rapport : choisir une piste de Descente (ou de Montée) le fait passer dans cette vue.</p>
         </div>
         <div class="detail-section">
           <h4>📊 Statut de la signalisation</h4>
@@ -426,11 +420,55 @@
         </div>
       `;
       
+      fillLocationEditor(r);
       document.getElementById('modal-resolved').checked = r.resolved || false;
       document.getElementById('modal-archived').checked = r.archived || false;
       
       document.getElementById('detail-modal').classList.add('show');
       document.body.style.overflow = 'hidden';
+    }
+
+    // ---- Admin correction of a report's sector and trail --------------------------------------------
+    // All the sectors of this activity are offered (not only the view shown), and every kind of trail with
+    // its kind in brackets, so a report can be moved between Montée and Descente by choosing a trail of the
+    // other one. The activity itself never changes (the Firestore rules refuse it).
+    function fillTrailEditor(sectorId, selectedName, selectedId) {
+      const trailSelect = document.getElementById('admin-trail');
+      const sector = SectorService.find(sectors, sectorId);
+      SectorService.fillTrails(trailSelect, sector, '-- Sélectionner une piste --');
+      const kindOfId = {};
+      ((sector && sector.items) || []).forEach(i => { kindOfId[i.id] = i.kind; });
+      [...trailSelect.options].forEach(o => {
+        const kind = kindOfId[o.dataset.trailId];
+        if (kind) o.textContent += ' (' + TrailService.kindLabel(kind) + ')';
+      });
+      if (selectedName !== undefined) SectorService.selectTrail(trailSelect, selectedName, selectedId);
+    }
+
+    function fillLocationEditor(r) {
+      const sectorSelect = document.getElementById('admin-sector');
+      SectorService.fillSectors(sectorSelect, sectors, '-- Sélectionner un secteur --');
+      SectorService.selectSector(sectorSelect, sectors, r.sector);
+      fillTrailEditor(sectorSelect.value, r.trail, r.trailId);
+      sectorSelect.onchange = () => fillTrailEditor(sectorSelect.value); // a new sector: choose its trail again
+    }
+
+    // The location fields to write, only when the admin changed them (so resolving or commenting never
+    // rewrites an older report). Returns null when unchanged, false when the choice is incomplete.
+    function locationChanges(r) {
+      const sectorId = document.getElementById('admin-sector').value;
+      const chosen = SectorService.readTrail(document.getElementById('admin-trail'));
+      const originalSector = SectorService.find(sectors, r.sector);
+      const sameSector = sectorId === (originalSector ? originalSector.id : (r.sector || ''));
+      const sameTrail = (chosen.id || null) === (r.trailId || null) && (chosen.name || '') === (r.trail || '');
+      if (sameSector && sameTrail) return null;
+      if (!sectorId || !chosen.name) return false;
+      return {
+        sector: sectorId,
+        sectorDisplayName: SectorService.nameOf(sectors, sectorId),
+        trail: chosen.name,
+        trailId: chosen.id
+      };
     }
 
     function closeModal() {
@@ -445,7 +483,13 @@
       const adminComments = document.getElementById('admin-comments').value.trim();
       const resolved = document.getElementById('modal-resolved').checked;
       const archived = document.getElementById('modal-archived').checked;
-      
+      const report = reportsData.find(rep => rep.id === currentReportId);
+      const location = report ? locationChanges(report) : null;
+      if (location === false) {
+        showToast('Choisissez un secteur et une piste.', 'warning');
+        return;
+      }
+
       try {
         const updateData = {
           adminComments: adminComments || null,
@@ -454,12 +498,22 @@
           adminModifiedAt: firebase.firestore.FieldValue.serverTimestamp()
         };
         
+        if (location) Object.assign(updateData, location); // never "network": the activity cannot change
         if (resolved) updateData.resolvedAt = firebase.firestore.FieldValue.serverTimestamp();
         if (archived) updateData.archivedAt = firebase.firestore.FieldValue.serverTimestamp();
         
         await db.collection('signalisations').doc(currentReportId).update(updateData);
         
-        showToast('Modifications enregistrées', 'success');
+        // A report moved to a trail of the other view leaves this list: say where it went
+        let moved = '';
+        if (location && TrailService.viewKinds()) {
+          const kind = SectorService.kindOfReport(sectors, allTrails, { ...report, ...location });
+          if (kind && !TrailService.viewKinds().includes(kind)) {
+            const view = Kind.ids().find(k => TrailService.kindsInView(k).includes(kind)) || kind;
+            moved = `. Le rapport est maintenant dans la vue « ${TrailService.kindLabel(view)} » (changer de vue dans l'en-tête pour le voir)`;
+          }
+        }
+        showToast('Modifications enregistrées' + moved, 'success');
         closeModal();
         loadReports();
       } catch (e) {

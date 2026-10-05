@@ -122,6 +122,36 @@
     const ids = [...document.querySelectorAll('#reports-tbody tr[data-id]')].map(r => r.dataset.id).sort();
     ok('lists this activity\'s reports of the view shown (an old report whose trail is unknown shows in both)', J(ids) === J(bike ? ['SIGB'] : (downhill ? ['SIG1', 'SIG2'] : ['SIG1'])), ids);
     ok('sector filter offers the sectors that have trails in the view shown', J(opts(document.getElementById('filter-sector'))) === J(bike ? ['', 'sentiers-velo'] : ['', 'mont-orford']), opts(document.getElementById('filter-sector')));
+    // ---- an admin can correct a report's sector and trail (and so move it between Montée and Descente) ----
+    if (!bike) {
+      const toasts = []; showToast = (m, type) => toasts.push([m, type]);
+      const updates = () => window.__writes.filter(x => x[0] === 'signalisations' && x[2] === 'update');
+      window.__writes.length = 0;
+      // unchanged location: resolving / commenting never rewrites sector or trail (old report, alias sector, name only)
+      openDetail('SIG1');
+      ok('modal: the location is editable and starts on the report\'s own sector and trail', document.getElementById('admin-sector').value === 'mont-giroux-nord' && document.getElementById('admin-trail').value === 'legacy:Magog', [document.getElementById('admin-sector').value, document.getElementById('admin-trail').value]);
+      document.getElementById('admin-comments').value = 'vu'; await saveChanges(); await wait(200);
+      ok('saving without touching the location writes no sector/trail (nor network)', updates().length === 1 && !('sector' in updates()[0][3]) && !('trail' in updates()[0][3]) && !('trailId' in updates()[0][3]) && !('network' in updates()[0][3]) && updates()[0][3].adminComments === 'vu', updates());
+      // a sector without a trail chosen is refused
+      window.__writes.length = 0; openDetail('SIG1');
+      document.getElementById('admin-sector').value = 'mont-orford'; document.getElementById('admin-sector').dispatchEvent(new Event('change'));
+      ok('a new sector asks for its trail again (placeholder first)', document.getElementById('admin-trail').value === '', document.getElementById('admin-trail').value);
+      await saveChanges();
+      ok('sector changed but no trail chosen: refused, nothing written', updates().length === 0 && toasts.some(t => /Choisissez un secteur et une piste/.test(t[0])), [updates(), toasts]);
+      // Descente <-> Montée: pick a trail of the other view
+      closeModal(); window.__writes.length = 0; toasts.length = 0;
+      openDetail(downhill ? 'SIG2' : 'SIG1');
+      const sec = document.getElementById('admin-sector');
+      sec.value = 'mont-orford'; sec.dispatchEvent(new Event('change'));
+      const labels = [...document.getElementById('admin-trail').options].map(o => o.textContent);
+      ok('the trail list shows every kind of the sector, each with its kind', J(labels) === J(['-- Sélectionner une piste --', 'Adams (Montée)', 'Maxi (Descente)', 'Slalom (Descente)']), labels);
+      document.getElementById('admin-trail').value = downhill ? 'trail_2' : 'run_1';
+      await saveChanges(); await wait(300);
+      const upd = updates()[0] && updates()[0][3];
+      const expected = downhill ? { trail: 'Adams', trailId: 'trail_2' } : { trail: 'Slalom', trailId: 'run_1' };
+      ok('the new sector, its display name, the trail name and trailId are saved (never the network)', !!upd && upd.sector === 'mont-orford' && upd.sectorDisplayName === 'Mont-Orford' && upd.trail === expected.trail && upd.trailId === expected.trailId && !('network' in upd), updates());
+      ok('the toast says which view the report moved to', toasts.some(t => new RegExp('vue « ' + (downhill ? 'Montée' : 'Descente') + ' »').test(t[0])), toasts);
+    }
   }
 
   if (PAGE === 'signalisation-resume') {

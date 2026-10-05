@@ -30,7 +30,7 @@
       { id: 'shelter_1', name: 'Abri Nord', network: 'ski', coordinates: { left: 350, top: 250 } }
     ],
     trail_inspections: [
-      { id: 'I1', trail_id: 'trail_1', condition: 'good', trail_status: 'open', date: ago(1), inspector_name: 'Test', inspector_id: 'u1', network: 'ski', photos: [] },
+      { id: 'I1', trail_id: 'trail_1', condition: 'good', trail_status: 'open', date: ago(1), inspector_name: 'Test', inspector_id: 'u1', network: 'ski', photos: [{ url: 'photo-i1.jpg', filename: 'photo-i1.jpg', coordinates: { latitude: 45.30, longitude: -72.22 }, timestamp: null }] },
       { id: 'I2', trail_id: 'trail_2', condition: 'critical', trail_status: 'closed', date: ago(2), inspector_name: 'Test', inspector_id: 'u1', network: 'ski', photos: [] },
       { id: 'IA1', trail_id: 'trail_3', condition: 'good', trail_status: 'open', date: ago(3), inspector_name: 'Test', inspector_id: 'u1', network: 'ski', photos: [] },   // on the hidden trail
       { id: 'IB1', trail_id: 'bike_1', condition: 'warning', trail_status: 'open', date: ago(1), inspector_name: 'Test', inspector_id: 'u1', network: 'bike', photos: [] }
@@ -41,7 +41,7 @@
     inspectors: [ { id: 'u1', name: 'Test' } ],
     infractions: [
       { id: 'INF1', patrolId: 'u1', patrolName: 'Test', offenderName: 'Jean', fault: 'downhill', sector: 'giroux-nord', trail: 'Magog', offPiste: false, archived: false, photos: [], network: 'ski', createdAt: ago(3), offenceTimestamp: ago(3) },   // old format: name only, no trail record named "Magog" any more (tests the "(ancienne piste)" fallback)
-      { id: 'INF2', patrolId: 'u1', patrolName: 'Test', offenderName: 'Luc', fault: 'saut-dangereux', sector: 'mont-orford', trail: 'Maxi', trailId: 'run_2', offPiste: false, archived: false, photos: [], network: 'ski', createdAt: ago(4), offenceTimestamp: ago(4) },   // new format: has a trailId
+      { id: 'INF2', patrolId: 'u1', patrolName: 'Test', offenderName: 'Luc', fault: 'saut-dangereux', sector: 'mont-orford', trail: 'Maxi', trailId: 'run_2', offPiste: false, archived: false, photos: [{ url: 'photo-inf2.jpg', filename: 'inf2.jpg', coordinates: { latitude: 45.305, longitude: -72.225 }, timestamp: null }], offenderImageCoordinates: { latitude: 45.305, longitude: -72.225 }, network: 'ski', createdAt: ago(4), offenceTimestamp: ago(4) },   // new format: has a trailId
       { id: 'INF3', patrolId: 'u1', patrolName: 'Test', offenderName: 'Ann', fault: 'downhill', sector: 'mont-orford', trail: 'MAXI', offPiste: false, archived: false, photos: [], network: 'ski', createdAt: ago(5), offenceTimestamp: ago(5) },   // old format: name only, spelled differently
       { id: 'INF4', patrolId: 'u1', patrolName: 'Test', offenderName: 'Bob', fault: 'downhill', sector: 'mont-orford', trail: 'Ancien nom', offPiste: false, archived: false, photos: [], network: 'ski', createdAt: ago(6), offenceTimestamp: ago(6) },   // old format: a trail that no longer exists
       { id: 'INFB', patrolId: 'u1', patrolName: 'Test', offenderName: 'Bike Guy', fault: 'autres', sector: 'sentiers-velo', trail: 'Piste verte', offPiste: false, archived: false, photos: [], network: 'bike', createdAt: ago(2), offenceTimestamp: ago(2) }
@@ -49,13 +49,14 @@
     maintenance_logs: [
       { id: 'ML1', network: 'bike', date: ago(2), builderId: 'u1', builderName: 'Test', supportBuilderIds: ['u2'], supportBuilderNames: ['Luc'], volunteerIds: ['v1', 'v2'], volunteerNames: ['Ann', 'Bob'], archived: false, createdAt: ago(2), modifiedAt: ago(1),
         entries: [
-          { sector: 'sentiers-velo', trailId: 'bike_1', trailName: 'Piste verte', jobText: 'Drainage, ajout de dalots', photos: [{ url: 'https://example.test/1.jpg', filename: '1.jpg', coordinates: { lat: 45.3, lon: -72.2 }, timestamp: ago(2) }, { url: 'https://example.test/2.jpg', filename: '2.jpg', coordinates: null, timestamp: ago(2) }] },
+          { sector: 'sentiers-velo', trailId: 'bike_1', trailName: 'Piste verte', jobText: 'Drainage, ajout de dalots', photos: [{ url: 'https://example.test/1.jpg', filename: '1.jpg', coordinates: { latitude: 45.3, longitude: -72.2 }, timestamp: ago(2) }, { url: 'https://example.test/2.jpg', filename: '2.jpg', coordinates: null, timestamp: ago(2) }] },
           { sector: 'sentiers-velo', trailId: 'bike_2', trailName: 'Descente', jobText: 'Reprofilage', photos: [] }
         ] }
     ],
     signalisations: [
       { id: 'SIG1', inspectorId: 'u1', inspectorName: 'Test', status: 'ouverte', sector: 'giroux-nord', sectorDisplayName: 'Mont Giroux Nord', trail: 'Magog', comments: 'c', resolved: false, archived: false, network: 'ski', createdAt: ago(3), photos: [] },   // old format: name only, no trail record named "Magog" any more
-      { id: 'SIG2', inspectorId: 'u1', inspectorName: 'Test', status: 'fermee', sector: 'mont-orford', sectorDisplayName: 'Mont-Orford', trail: 'Maxi', trailId: 'run_2', comments: '', resolved: false, archived: false, network: 'ski', createdAt: ago(4), photos: [], coordinates: { latitude: 45.31, longitude: -72.23 } },
+      { id: 'SIG2', inspectorId: 'u1', inspectorName: 'Test', status: 'fermee', sector: 'mont-orford', sectorDisplayName: 'Mont-Orford', trail: 'Maxi', trailId: 'run_2', comments: '', resolved: false, archived: false, network: 'ski', createdAt: ago(4), coordinates: { latitude: 45.31, longitude: -72.23 },
+        photos: [{ url: 'photo-sig2-a.jpg', filename: 'a.jpg', coordinates: { latitude: 45.31, longitude: -72.23 }, timestamp: null }, { url: 'photo-sig2-b.jpg', filename: 'b.jpg', coordinates: null, timestamp: null }] },
       { id: 'SIGB', inspectorId: 'u1', inspectorName: 'Test', status: 'ouverte', sector: 'sentiers-velo', sectorDisplayName: 'Sentiers vélo', trail: 'Piste verte', comments: '', resolved: false, archived: false, network: 'bike', createdAt: ago(2), photos: [] }
     ]
   };
@@ -88,7 +89,7 @@
     };
     return api;
   }
-  window.db = { collection: query, batch: () => { const ops = []; return { set: (ref, d) => ops.push([ref.__name, ref.__id, 'set', d]), update: (ref, d) => ops.push([ref.__name, ref.__id, 'update', d]), commit: async () => { window.__writes.push(['batch', ops]); } }; } };
+  window.db = { collection: query, runTransaction: async fn => fn({ get: ref => ref.get(), update: (ref, d) => ref.update(d) }), batch: () => { const ops = []; return { set: (ref, d) => ops.push([ref.__name, ref.__id, 'set', d]), update: (ref, d) => ops.push([ref.__name, ref.__id, 'update', d]), commit: async () => { window.__writes.push(['batch', ops]); } }; } };
   window.storage = { ref: () => ({}), refFromURL: () => ({ delete: async () => {} }) };
   window.firebase = { auth: () => ({ currentUser: { uid: 'u1', email: 't@x' } }), storage: () => window.storage, firestore: { FieldValue: { serverTimestamp: () => 'TS', delete: () => 'DEL' }, Timestamp: { fromDate: d => d } } };
   var currentUser = { uid: 'u1', email: 't@x' };

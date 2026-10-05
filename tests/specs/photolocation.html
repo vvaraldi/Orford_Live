@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html><head><meta charset="utf-8"><title>Photo location (hand-set position) tests</title></head>
+<body>
+<pre id="out">running...</pre>
+<script src="/js/core/config.js"></script>
+<script src="/js/core/network.js"></script>
+<script src="/js/services/map-service.js"></script>
+<script src="/js/services/photo-service.js"></script>
+<script src="/js/services/photo-map-modal.js"></script>
+<script>
+// The pure parts of changing a photo's position: the record of a hand-set change, which document field is
+// rewritten for each module (and the copy of the first photo's position), who may edit, and typed coordinates.
+(() => {
+  const out = []; const J = JSON.stringify;
+  const ok = (n, c, x) => out.push((c ? 'PASS ' : 'FAIL ') + n + (c ? '' : ' :: ' + J(x)));
+  const P = PhotoService;
+  const editor = { uid: 'u1', name: 'Test' };
+  const now = new Date(2026, 9, 5, 12, 0, 0);
+  const exif = { latitude: 45.31, longitude: -72.23 };
+  const to = { latitude: 45.3105, longitude: -72.2301 };
+
+  // ---- relocate: the record of a hand-set change ----
+  const a = P.relocate({ url: 'x', coordinates: exif }, { coordinates: to }, editor, now);
+  ok('first change: new position, the original EXIF position kept, who and when', J(a.coordinates) === J(to) && J(a.locationEdit.original) === J(exif) && a.locationEdit.by === 'u1' && a.locationEdit.byName === 'Test' && a.locationEdit.at === now, a);
+  const b = P.relocate(a, { coordinates: { latitude: 45.32, longitude: -72.24 } }, editor, now);
+  ok('second change: the ORIGINAL stays the EXIF one (not the first correction)', J(b.locationEdit.original) === J(exif) && b.coordinates.latitude === 45.32, b);
+  const c = P.relocate(b, { reset: true }, editor, now);
+  ok('reset: original position back, no hand-set record left', J(c.coordinates) === J(exif) && !('locationEdit' in c), c);
+  const d = P.relocate({ url: 'x', coordinates: null }, { coordinates: to }, editor, now);
+  ok('a photo with no position: placed, original = none', J(d.coordinates) === J(to) && d.locationEdit.original === null, d);
+  let threw = null; try { P.relocate(d, { reset: true }, editor, now); } catch (e) { threw = e.message; }
+  ok('no reset when there was no original position', !!threw, threw);
+  threw = null; try { P.relocate(a, { coordinates: { latitude: 91, longitude: 0 } }, editor, now); } catch (e) { threw = e.message; }
+  ok('an impossible position is refused', !!threw, threw);
+  ok('positions are rounded to 6 decimals', P.relocate({ coordinates: null }, { coordinates: { latitude: 45.31234567891, longitude: -72.1 } }, editor, now).coordinates.latitude === 45.312346);
+  ok('the input photo is not modified', J(a.locationEdit.original) === J(exif) && J({ url: 'x', coordinates: exif }) === J({ url: 'x', coordinates: exif }));
+
+  // ---- applyLocationChange: which field of the document is written ----
+  const ts = { seconds: 1, nanoseconds: 0, toDate: () => new Date(1000) };
+  const photo = (url, coordinates) => ({ url, filename: url, coordinates, timestamp: ts });
+  const sig = { inspectorId: 'u1', coordinates: exif, photos: [photo('p0', exif), photo('p1', null)] };
+  let r = P.applyLocationChange(sig, 'signalisations', 'p0', { coordinates: to }, editor, now);
+  ok('signalisation, first photo: photos[0] changed AND the copy `coordinates` (map markers read it)', J(r.fields.photos[0].coordinates) === J(to) && J(r.fields.coordinates) === J(to) && r.fields.photos[1].url === 'p1' && r.fields.photos[0].timestamp === ts, r.fields);
+  r = P.applyLocationChange(sig, 'signalisations', 'p1', { coordinates: to }, editor, now);
+  ok('signalisation, second photo (had no position): only photos[1]; the copy of the first is left alone', J(r.fields.photos[1].coordinates) === J(to) && r.fields.photos[1].locationEdit.original === null && !('coordinates' in r.fields) && J(r.fields.photos[0].coordinates) === J(exif), r.fields);
+  const inf = { patrolId: 'u1', offenderImageCoordinates: exif, photos: [photo('p0', exif)] };
+  r = P.applyLocationChange(inf, 'infractions', 'p0', { coordinates: to }, editor, now);
+  ok('infraction: the copy is `offenderImageCoordinates`', J(r.fields.offenderImageCoordinates) === J(to) && !('coordinates' in r.fields), r.fields);
+  r = P.applyLocationChange({ inspector_id: 'u1', photos: [photo('p0', exif)] }, 'trail_inspections', 'p0', { coordinates: to }, editor, now);
+  ok('inspection: only photos[] (no copy field)', Object.keys(r.fields).join() === 'photos', r.fields);
+  r = P.applyLocationChange({ inspector_id: 'u1', photos: ['legacy-url.jpg'], coordinates: exif }, 'trail_inspections', 'legacy-url.jpg', { coordinates: to }, editor, now);
+  ok('inspection with an old plain-URL photo: becomes a photo object with the position', typeof r.fields.photos[0] === 'object' && r.fields.photos[0].url === 'legacy-url.jpg' && J(r.fields.photos[0].locationEdit.original) === J(exif), r.fields);
+  const log = { builderId: 'u1', entries: [{ jobText: 'a', photos: [photo('e0', null)] }, { jobText: 'b', photos: [photo('e1', exif), photo('e2', exif)] }] };
+  r = P.applyLocationChange(log, 'maintenance_logs', 'e2', { coordinates: to }, editor, now);
+  ok('maintenance: the photo inside the right work entry; the others untouched', J(r.fields.entries[1].photos[1].coordinates) === J(to) && J(r.fields.entries[1].photos[0].coordinates) === J(exif) && r.fields.entries[0].photos[0].url === 'e0' && r.fields.entries[1].jobText === 'b' && Object.keys(r.fields).join() === 'entries', r.fields);
+  r = P.applyLocationChange({ patrolId: 'u1', offenderImageUrl: 'old.jpg', offenderImageCoordinates: exif }, 'infractions', 'old.jpg', { coordinates: to }, editor, now);
+  ok('old single-photo infraction: moved into photos[], legacy coordinates field and the copy kept in step', r.fields.photos.length === 1 && r.fields.photos[0].url === 'old.jpg' && J(r.fields.offenderImageCoordinates) === J(to) && J(r.fields.photos[0].locationEdit.original) === J(exif), r.fields);
+  r = P.applyLocationChange({ inspectorId: 'u1', photoUrl: 'old2.jpg', coordinates: exif }, 'signalisations', 'old2.jpg', { coordinates: to }, editor, now);
+  ok('old single-photo signalisation: the legacy field `coordinates` is the position', J(r.fields.coordinates) === J(to) && r.fields.photos[0].url === 'old2.jpg', r.fields);
+  threw = null; try { P.applyLocationChange(sig, 'signalisations', 'gone', { coordinates: to }, editor, now); } catch (e) { threw = e.message; }
+  ok('a photo that is not in the record: clear error', /introuvable/.test(threw || ''), threw);
+  // reset through the document
+  const moved = P.applyLocationChange(sig, 'signalisations', 'p0', { coordinates: to }, editor, now).fields;
+  r = P.applyLocationChange(Object.assign({}, sig, moved), 'signalisations', 'p0', { reset: true }, editor, now);
+  ok('reset through the document: original back, hand-set record gone, copy back too', J(r.fields.photos[0].coordinates) === J(exif) && !('locationEdit' in r.fields.photos[0]) && J(r.fields.coordinates) === J(exif), r.fields);
+
+  // ---- photos read / written by the service keep the record ----
+  const edited = Object.assign(photo('p0', to), { locationEdit: { original: exif, by: 'u1', byName: 'Test', at: ts } });
+  const read = P.photosFrom({ photos: [edited, photo('p1', null)] });
+  ok('photosFrom keeps the hand-set record (date as a Date), and adds none to other photos', read[0].locationEdit && J(read[0].locationEdit.original) === J(exif) && read[0].locationEdit.at instanceof Date && !('locationEdit' in read[1]), read);
+  const written = P.toFirestore(read);
+  ok('toFirestore writes it back; an untouched photo keeps exactly its old shape', written[0].locationEdit && written[0].locationEdit.by === 'u1' && J(Object.keys(written[1])) === J(['url', 'filename', 'coordinates', 'timestamp']), written);
+
+  // ---- who may edit ----
+  const as = (role, uid) => { window.currentUser = uid ? { uid } : null; window.currentUserData = uid ? { role, name: 'N' } : null; };
+  as('inspector', 'u1');
+  ok('the owner may edit (inspection / signalisation / infraction / maintenance)', P.canEditLocation('trail_inspections', { inspector_id: 'u1' }) && P.canEditLocation('shelter_inspections', { inspector_id: 'u1' }) && P.canEditLocation('signalisations', { inspectorId: 'u1' }) && P.canEditLocation('infractions', { patrolId: 'u1' }) && P.canEditLocation('maintenance_logs', { builderId: 'u1' }));
+  ok('another inspector may not', !P.canEditLocation('trail_inspections', { inspector_id: 'u2' }) && !P.canEditLocation('signalisations', { inspectorId: 'u2' }) && !P.canEditLocation('infractions', { patrolId: 'u2' }) && !P.canEditLocation('maintenance_logs', { builderId: 'u2' }));
+  ok('a record without an owner field cannot be edited by a plain inspector', !P.canEditLocation('trail_inspections', {}) && !P.canEditLocation('unknown_collection', { inspector_id: 'u1' }));
+  as('admin', 'u9');
+  ok('an admin may, whoever owns it; so may a system admin', P.canEditLocation('infractions', { patrolId: 'u2' }) && (as('system_admin', 'u9'), P.canEditLocation('maintenance_logs', { builderId: 'u2' })));
+  as(null, null);
+  ok('nobody signed in: no', !P.canEditLocation('infractions', { patrolId: 'u2' }));
+
+  // ---- typed / pasted coordinates ----
+  const pp = PhotoMapModal.parsePosition;
+  ok('typed coordinates: as copied from Google Maps, with space, without comma, French decimals with ";"', J(pp('45.31012, -72.23011')) === J({ latitude: 45.31012, longitude: -72.23011 }) && J(pp('45.31012 -72.23011')) === J({ latitude: 45.31012, longitude: -72.23011 }) && J(pp('45,31012; -72,23011')) === J({ latitude: 45.31012, longitude: -72.23011 }) && J(pp(' (45.3, -72.2) ')) === J({ latitude: 45.3, longitude: -72.2 }), [pp('45.31012, -72.23011'), pp('45,31012; -72,23011')]);
+  ok('typed coordinates: empty = nothing yet (null); text, one number, out of range = not understood (undefined)', pp('') === null && pp('abc') === undefined && pp('45.3') === undefined && pp('95, 10') === undefined && pp('45, 190') === undefined);
+
+  document.getElementById('out').textContent = out.join('\n');
+})();
+</script>
+</body></html>

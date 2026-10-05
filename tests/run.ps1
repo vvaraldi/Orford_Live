@@ -58,10 +58,20 @@ $tests = @(
   @{ name = 'inspection-admin';         type = 'page'; page = 'pages\inspection-admin.html';          spec = 'inspection.html'; queries = @('?page=inspection-admin&net=ski', '?page=inspection-admin&net=bike', '?page=inspection-admin&net=ski&kind=downhill') }
   @{ name = 'cartes-tab';               type = 'page'; page = 'pages\user-management.html';           spec = 'maps.html';       queries = @('?page=user-management&net=ski&as=system') }
   @{ name = 'sentiers-tab';             type = 'page'; page = 'pages\user-management.html';           spec = 'trails.html';     queries = @('?page=user-management&net=ski&as=system&choice=ski') }
+  @{ name = 'photoloc-signalisation-admin';  type = 'page'; page = 'pages\signalisation-admin.html';  spec = 'photolocation-pages.html'; queries = @('?page=signalisation-admin&net=ski&kind=downhill') }
+  @{ name = 'photoloc-signalisation-resume'; type = 'page'; page = 'pages\signalisation-resume.html'; spec = 'photolocation-pages.html'; queries = @('?page=signalisation-resume&net=ski&kind=downhill&as=inspector', '?page=signalisation-resume&net=ski&kind=downhill&as=admin') }
+  @{ name = 'photoloc-inspection-history';   type = 'page'; page = 'pages\inspection-history.html';   spec = 'photolocation-pages.html'; queries = @('?page=inspection-history&net=ski&as=inspector', '?page=inspection-history&net=ski&as=admin') }
+  @{ name = 'photoloc-inspection-dashboard'; type = 'page'; page = 'pages\inspection-dashboard.html'; spec = 'photolocation-pages.html'; queries = @('?page=inspection-dashboard&net=ski&as=inspector') }
+  @{ name = 'photoloc-maintenance-admin';    type = 'page'; page = 'pages\maintenance-admin.html';    spec = 'photolocation-pages.html'; queries = @('?page=maintenance-admin&net=bike') }
+  @{ name = 'photoloc-infraction-admin';     type = 'page'; page = 'pages\infraction-admin.html';     spec = 'photolocation-pages.html'; queries = @('?page=infraction-admin&net=ski') }
+  @{ name = 'photoloc-signalisation-report'; type = 'page'; page = 'pages\signalisation-report.html'; spec = 'photolocation-pages.html'; queries = @('?page=signalisation-report&net=ski&kind=downhill') }
+  @{ name = 'photoloc-infraction-report';    type = 'page'; page = 'pages\infraction-report.html';    spec = 'photolocation-pages.html'; queries = @('?page=infraction-report&net=ski') }
+  @{ name = 'photoloc-maintenance-report';   type = 'page'; page = 'pages\maintenance-report.html';   spec = 'photolocation-pages.html'; queries = @('?page=maintenance-report&net=bike') }
   @{ name = 'trailservice';             type = 'unit'; spec = 'trailservice.html' }
   @{ name = 'mapservice';               type = 'unit'; spec = 'mapservice.html' }
   @{ name = 'kind';                     type = 'unit'; spec = 'kind.html' }
   @{ name = 'hosting';                  type = 'unit'; spec = 'hosting.html' }
+  @{ name = 'photolocation';             type = 'unit'; spec = 'photolocation.html' }
 )
 if ($Only) { $tests = $tests | Where-Object { $Only -contains $_.name } }
 

@@ -1,0 +1,176 @@
+<pre id="out" style="position:fixed;left:0;bottom:0;background:#fff;color:#000;font-size:11px;z-index:99999">running...</pre>
+<script>
+// Placing / correcting a photo on the map, in every page that offers it: the links under a photo in the
+// detail views (written at once), and the thumbnails of the report forms (kept in the form, saved with it).
+(async () => {
+  const out = []; const J = JSON.stringify;
+  const ok = (n, c, x) => out.push((c ? 'PASS ' : 'FAIL ') + n + (c ? '' : ' :: ' + J(x)));
+  const wait = ms => new Promise(r => setTimeout(r, ms));
+  const PAGE = Q.get('page');
+  const AS = Q.get('as') || 'admin';
+  const $ = id => document.getElementById(id);
+  const text = el => (el ? el.textContent : '');
+  await wait(1000);
+  ok('no script errors on load', window.__errs.length === 0, window.__errs);
+
+  // ---- helpers ----
+  const click = el => el.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
+  const dialogOpen = () => $('pme-modal') && $('pme-modal').classList.contains('show');
+  const typeIn = value => { const i = $('pme-input'); i.value = value; i.dispatchEvent(new Event('input', { bubbles: true })); };
+  const saveBtn = () => $('pme-save');
+  const updates = coll => window.__writes.filter(x => x[0] === coll && x[2] === 'update').map(x => x[3]);
+  const links = scope => [...(scope || document).querySelectorAll('.photo-location')];
+  const editLink = box => [...box.querySelectorAll('a')].find(a => /✏️|Ajouter/.test(a.textContent));
+  const mapCal = { mode: 'affine', points: [{ x: 0, y: 0, lat: 45.33, lon: -72.26 }, { x: 1404, y: 0, lat: 45.33, lon: -72.20 }, { x: 0, y: 932, lat: 45.29, lon: -72.26 }] };
+  const exif = { latitude: 45.31, longitude: -72.23 };
+  const to = { latitude: 45.3105, longitude: -72.2301 };
+  const near = (a, b) => Math.abs(a - b) < 1e-6;
+
+  // =================================================================================================
+  // Detail views: signalisation management (admin, Descente view: SIG2 has two photos, one placed, one not)
+  // =================================================================================================
+  if (PAGE === 'signalisation-admin') {
+    openDetail('SIG2');
+    let boxes = links($('modal-body'));
+    ok('two photos: the placed one has Carte + Google + ✏️, the other only "Ajouter"', boxes.length === 2 && /Carte/.test(text(boxes[0])) && /✏️/.test(text(boxes[0])) && /Ajouter/.test(text(boxes[1])) && !/Carte/.test(text(boxes[1])), boxes.map(text));
+    click(editLink(boxes[0])); await wait(300);
+    ok('the dialog opens with the photo, and its current position typed in', dialogOpen() && $('pme-photo').getAttribute('src') === 'photo-sig2-a.jpg' && $('pme-input').value === '45.31, -72.23', [$('pme-photo').getAttribute('src'), $('pme-input').value]);
+    ok('nothing to save yet, no reset (the position was never changed by hand)', saveBtn().disabled === true && $('pme-reset').hidden === true);
+    typeIn('abc');
+    ok('text that is not coordinates: explained, cannot be saved', /non reconnues/.test(text($('pme-status'))) && saveBtn().disabled === true, text($('pme-status')));
+    typeIn('45.3105, -72.2301');
+    ok('typed coordinates: can be saved, Google Maps link follows', saveBtn().disabled === false && /maps\?q=45\.3105,-72\.2301/.test($('pme-google').href) && !$('pme-google').hidden, $('pme-google').href);
+    click(saveBtn()); await wait(500);
+    let u = updates('signalisations')[0];
+    ok('saved at once in Firestore: the photo, its record (original position, who), and the copy used by the map markers', !!u && near(u.photos[0].coordinates.latitude, to.latitude) && near(u.photos[0].coordinates.longitude, to.longitude) && J(u.photos[0].locationEdit.original) === J(exif) && u.photos[0].locationEdit.by === 'u1' && near(u.coordinates.latitude, to.latitude) && u.photos[1].url === 'photo-sig2-b.jpg' && u.photos[1].coordinates === null, u);
+    ok('the dialog closed, the report is shown again with "(modifiée)"', !dialogOpen() && /\(modifiée\)/.test(text($('modal-body'))), text($('modal-body')).slice(0, 80));
+
+    window.__writes.length = 0;
+    click(editLink(links($('modal-body'))[0])); await wait(300);
+    ok('second edit: the original position is offered and can be restored', $('pme-reset').hidden === false && /45\.310000°, -72\.230000°/.test(text($('pme-original'))), text($('pme-original')));
+    click($('pme-reset')); await wait(500);
+    u = updates('signalisations')[0];
+    ok('reset: original position back, hand-set record gone, copy restored', !!u && J(u.photos[0].coordinates) === J(exif) && !('locationEdit' in u.photos[0]) && J(u.coordinates) === J(exif), u);
+
+    window.__writes.length = 0;
+    click(editLink(links($('modal-body'))[1])); await wait(300);
+    ok('a photo with no position: empty field, nothing to save yet', $('pme-input').value === '' && saveBtn().disabled === true, [$('pme-input').value, text($('pme-status'))]);
+    typeIn('45.32, -72.24'); click(saveBtn()); await wait(500);
+    u = updates('signalisations')[0];
+    ok('"Ajouter": recorded as hand-set with no original; the copy of the FIRST photo is left alone', !!u && u.photos[1].locationEdit.original === null && near(u.photos[1].coordinates.latitude, 45.32) && !('coordinates' in u), u);
+    boxes = links($('modal-body'));
+    click(editLink(boxes[1])); await wait(300);
+    ok('a photo that had no original position has nothing to reset', $('pme-reset').hidden === true);
+    $('pme-cancel').click();
+
+    // a click on the map becomes GPS (the reverse of how pins are drawn)
+    window.__data.maps = [Object.assign({ id: 'ski-downhill-geo', width: 1404, height: 932 }, mapCal), { id: 'ski-geo', mode: 'affine', width: 800, height: 700, points: [{ x: 0, y: 0, lat: 45.296611, lon: -72.243361 }, { x: 800, y: 0, lat: 45.325861, lon: -72.249972 }, { x: 0, y: 700, lat: 45.299444, lon: -72.205667 }] }];
+    await MapService.load(true);
+    click(editLink(links($('modal-body'))[0])); await wait(900);
+    const img = $('pme-img'); const rect = img.getBoundingClientRect();
+    ok('the dialog opens on the map of the view shown (Descente), with a marker on the current position', /Ski-Downhill_Geolocalisation/.test(img.getAttribute('src')) && $('pme-marker').style.display === 'block', [img.getAttribute('src'), $('pme-marker').style.display]);
+    img.dispatchEvent(new MouseEvent('click', { bubbles: true, clientX: rect.left + rect.width / 2, clientY: rect.top + rect.height / 2 }));
+    const gps = MapService.pixelToGps(1404 / 2, 932 / 2, 'ski-downhill-geo');
+    const typed = parsePositionFromInput();
+    function parsePositionFromInput() { const m = $('pme-input').value.match(/(-?\d+\.\d+),\s*(-?\d+\.\d+)/); return m ? { latitude: +m[1], longitude: +m[2] } : null; }
+    ok('a click on the map puts the matching GPS position in the field (and the marker moves)', !!typed && Math.abs(typed.latitude - gps.lat) < 1e-4 && Math.abs(typed.longitude - gps.lon) < 1e-4 && saveBtn().disabled === false, [$('pme-input').value, gps]);
+    const sw = [...$('pme-switch').querySelectorAll('button')];
+    ok('Montée / Descente: both geolocalisation maps are offered', sw.length === 2 && /Montée/.test(sw[1].textContent) && /Descente/.test(sw[0].textContent), sw.map(b => b.textContent));
+    click(sw[1]); await wait(600);
+    ok('switching to the touring map changes the map, keeps the position', /Touring_geolocalisation/.test($('pme-img').getAttribute('src')) && parsePositionFromInput() && Math.abs(parsePositionFromInput().latitude - gps.lat) < 1e-4, $('pme-img').getAttribute('src'));
+    $('pme-cancel').click();
+    ok('cancelling writes nothing more', window.__writes.filter(x => x[0] === 'signalisations').length === 1, window.__writes);
+  }
+
+  // ---- who sees the edit link: the owner or an admin (signalisation dashboard) ----
+  if (PAGE === 'signalisation-resume') {
+    openDetailModal('SIG2');
+    ok(AS === 'admin' ? 'admin: ✏️ shown on a report' : 'owner (inspector): ✏️ shown on their own report', links($('modal-body')).some(b => /✏️/.test(text(b))), links($('modal-body')).map(text));
+    reportsData.find(r => r.id === 'SIG2').inspectorId = 'somebody-else';
+    openDetailModal('SIG2');
+    const shown = links($('modal-body')).some(b => /✏️|Ajouter/.test(text(b)));
+    ok(AS === 'admin' ? 'admin: still allowed on someone else\'s report' : 'someone else\'s report: no edit link for a plain inspector (the Carte / Google links stay)', shown === (AS === 'admin') && links($('modal-body')).some(b => /Carte/.test(text(b))), links($('modal-body')).map(text));
+  }
+
+  // ---- Inspections: the inspector who made it, or an admin ----
+  if (PAGE === 'inspection-history') {
+    viewDetails('I1');
+    ok('own inspection: the position can be edited', links($('modal-body')).some(b => /✏️/.test(text(b))) && /Carte/.test(text($('modal-body'))), links($('modal-body')).map(text));
+    click(editLink(links($('modal-body'))[0])); await wait(300);
+    typeIn('45.31, -72.31'); click(saveBtn()); await wait(600);
+    const u = updates('trail_inspections')[0];
+    ok('saved in trail_inspections/I1 (photos only, no copy field), by the inspector', !!u && Object.keys(u).join() === 'photos' && near(u.photos[0].coordinates.longitude, -72.31) && J(u.photos[0].locationEdit.original) === J({ latitude: 45.30, longitude: -72.22 }) && u.photos[0].locationEdit.by === 'u1', u);
+    allInspections.find(i => i.id === 'I1').raw.inspector_id = 'somebody-else';
+    viewDetails('I1');
+    ok(AS === 'admin' ? 'admin: may edit anyone\'s inspection' : 'someone else\'s inspection: no edit link', links($('modal-body')).some(b => /✏️/.test(text(b))) === (AS === 'admin'), links($('modal-body')).map(text));
+  }
+  if (PAGE === 'inspection-dashboard') {
+    openTrailModal('trail_1');
+    ok('dashboard: own inspection\'s photo can be relocated', links($('modal-body')).some(b => /✏️/.test(text(b))), links($('modal-body')).map(text));
+    click(editLink(links($('modal-body'))[0])); await wait(300);
+    typeIn('45.29, -72.2'); click(saveBtn()); await wait(900);
+    const u = updates('trail_inspections')[0];
+    ok('dashboard: saved in trail_inspections/I1, and the report window is shown again', !!u && near(u.photos[0].coordinates.latitude, 45.29) && $('inspection-modal').classList.contains('show') && /\(modifiée\)/.test(text($('modal-body'))), [u, text($('modal-body')).slice(0, 60)]);
+  }
+
+  // ---- Entretien (photos inside each work entry) ----
+  if (PAGE === 'maintenance-admin') {
+    openDetail('ML1');
+    const boxes = links($('modal-body'));
+    ok('work entry photos: the placed one has ✏️, the other "Ajouter"', boxes.length === 2 && /✏️/.test(text(boxes[0])) && /Ajouter/.test(text(boxes[1])), boxes.map(text));
+    click(editLink(boxes[1])); await wait(300);
+    typeIn('45.31, -72.22'); click(saveBtn()); await wait(600);
+    const u = updates('maintenance_logs')[0];
+    ok('saved in the right work entry; the other entry and photo are untouched', !!u && Object.keys(u).join() === 'entries' && u.entries.length === 2 && near(u.entries[0].photos[1].coordinates.latitude, 45.31) && u.entries[0].photos[1].locationEdit.original === null && u.entries[0].photos[0].locationEdit === undefined && u.entries[1].jobText === 'Reprofilage', u);
+  }
+
+  // ---- Infractions: the copy of the first photo's position is kept in step ----
+  if (PAGE === 'infraction-admin') {
+    await openDetail('INF2');
+    click(editLink(links($('modal-body'))[0])); await wait(300);
+    typeIn('45.3, -72.2'); click(saveBtn()); await wait(600);
+    const u = updates('infractions')[0];
+    ok('saved in infractions/INF2: photos[0] and offenderImageCoordinates', !!u && near(u.photos[0].coordinates.latitude, 45.3) && near(u.offenderImageCoordinates.latitude, 45.3) && !('coordinates' in u), u);
+  }
+
+  // =================================================================================================
+  // Report forms: the owner places a photo while looking at it; it is saved WITH the form
+  // =================================================================================================
+  if (PAGE === 'signalisation-report') {
+    reportSelector.value = 'SIG2'; handleReportChange(); await wait(300);
+    const thumbs = [...document.querySelectorAll('#photo-preview-container .photo-preview-item')];
+    const locate = i => [...thumbs[i].querySelectorAll('button')].find(b => /✏️|Ajouter/.test(b.textContent));
+    ok('each thumbnail has a locate button (✏️ when placed, "Ajouter" when not)', thumbs.length === 2 && /✏️/.test(locate(0).textContent) && /Ajouter/.test(locate(1).textContent), thumbs.length);
+    click(locate(0)); await wait(300);
+    ok('the dialog shows the photo being relocated', dialogOpen() && $('pme-photo').getAttribute('src') === 'photo-sig2-a.jpg');
+    typeIn('45.3105, -72.2301'); click(saveBtn()); await wait(300);
+    ok('the form keeps the change (nothing is written yet)', near(photoPicker.getPhotos()[0].coordinates.latitude, 45.3105) && J(photoPicker.getPhotos()[0].locationEdit.original) === J(exif) && window.__writes.filter(x => x[0] === 'signalisations').length === 0, photoPicker.getPhotos());
+    await handleModify(); await wait(300);
+    const u = updates('signalisations')[0];
+    ok('"Modifier" saves it with the report: the photo\'s hand-set record and the copy of the position', !!u && near(u.photos[0].coordinates.latitude, 45.3105) && u.photos[0].locationEdit && u.photos[0].locationEdit.by === 'u1' && near(u.coordinates.latitude, 45.3105), u);
+  }
+  if (PAGE === 'infraction-report') {
+    reportSelector.value = 'INF2'; handleReportChange(); await wait(300);
+    const btn = [...document.querySelectorAll('#photo-preview-container .photo-preview-item button')].find(b => /✏️|Ajouter/.test(b.textContent));
+    ok('infraction form: the thumbnail has the locate button', !!btn);
+    click(btn); await wait(300);
+    typeIn('45.3, -72.2'); click(saveBtn()); await wait(300);
+    await handleModify(); await wait(300);
+    const u = updates('infractions')[0];
+    ok('infraction "Modifier": photo, hand-set record and offenderImageCoordinates saved together', !!u && u.photos && near(u.photos[0].coordinates.latitude, 45.3) && u.photos[0].locationEdit && near(u.offenderImageCoordinates.latitude, 45.3), u);
+  }
+  if (PAGE === 'maintenance-report') {
+    reportSelector.value = 'ML1'; handleReportChange(); await wait(400);
+    const items = [...document.querySelectorAll('.photo-preview-item')];
+    const btns = items.map(i => [...i.querySelectorAll('button')].find(b => /✏️|Ajouter/.test(b.textContent))).filter(Boolean);
+    ok('maintenance form: every photo of every work entry has the locate button', btns.length === 2, btns.length);
+    click(btns[1]); await wait(300);
+    typeIn('45.31, -72.22'); click(saveBtn()); await wait(300);
+    await handleModify(); await wait(400);
+    const u = updates('maintenance_logs')[0];
+    ok('maintenance "Modifier": the hand-set photo is saved inside its work entry', !!u && u.entries && u.entries[0].photos[1].locationEdit && near(u.entries[0].photos[1].coordinates.latitude, 45.31), u);
+  }
+
+  document.getElementById('out').textContent = out.join('\n');
+})().catch(e => { document.getElementById('out').textContent = 'HARNESS ERROR ' + e.stack; });
+</script>

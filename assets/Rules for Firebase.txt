@@ -98,14 +98,20 @@ service cloud.firestore {
     match /trail_inspections/{document} {
       allow read: if true;
       allow create: if canWorkIn(recordNetwork(request.resource.data));
-      allow update: if canWorkIn(recordNetwork(resource.data)) && sameNetwork();
+      // Only the inspector who made it, or an admin (e.g. to correct a photo's position)
+      allow update: if request.auth != null &&
+          (request.auth.uid == resource.data.inspector_id || isAdmin()) &&
+          canWorkIn(recordNetwork(resource.data)) && sameNetwork();
       allow delete: if isAdmin() && canWorkIn(recordNetwork(resource.data));
     }
 
     match /shelter_inspections/{document} {
       allow read: if true;
       allow create: if canWorkIn(recordNetwork(request.resource.data));
-      allow update: if canWorkIn(recordNetwork(resource.data)) && sameNetwork();
+      // Only the inspector who made it, or an admin (e.g. to correct a photo's position)
+      allow update: if request.auth != null &&
+          (request.auth.uid == resource.data.inspector_id || isAdmin()) &&
+          canWorkIn(recordNetwork(resource.data)) && sameNetwork();
       allow delete: if isAdmin() && canWorkIn(recordNetwork(resource.data));
     }
     

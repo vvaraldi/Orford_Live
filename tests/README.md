@@ -53,6 +53,9 @@ DOM) - retry with `-Budget 20000` or so, not a sign of a real bug.
 | `specs/trailservice.html` | none (loads `js/core/*.js` directly) | `TrailService` unit tests: kinds, difficulties, status/condition wording, issue lists. |
 | `specs/mapservice.html` | none (loads `js/core/*.js` directly) | `MapService` unit tests: the affine/perspective GPS math, calibration save/load. |
 | `specs/kind.html` | none (loads `js/core/*.js` directly) | `Kind` (the Montée/Descente switcher's state) unit tests: defaults, persistence, per-network isolation. |
+| `specs/hosting.html` | none (loads `js/core/config.js` directly) | `siteUrl()` / `relativeSiteUrl()`: links are right from any address (domain root, sub-folder, a folder named `pages`, accents, local folder). |
+| `specs/photolocation.html` | none (loads the real services) | Placing / correcting a photo's GPS position: the hand-set record (`locationEdit`, original kept, reset), which document field is rewritten per module, who may edit (owner or admin), typed coordinates. |
+| `specs/photolocation-pages.html` | `photoloc-*` entries of `run.ps1`: the six detail views and the three report forms | The ✏️ / "Ajouter" links and the dialog on every page that offers it: click on the map -> GPS, typed coordinates, reset, Montée / Descente maps, owner vs other inspector vs admin, saved at once in the detail views and with the form in the report forms. |
 
 ## Adding a test
 

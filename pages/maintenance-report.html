@@ -153,6 +153,8 @@
   <script src="../js/core/auth.js"></script>
   <script src="../js/utils/photo-picker.js"></script>
   <script src="../js/services/photo-service.js"></script>
+  <script src="../js/services/map-service.js"></script>
+  <script src="../js/services/photo-map-modal.js"></script>
   <script src="../js/services/sector-service.js"></script>
 
   <script>
@@ -410,7 +412,8 @@
         dropZone: el.querySelector(`#entry-photo-upload-${rowId}`),
         previewContainer: el.querySelector(`#entry-photo-preview-${rowId}`),
         multiple: true,
-        maxPhotos: 10
+        maxPhotos: 10,
+        locationEditing: true // the builder can place / correct a photo on the map (saved with the log)
       });
 
       const entry = { rowId, el, sectorSelect, trailSelect, jobTextEl, picker };

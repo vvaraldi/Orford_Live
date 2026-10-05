@@ -255,6 +255,160 @@
     return compressImage(file, rule.quality, rule.maxWidth);
   }
 
+  // ─── Hand-set location ─────────────────────────────────────────────────────
+  //
+  // An admin or the owner of a record can place a photo on the map (or correct its GPS position).
+  // The photo then carries a `locationEdit` record:
+  //   locationEdit: { original, by, byName, at }
+  //     original  the position the photo had before the FIRST hand-set change ({latitude, longitude}),
+  //               or null when it had none - "reset" puts it back (and is only offered when not null)
+  //     by/byName who set it, at when (a Timestamp in Firestore, a Date in memory)
+  // Firestore cannot hold a server timestamp inside an array, so `at` is a client Timestamp.
+
+  function readLocationEdit(raw) {
+    return {
+      original: raw.original || null,
+      by: raw.by || null,
+      byName: raw.byName || null,
+      at: toDate(raw.at)
+    };
+  }
+
+  function writeLocationEdit(edit) {
+    var TS = global.firebase && global.firebase.firestore ? global.firebase.firestore.Timestamp : null;
+    var at = edit.at;
+    if (at && TS && !at.toDate && at.seconds === undefined) at = TS.fromDate(at instanceof Date ? at : new Date(at));
+    return { original: edit.original || null, by: edit.by || null, byName: edit.byName || null, at: at || null };
+  }
+
+  /** Who is making the change: the signed-in user. */
+  function currentEditor() {
+    var user = global.currentUser, data = global.currentUserData;
+    return { uid: user ? user.uid : null, name: (data && data.name) || (user && user.email) || null };
+  }
+
+  // The field that says who owns a record, per collection (the Firestore rules use the same ones).
+  var OWNER_FIELDS = {
+    trail_inspections: 'inspector_id',
+    shelter_inspections: 'inspector_id',
+    infractions: 'patrolId',
+    signalisations: 'inspectorId',
+    maintenance_logs: 'builderId'
+  };
+
+  // Infractions and signalisations also keep a copy of the first photo's position (the map markers read it)
+  var MIRROR_FIELDS = { signalisations: 'coordinates', infractions: 'offenderImageCoordinates' };
+
+  /** May the signed-in user change the photo positions of this record? An admin, or its owner. */
+  function canEditLocation(collection, record) {
+    var user = global.currentUser, data = global.currentUserData;
+    if (!user || !data || !record) return false;
+    if (data.role === 'admin' || data.role === 'system_admin') return true;
+    var field = OWNER_FIELDS[collection];
+    return !!field && !!record[field] && record[field] === user.uid;
+  }
+
+  function validPosition(c) {
+    return !!c && typeof c.latitude === 'number' && typeof c.longitude === 'number' &&
+      isFinite(c.latitude) && isFinite(c.longitude) && Math.abs(c.latitude) <= 90 && Math.abs(c.longitude) <= 180;
+  }
+
+  /**
+   * The photo (any object with coordinates / locationEdit) after a hand-set change. Pure.
+   *   change = { coordinates: {latitude, longitude} }   place it there
+   *   change = { reset: true }                           back to the original position
+   */
+  function relocate(photo, change, editor, now) {
+    var out = Object.assign({}, photo);
+    if (change.reset) {
+      if (!(out.locationEdit && out.locationEdit.original)) throw new Error('Aucune position d\'origine à rétablir.');
+      out.coordinates = out.locationEdit.original;
+      delete out.locationEdit;
+      return out;
+    }
+    if (!validPosition(change.coordinates)) throw new Error('Position GPS invalide.');
+    var original = out.locationEdit ? out.locationEdit.original : (out.coordinates || null);
+    out.coordinates = {
+      latitude: Math.round(change.coordinates.latitude * 1e6) / 1e6,
+      longitude: Math.round(change.coordinates.longitude * 1e6) / 1e6
+    };
+    out.locationEdit = { original: original || null, by: (editor && editor.uid) || null, byName: (editor && editor.name) || null, at: now || new Date() };
+    return out;
+  }
+
+  /**
+   * What to write to a Firestore document to change one photo's position (found by its URL):
+   * in `photos` (all modules), in `entries[].photos` (maintenance), or in a legacy single-URL field
+   * (the photo then moves into `photos`; the legacy field is kept in step). Pure: returns
+   * { fields, photo } without touching Firestore.
+   */
+  function applyLocationChange(data, collection, url, change, editor, now) {
+    var change2 = function (photo) {
+      var next = relocate(photo, change, editor, now);
+      if (next.locationEdit) next.locationEdit = writeLocationEdit(next.locationEdit);
+      return next;
+    };
+    var urlOf = function (p) { return typeof p === 'string' ? p : (p && p.url); };
+    var asObject = function (p, fallback) {
+      return typeof p === 'string' ? { url: p, filename: filenameFromUrl(p), coordinates: fallback || null, timestamp: null } : p;
+    };
+    var mirror = MIRROR_FIELDS[collection];
+
+    var photos = Array.isArray(data.photos) ? data.photos.slice() : [];
+    var index = photos.findIndex(function (p) { return urlOf(p) === url; });
+    if (index !== -1) {
+      var updated = change2(asObject(photos[index], data.coordinates));
+      photos[index] = updated;
+      var fields = { photos: photos };
+      if (mirror && index === 0) fields[mirror] = updated.coordinates || null;
+      return { fields: fields, photo: updated };
+    }
+
+    if (Array.isArray(data.entries)) {
+      for (var e = 0; e < data.entries.length; e++) {
+        var entryPhotos = Array.isArray(data.entries[e].photos) ? data.entries[e].photos.slice() : [];
+        var j = entryPhotos.findIndex(function (p) { return urlOf(p) === url; });
+        if (j !== -1) {
+          var changed = change2(asObject(entryPhotos[j], null));
+          entryPhotos[j] = changed;
+          var entries = data.entries.slice();
+          entries[e] = Object.assign({}, entries[e], { photos: entryPhotos });
+          return { fields: { entries: entries }, photo: changed };
+        }
+      }
+    }
+
+    for (var k = 0; k < LEGACY_URL_FIELDS.length; k++) {
+      var legacy = LEGACY_URL_FIELDS[k];
+      if (data[legacy.url] === url) {
+        var moved = change2({ url: url, filename: filenameFromUrl(url), coordinates: data[legacy.coords] || null, timestamp: null });
+        photos.push(moved);
+        var legacyFields = { photos: photos };
+        legacyFields[legacy.coords] = moved.coordinates || null;
+        if (mirror && photos.length === 1) legacyFields[mirror] = moved.coordinates || null;
+        return { fields: legacyFields, photo: moved };
+      }
+    }
+
+    throw new Error('Photo introuvable dans ce rapport (a-t-elle été retirée ?).');
+  }
+
+  /**
+   * Changes one photo's position in Firestore. Re-reads the record inside a transaction, so a change
+   * made meanwhile on another photo of the same report is not overwritten. Resolves to the new photo.
+   */
+  async function updateLocation(collection, docId, url, change, editor) {
+    var ref = global.db.collection(collection).doc(docId);
+    var result = null;
+    await global.db.runTransaction(async function (tx) {
+      var snap = await tx.get(ref);
+      if (!snap.exists) throw new Error('Rapport introuvable.');
+      var res = applyLocationChange(snap.data(), collection, url, change, editor || currentEditor(), new Date());
+      tx.update(ref, res.fields);
+      result = res.photo;
+    });
+    return result;
+  }
   // ─── Reading ───────────────────────────────────────────────────────────────
 
   /**
@@ -276,13 +430,15 @@
     }
 
     if (typeof raw === 'object' && raw.url) {
-      return {
+      var photo = {
         url: raw.url,
         filename: raw.filename || filenameFromUrl(raw.url),
         coordinates: raw.coordinates || null,
         timestamp: toDate(raw.timestamp),
         legacy: false
       };
+      if (raw.locationEdit) photo.locationEdit = readLocationEdit(raw.locationEdit);
+      return photo;
     }
 
     return null;
@@ -347,12 +503,14 @@
       : null;
 
     return (photos || []).map(function (p) {
-      return {
+      var out = {
         url: p.url,
         filename: p.filename,
         coordinates: p.coordinates || null,
         timestamp: (p.timestamp && TS) ? TS.fromDate(p.timestamp) : null
       };
+      if (p.locationEdit) out.locationEdit = writeLocationEdit(p.locationEdit);
+      return out;
     });
   }
 
@@ -369,7 +527,8 @@
         file: item.file,
         exif: (item.coordinates !== undefined || item.timestamp !== undefined)
           ? { coordinates: item.coordinates || null, timestamp: item.timestamp || null }
-          : null
+          : null,
+        locationEdit: item.locationEdit || null
       };
     }
     return { file: item, exif: null };
@@ -389,7 +548,7 @@
     var exif = entry.exif || await readExif(entry.file);
     var rule = (options.compress === undefined) ? profile.compress : options.compress;
     var payload = await maybeCompress(entry.file, rule);
-    return { file: entry.file, payload: payload, exif: exif };
+    return { file: entry.file, payload: payload, exif: exif, locationEdit: entry.locationEdit || null };
   }
 
   /**
@@ -411,13 +570,15 @@
     await ref.put(prepared.payload);
     var url = await ref.getDownloadURL();
 
-    return {
+    var record = {
       url: url,
       filename: prepared.file.name,
       coordinates: prepared.exif.coordinates,
       timestamp: prepared.exif.timestamp,
       legacy: false
     };
+    if (prepared.locationEdit) record.locationEdit = prepared.locationEdit;
+    return record;
   }
 
   /**
@@ -600,6 +761,11 @@
     firstPhotoUrl: firstPhotoUrl,
     urlsFrom: urlsFrom,
     primaryCoordinates: primaryCoordinates,
+    canEditLocation: canEditLocation,
+    currentEditor: currentEditor,
+    relocate: relocate,
+    applyLocationChange: applyLocationChange,
+    updateLocation: updateLocation,
     toFirestore: toFirestore,
     // exif
     readExif: readExif,

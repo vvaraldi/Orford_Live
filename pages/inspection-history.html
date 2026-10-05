@@ -731,9 +731,12 @@
       if (insp.photos && insp.photos.length > 0) {
         const photoMapId = insp.type === 'trail' ? TrailService.geoMapIdOf(trails.get(insp.locationId)) : null;
         html += `<div class="detail-section"><div class="detail-section__title">📷 Photos (${insp.photos.length})</div><div class="detail-photos">${insp.photos.map(p => {
-          const coords = p.coordinates;
-          let loc = '';
-          if (coords && coords.latitude && coords.longitude) loc = `<div class="photo-location"><a href="#" onclick="openPhotoLocationModal(${coords.latitude},${coords.longitude}${photoMapId ? `,'${photoMapId}'` : ''});return false;" title="Carte locale">📍 Carte</a> <a href="https://www.google.com/maps?q=${coords.latitude},${coords.longitude}" target="_blank" rel="noopener noreferrer" title="Google Maps" aria-label="Google Maps">🗺️</a></div>`;
+          // 📍 Carte / Google Maps, and ✏️ for the inspector who made it or an admin (hand-set position)
+          const loc = PhotoMapModal.locationLinks(p, {
+            collection: insp.type === 'trail' ? 'trail_inspections' : 'shelter_inspections',
+            docId: insp.id, record: insp.raw, preferredMap: photoMapId,
+            onChanged: async () => { await loadAllData(loadedFullHistory); viewDetails(insp.id); }
+          });
           return `<div class="detail-photo"><img src="${p.url}" alt="Photo" onclick="window.open('${p.url}','_blank')">${loc}</div>`;
         }).join('')}</div></div>`;
       }

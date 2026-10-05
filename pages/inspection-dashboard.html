@@ -521,16 +521,16 @@
      * geolocalisation map for a shelter one (null lets it fall back to the network default). The
      * full report-maps switch is still offered either way.
      */
-    function renderPhotosSection(insp, mapId) {
+    function renderPhotosSection(insp, mapId, collection, reopen) {
       const photos = PhotoService.photosFrom(insp);
       if (!photos.length) return '';
 
       const items = photos.map(p => {
-        const c = p.coordinates;
-        let loc = '';
-        if (c && c.latitude && c.longitude) {
-          loc = `<div class="photo-location"><a href="#" onclick="openPhotoLocationModal(${c.latitude},${c.longitude}${mapId ? `,'${mapId}'` : ''});return false;" title="Carte locale">📍 Carte</a> <a href="https://www.google.com/maps?q=${c.latitude},${c.longitude}" target="_blank" rel="noopener noreferrer" title="Google Maps" aria-label="Google Maps">🗺️</a></div>`;
-        }
+        // 📍 Carte / Google Maps, and ✏️ for the inspector who made it or an admin (hand-set position)
+        const loc = PhotoMapModal.locationLinks(p, {
+          collection, docId: insp.id, record: insp, preferredMap: mapId,
+          onChanged: async () => { await loadDashboardData(); reopen(); }
+        });
         return `<div class="photo-item"><img src="${p.url}" class="photo-thumb" onclick="window.open('${p.url}','_blank')">${loc}</div>`;
       }).join('');
 
@@ -568,7 +568,7 @@
         if (insp.notes && insp.notes.trim()) {
           html += `<div class="detail-section"><div class="detail-section__title">📝 Notes</div><div class="notes-box">${escapeHtml(insp.notes).replace(/\n/g, '<br>')}</div></div>`;
         }
-        html += renderPhotosSection(insp, TrailService.geoMapIdOf(trail));
+        html += renderPhotosSection(insp, TrailService.geoMapIdOf(trail), 'trail_inspections', () => openTrailModal(trailId));
         body.innerHTML = html;
       }
       document.getElementById('inspection-modal').classList.add('show');
@@ -602,7 +602,7 @@
         if (insp.notes && insp.notes.trim()) {
           html += `<div class="detail-section"><div class="detail-section__title">📝 Notes</div><div class="notes-box">${escapeHtml(insp.notes).replace(/\n/g, '<br>')}</div></div>`;
         }
-        html += renderPhotosSection(insp, null); // shelters are not kind-specific: network default
+        html += renderPhotosSection(insp, null, 'shelter_inspections', () => openShelterModal(shelterId)); // shelters are not kind-specific: network default
         body.innerHTML = html;
       }
       document.getElementById('inspection-modal').classList.add('show');

@@ -8,6 +8,9 @@
  * - Drag & drop support for desktop
  * - EXIF extraction (GPS coordinates + timestamp)
  * - Multiple photo support
+ * - Optional per-photo "locate" button (option locationEditing): the owner places a photo on the
+ *   map, or corrects its position, by clicking the geolocalisation map (PhotoMapModal.edit). The
+ *   change stays in the picker (coordinates + locationEdit) and is saved with the form.
  */
 
 class PhotoPicker {
@@ -22,6 +25,8 @@ class PhotoPicker {
       maxFileSize: 10 * 1024 * 1024,
       accept: 'image/*',
       exifTimeout: 5000, // New: timeout for EXIF extraction (ms)
+      locationEditing: false, // show a button to place / correct each photo on the map
+      preferredMap: null,     // map id (or function(photo) -> map id) the relocation dialog opens on
       ...options
     };
 
@@ -62,8 +67,14 @@ class PhotoPicker {
     return new Promise(resolve => { this._resolve = resolve; });
   }
 
+  // locationEdit (a hand-set position: see PhotoService) travels with the photo, only when there is one
+  _withEdit(p, out) {
+    if (p.locationEdit) out.locationEdit = p.locationEdit;
+    return out;
+  }
+
   getPhotos() {
-    return this._photos.map(p => ({
+    return this._photos.map(p => this._withEdit(p, {
       url: p.url,
       filename: p.filename,
       coordinates: p.coordinates,
@@ -74,7 +85,7 @@ class PhotoPicker {
   getUploadedPhotos() {
     return this._photos
       .filter(p => p.isUploaded && p.url)
-      .map(p => ({
+      .map(p => this._withEdit(p, {
         url: p.url,
         filename: p.filename,
         coordinates: p.coordinates,
@@ -85,7 +96,7 @@ class PhotoPicker {
   getPendingFiles() {
     return this._photos
       .filter(p => !p.isUploaded && p.file)
-      .map(p => ({
+      .map(p => this._withEdit(p, {
         file: p.file,
         filename: p.filename,
         coordinates: p.coordinates,
@@ -109,6 +120,12 @@ class PhotoPicker {
       filename: p.filename || 'photo.jpg',
       coordinates: p.coordinates || null,
       timestamp: p.timestamp ? (p.timestamp.toDate ? p.timestamp.toDate() : new Date(p.timestamp)) : null,
+      locationEdit: p.locationEdit ? {
+        original: p.locationEdit.original || null,
+        by: p.locationEdit.by || null,
+        byName: p.locationEdit.byName || null,
+        at: p.locationEdit.at && p.locationEdit.at.toDate ? p.locationEdit.at.toDate() : (p.locationEdit.at || null)
+      } : null,
       isUploaded: true
     }));
     this._renderPreviews();
@@ -462,11 +479,23 @@ class PhotoPicker {
       removeBtn.style.cssText = 'position:absolute;top:-6px;right:-6px;width:22px;height:22px;border:none;border-radius:50%;background:#ef4444;color:white;font-size:14px;font-weight:bold;cursor:pointer;display:flex;align-items:center;justify-content:center;line-height:1;';
       removeBtn.addEventListener('click', (e) => { e.stopPropagation(); this.removePhoto(index); });
 
+      if (this.options.locationEditing && typeof PhotoMapModal !== 'undefined') {
+        const locateBtn = document.createElement('button');
+        locateBtn.type = 'button';
+        locateBtn.textContent = photo.coordinates ? '✏️' : '📍 Ajouter';
+        const label = photo.coordinates ? 'Modifier la localisation de la photo' : 'Ajouter une localisation à la photo';
+        locateBtn.title = label;
+        locateBtn.setAttribute('aria-label', label);
+        locateBtn.style.cssText = 'position:absolute;bottom:4px;right:4px;font-size:12px;line-height:1;border:none;border-radius:4px;padding:3px 5px;cursor:pointer;background:rgba(255,255,255,0.92);color:#111827;';
+        locateBtn.addEventListener('click', (e) => { e.stopPropagation(); this._editLocation(index); });
+        item.appendChild(locateBtn);
+      }
+
       if (photo.coordinates) {
         const gpsIndicator = document.createElement('span');
         gpsIndicator.innerHTML = '📍';
         gpsIndicator.setAttribute('aria-label', 'Photo géolocalisée');
-        gpsIndicator.title = `GPS: ${photo.coordinates.latitude}, ${photo.coordinates.longitude}`;
+        gpsIndicator.title = `GPS: ${photo.coordinates.latitude}, ${photo.coordinates.longitude}` + (photo.locationEdit ? ' (position modifiée)' : '');
         gpsIndicator.style.cssText = 'position:absolute;bottom:4px;left:4px;font-size:14px;background:rgba(255,255,255,0.9);border-radius:4px;padding:2px 4px;';
         item.appendChild(gpsIndicator);
       }
@@ -477,6 +506,30 @@ class PhotoPicker {
     });
 
     container.style.display = this._photos.length > 0 ? 'block' : 'none';
+  }
+
+  // ─── Internal: hand-set location (saved with the form, not on its own) ────────────────────
+
+  _editLocation(index) {
+    const photo = this._photos[index];
+    if (!photo || typeof PhotoMapModal === 'undefined') return;
+    const preferred = typeof this.options.preferredMap === 'function' ? this.options.preferredMap(photo) : this.options.preferredMap;
+    PhotoMapModal.edit({
+      photoUrl: photo.previewUrl || photo.url,
+      coordinates: photo.coordinates,
+      original: photo.locationEdit ? photo.locationEdit.original : null,
+      preferred: preferred || undefined,
+      save: async (change) => {
+        // the photo may have moved in the list while the dialog was open
+        const i = this._photos.indexOf(photo);
+        if (i === -1) return;
+        const next = PhotoService.relocate(photo, change, PhotoService.currentEditor(), new Date());
+        photo.coordinates = next.coordinates || null;
+        if (next.locationEdit) photo.locationEdit = next.locationEdit; else delete photo.locationEdit;
+        this._renderPreviews();
+        this._notifyChange();
+      }
+    });
   }
 
   _notifyChange() {

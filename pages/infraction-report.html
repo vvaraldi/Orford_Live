@@ -212,6 +212,8 @@
   <script src="../js/core/auth.js"></script>
   <script src="../js/utils/photo-picker.js"></script>
   <script src="../js/services/photo-service.js"></script>
+  <script src="../js/services/map-service.js"></script>
+  <script src="../js/services/photo-map-modal.js"></script>
   <script src="../js/services/sector-service.js"></script>
 
   <script>
@@ -288,7 +290,8 @@
         dropZone: photoUploadArea,
         previewContainer: photoPreviewContainer,
         multiple: true,
-        maxPhotos: 10
+        maxPhotos: 10,
+        locationEditing: true // the owner can place / correct a photo on the map (saved with the report)
       });
       
       scanQrBtn = document.getElementById('scan-qr-btn');
@@ -637,12 +640,7 @@
         }
         
         // Get all photos for saving
-        const photos = photoPicker.getUploadedPhotos().map(p => ({
-          url: p.url,
-          filename: p.filename,
-          coordinates: p.coordinates || null,
-          timestamp: p.timestamp ? firebase.firestore.Timestamp.fromDate(p.timestamp) : null
-        }));
+        const photos = PhotoService.toFirestore(photoPicker.getUploadedPhotos()); // also carries a hand-set position (locationEdit)
         
         // Upload QR image if any
         let uploadedQrUrl = null;
@@ -712,12 +710,7 @@
         }
         
         // Get all photos for saving
-        const photos = photoPicker.getUploadedPhotos().map(p => ({
-          url: p.url,
-          filename: p.filename,
-          coordinates: p.coordinates || null,
-          timestamp: p.timestamp ? firebase.firestore.Timestamp.fromDate(p.timestamp) : null
-        }));
+        const photos = PhotoService.toFirestore(photoPicker.getUploadedPhotos()); // also carries a hand-set position (locationEdit)
         
         // Upload new QR image if changed
         let uploadedQrUrl = qrCodeImageUrl;
