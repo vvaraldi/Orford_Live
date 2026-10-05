@@ -2,13 +2,16 @@
 
 2. Improve the code
 #	Priority	Item
-2.1 Manage Signalisations for ski touring, velo and downhill
-2.2 Documentation / README & deployment guide
+2.2 Medium Documentation / README & deployment guide
 2.3	Low	Trim legacy back-compat branches
 
 3. Improve the user experience
 #	Priority	Item
 3.1	Low	Season label wording for bike
+I want all the switches of season to be as follow in all apps, download, visual, ...
+Ski 1st of november to 30th of April
+Bike 1st of May to 31 of October
+
 3.2	Low	Accessibility audit pass
 
 

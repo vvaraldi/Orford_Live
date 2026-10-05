@@ -101,8 +101,11 @@ const APP_CONFIG = {
   // and the network used when no activity is in season (see js/core/network.js ofSeason).
   //
   // Per network:
-  //   seasonMonths  months (1-12) when this network is the default one; the network with no
-  //                 seasonMonths is the default the rest of the year (see js/core/network.js)
+  //   season        { from: {month, day}, to: {month, day} } - THE definition of the activity's season,
+  //                 used everywhere: which activity opens by default on a given date (header, public
+  //                 status page), the window the dashboard and history read, the seasons of the admin
+  //                 statistics, the default start date of the data export. A season may run over New
+  //                 Year (ski: 1 Nov to 30 Apr). See js/core/network.js (seasonRange, ofSeason).
   //   map           id of the network's main map (in maps above), the one behind the inspection
   //                 markers and the report locations. Trails of another kind can use another
   //                 map: see trailKinds.<kind>.map
@@ -115,19 +118,18 @@ const APP_CONFIG = {
   //   features      what the network has: shelters, snowCondition (ski-only inspection field)
   //   infractions   the fault types and practices offered on the infraction form (id -> label)
   //   publicTitle   what the public status page calls this activity's trails
-  //   statsSince    month/day the inspection statistics start counting each year
   //   mapCenter     GPS centre of the activity's map (distance-from-centre photo check); none = skipped.
   //                 Ski and bike use the same point: both maps cover Mont Orford.
   networks: {
     ski: {
       id: 'ski', name: 'Ski', icon: '⛷️',
+      season: { from: { month: 11, day: 1 }, to: { month: 4, day: 30 } }, // 1 November to 30 April
       map: 'ski',
       trailKinds: ['uphill', 'downhill', 'lift'],
       reportMaps: ['ski-downhill-geo', 'ski-geo'],
       inspectionKinds: ['uphill', 'downhill'],
       features: { shelters: true, snowCondition: true },
       publicTitle: 'État des sentiers de randonnée alpine',
-      statsSince: { month: 9, day: 1 }, // 1 September
       mapCenter: { lat: 45.310, lon: -72.230 },
       infractions: {
         faults: {
@@ -144,14 +146,13 @@ const APP_CONFIG = {
     },
     bike: {
       id: 'bike', name: 'Vélo', icon: '🚵',
-      seasonMonths: [5, 6, 7, 8, 9, 10], // 1 May to 31 October
+      season: { from: { month: 5, day: 1 }, to: { month: 10, day: 31 } }, // 1 May to 31 October
       map: 'bike',
       trailKinds: ['bike'],
       reportMaps: ['bike-geo'],
       inspectionKinds: ['bike'],
       features: { shelters: false, snowCondition: false },
       publicTitle: 'État des sentiers de vélo de montagne',
-      statsSince: { month: 5, day: 1 }, // 1 May
       mapCenter: { lat: 45.310, lon: -72.230 }, // same point as ski: both maps cover Mont Orford
       infractions: {
         faults: {
@@ -167,7 +168,7 @@ const APP_CONFIG = {
 
   // The earliest season the admin Statistiques tab's season navigator can go back to, for every
   // activity (winter 2025-2026: when the app went live - nothing meaningful exists before it).
-  // A season (see pages/inspection-admin.html, 12 months anchored on a network's statsSince) is
+  // A season (see pages/inspection-admin.html and each network's season above) is
   // reachable only if it STARTS on or after this date; "Previous" disables itself once going back
   // one more season would start earlier than this.
   earliestSeasonStart: { year: 2025, month: 9, day: 1 },

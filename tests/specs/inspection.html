@@ -60,7 +60,7 @@
       ok('dashboard: every inspection read has a start date (no whole-collection read)', inspectionReads.length > 0 && inspectionReads.every(q => q.where.some(w => w[0] === 'date' && w[1] === '>=')), inspectionReads);
       ok('dashboard: the main trail-inspections read starts exactly at the season start', inspectionReads.some(q => q.name === 'trail_inspections' && q.where.some(w => +w[2] === seasonMs)), inspectionReads);
       ok('dashboard: shelter inspections are read only where shelters exist', inspectionReads.some(q => q.name === 'shelter_inspections') === !bike, inspectionReads.map(q => q.name));
-      ok('dashboard: the season is stated next to the map title', /saison depuis le/.test(document.getElementById('season-note').textContent), document.getElementById('season-note').textContent);
+      ok('dashboard: the season is stated next to the map title', /(Saison en cours \(depuis le|Dernière saison \()/.test(document.getElementById('season-note').textContent) && document.getElementById('season-note').textContent.includes(Network.seasonLabel(Network.seasonRange())), document.getElementById('season-note').textContent);
       if (!bike) {
         // same for a shelter marker: the shelter report with that shelter preselected
         const shelterMarker = document.querySelector('.map-marker--shelter');
@@ -227,7 +227,7 @@
     // 2.2: Historique opens on the current season; the whole history is read once, only when a period needs it
     const seasonMs = +Network.seasonStart();
     const histReads = () => (window.__queries || []).filter(q => /^(trail|shelter)_inspections$/.test(q.name));
-    ok('history: opens on the current season, and only that season is read', document.getElementById('date-filter').value === 'season' && /Saison en cours \(depuis le/.test(document.getElementById('season-option').textContent) && histReads().length > 0 && histReads().every(q => q.where.some(w => w[0] === 'date' && w[1] === '>=' && +w[2] === seasonMs)), histReads());
+    ok('history: opens on the current season, and only that season is read', document.getElementById('date-filter').value === 'season' && document.getElementById('season-option').textContent === Network.seasonLabel(Network.seasonRange()) && histReads().length > 0 && histReads().every(q => q.where.some(w => w[0] === 'date' && w[1] === '>=' && +w[2] === seasonMs)), histReads());
     const dateFilter = document.getElementById('date-filter');
     const readsBefore = histReads().length;
     dateFilter.value = 'today'; dateFilter.dispatchEvent(new Event('change')); await wait(400);
@@ -247,7 +247,9 @@
 
   if (PAGE === 'inspection-admin' && !downhill) {
     ok('statistics cover this activity\'s inspections of the shown kind (a hidden trail\'s inspections still count)', trailInspections.length === (bike ? 1 : 3) && shelterInspections.length === (bike ? 0 : 1), [trailInspections.length, shelterInspections.length]);
-    ok('season start uses the activity\'s statsSince (bike 1 May, ski 1 Sep)', seasonStart.getMonth() === (bike ? 4 : 8) && seasonStart.getDate() === 1, seasonStart);
+    ok('season start follows the activity\'s season (bike 1 May, ski 1 Nov)', seasonStart.getMonth() === (bike ? 4 : 10) && seasonStart.getDate() === 1, seasonStart);
+    const range = Network.seasonRange();
+    ok('the season ends on its last day (bike 31 Oct, ski 30 Apr)', range.end.getMonth() === (bike ? 9 : 3) && range.end.getDate() === (bike ? 31 : 30), range.end);
     ok('bike and ski share the same map centre', MAP_CENTER && MAP_CENTER.lat === 45.31 && MAP_CENTER.lon === -72.23, MAP_CENTER);
     const card = document.getElementById('stat-shelter-inspections').closest('.stat-card');
     ok('shelter statistic hidden without shelters', (card.style.display === 'none') === bike);
@@ -276,15 +278,10 @@
     const prevBtn = document.getElementById('season-prev');
     const nextBtn = document.getElementById('season-next');
     const floorDate = (() => { const e = APP_CONFIG.earliestSeasonStart; return new Date(e.year, e.month - 1, e.day); })();
-    const currentStart = () => {
-      const { statsSince } = Network.config();
-      const now = new Date();
-      const thisYear = new Date(now.getFullYear(), statsSince.month - 1, statsSince.day);
-      return thisYear <= now ? thisYear : new Date(now.getFullYear() - 1, statsSince.month - 1, statsSince.day);
-    };
+    const currentStart = () => Network.seasonRange().start;
     const startOf = offset => { const a = currentStart(); return new Date(a.getFullYear() - offset, a.getMonth(), a.getDate()); };
 
-    ok('starts on the current season: label says so, "Next" disabled (no future data)', /Saison en cours/.test(seasonLabelEl.textContent) && nextBtn.disabled === true, seasonLabelEl.textContent);
+    ok('starts on the current season: label says so, "Next" disabled (no future data)', (Network.seasonRange().active ? /Saison en cours/ : /Dernière saison/).test(seasonLabelEl.textContent) && nextBtn.disabled === true, seasonLabelEl.textContent);
     const canGoBackOnce = startOf(1) >= floorDate;
     ok('"Previous" is enabled iff a season exists on/after config.js\'s earliestSeasonStart (winter 2025-2026)', prevBtn.disabled === !canGoBackOnce, [prevBtn.disabled, canGoBackOnce, startOf(1).toISOString(), floorDate.toISOString()]);
 
@@ -297,10 +294,14 @@
       ok('"Previous" now reflects whether going back once MORE would cross the earliest reachable season', prevBtn.disabled === !canGoBackTwice, [prevBtn.disabled, canGoBackTwice]);
       nextBtn.click();
       await wait(300);
-      ok('"Next": back to the current season, "Next" disabled again', /Saison en cours/.test(seasonLabelEl.textContent) && nextBtn.disabled === true, seasonLabelEl.textContent);
+      ok('"Next": back to the current season, "Next" disabled again', (Network.seasonRange().active ? /Saison en cours/ : /Dernière saison/).test(seasonLabelEl.textContent) && nextBtn.disabled === true, seasonLabelEl.textContent);
     } else {
       ok('"Previous" click is a no-op when already at the earliest reachable season (disabled button)', prevBtn.disabled === true);
     }
+    // 3.1 wording: a past bike season is one calendar year (May-Oct), a past ski winter spans two
+    const past = seasonLabel(seasonBounds(1));
+    ok('past season label: ' + (bike ? 'bike = one year ("Saison 2025 (1 mai 2025 – 31 oct. 2025)")' : 'ski = two years ("Saison 2024-2025 (1 nov. 2024 – 30 avr. 2025)")'), bike ? /^Saison \d{4} \(/.test(past) && !/^Saison \d{4}-\d{4}/.test(past) : /^Saison \d{4}-\d{4} \(/.test(past), past);
+    ok('past season label spells out the season\'s own dates (bike May to October, ski November to April)', bike ? /mai.*oct/i.test(past) : /nov.*avr/i.test(past), past);
     ok('no script errors from repeatedly re-rendering the charts (season navigation calls renderCharts() every time)', window.__errs.length === 0, window.__errs);
   }
   document.getElementById('out').textContent = out.join('\n');

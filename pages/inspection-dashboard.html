@@ -280,11 +280,11 @@
         const shelterIds = new Set(allShelters.map(s => s.id));
 
         // Inspections: only the current season is read (not the whole history of every activity),
-        // the same rule for ski and bike (Network.seasonStart). A trail not inspected since the
-        // season started shows as "not inspected" until its first inspection of the season.
+        // the same rule for ski (1 Nov - 30 Apr) and bike (1 May - 31 Oct), see Network.seasonRange.
+        // Out of season it is the season that just ended. A trail not inspected since that season
+        // started shows as "not inspected" until its first inspection.
         const seasonStart = firebase.firestore.Timestamp.fromDate(Network.seasonStart());
-        document.getElementById('season-note').textContent =
-          `· saison depuis le ${Network.seasonStart().toLocaleDateString('fr-CA', { day: 'numeric', month: 'short', year: 'numeric' })}`;
+        document.getElementById('season-note').textContent = `· ${Network.seasonLabel(Network.seasonRange())}`;
 
         // Load trail inspections (most recent per trail)
         const trailInspSnap = await db.collection('trail_inspections').where('date', '>=', seasonStart).orderBy('date', 'desc').get();

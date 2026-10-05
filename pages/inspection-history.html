@@ -134,7 +134,7 @@
           <div class="form-group">
             <label class="form-label" for="date-filter">Période</label>
             <select class="form-select" id="date-filter">
-              <option value="season" id="season-option">Saison en cours</option>
+              <option value="season" id="season-option">Saison en cours</option><!-- label filled with the dates -->
               <option value="all">Toutes les saisons</option>
               <option value="today">Aujourd'hui</option>
               <option value="week">7 derniers jours</option>
@@ -329,8 +329,7 @@
       loadedFullHistory = full;
       const since = full ? null : firebase.firestore.Timestamp.fromDate(Network.seasonStart());
       const readInspections = name => (since ? db.collection(name).where('date', '>=', since).orderBy('date', 'desc') : db.collection(name)).get();
-      document.getElementById('season-option').textContent =
-        `Saison en cours (depuis le ${Network.seasonStart().toLocaleDateString('fr-CA', { day: 'numeric', month: 'short', year: 'numeric' })})`;
+      document.getElementById('season-option').textContent = Network.seasonLabel(Network.seasonRange());
       try {
         // Load trails (this activity's only, of the kind currently shown - kind.js + header switcher)
         const trailsSnap = await db.collection('trails').get();

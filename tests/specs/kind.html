@@ -71,12 +71,24 @@
     const s = Network.seasonStart();
     return [s.getFullYear(), s.getMonth() + 1, s.getDate()].join('-');
   };
-  ok('seasonStart, ski, on 4 Oct 2026: 1 Sept 2026', startOf('ski', 2026, 10, 4) === '2026-9-1', startOf('ski', 2026, 10, 4));
-  ok('seasonStart, ski, on 10 Feb 2026: 1 Sept 2025 (the season is still the previous winter)', startOf('ski', 2026, 2, 10) === '2025-9-1', startOf('ski', 2026, 2, 10));
-  ok('seasonStart, ski, exactly on 1 Sept: that very day', startOf('ski', 2026, 9, 1) === '2026-9-1', startOf('ski', 2026, 9, 1));
-  ok('seasonStart, bike, on 4 Oct 2026: 1 May 2026', startOf('bike', 2026, 10, 4) === '2026-5-1', startOf('bike', 2026, 10, 4));
-  ok('seasonStart, bike, on 10 Feb 2026: 1 May 2025', startOf('bike', 2026, 2, 10) === '2025-5-1', startOf('bike', 2026, 2, 10));
-
+  ok('seasonStart, ski, on 4 Oct 2026 (out of season): the winter that just ended started 1 Nov 2025', startOf('ski', 2026, 10, 4) === '2025-11-1', startOf('ski', 2026, 10, 4));
+  ok('seasonStart, ski, on 10 Feb 2026 (in season): 1 Nov 2025', startOf('ski', 2026, 2, 10) === '2025-11-1', startOf('ski', 2026, 2, 10));
+  ok('seasonStart, ski, exactly on 1 Nov: that very day', startOf('ski', 2026, 11, 1) === '2026-11-1', startOf('ski', 2026, 11, 1));
+  ok('seasonStart, ski, on 31 Oct: still the previous winter', startOf('ski', 2026, 10, 31) === '2025-11-1', startOf('ski', 2026, 10, 31));
+  ok('seasonStart, bike, on 4 Oct 2026 (in season): 1 May 2026', startOf('bike', 2026, 10, 4) === '2026-5-1', startOf('bike', 2026, 10, 4));
+  ok('seasonStart, bike, on 10 Feb 2026 (out of season): the summer that just ended started 1 May 2025', startOf('bike', 2026, 2, 10) === '2025-5-1', startOf('bike', 2026, 2, 10));
+  const rangeOf = (net, y, m, d) => { startOf(net, y, m, d); const r = Network.seasonRange(); const f = x => [x.getFullYear(), x.getMonth() + 1, x.getDate()].join('-'); return [f(r.start), f(r.end), r.active].join(' '); };
+  ok('seasonRange, ski in season: 1 Nov -> 30 Apr (runs over New Year), active', rangeOf('ski', 2026, 2, 10) === '2025-11-1 2026-4-30 true', rangeOf('ski', 2026, 2, 10));
+  ok('seasonRange, ski out of season: the ended winter, not active', rangeOf('ski', 2026, 7, 15) === '2025-11-1 2026-4-30 false', rangeOf('ski', 2026, 7, 15));
+  ok('seasonRange, ski, last day 30 Apr is still in season, 1 May is not', rangeOf('ski', 2026, 4, 30) === '2025-11-1 2026-4-30 true' && rangeOf('ski', 2026, 5, 1) === '2025-11-1 2026-4-30 false', [rangeOf('ski', 2026, 4, 30), rangeOf('ski', 2026, 5, 1)]);
+  ok('seasonRange, bike in season: 1 May -> 31 Oct, active; on 31 Oct still active, 1 Nov not', rangeOf('bike', 2026, 7, 1) === '2026-5-1 2026-10-31 true' && rangeOf('bike', 2026, 10, 31) === '2026-5-1 2026-10-31 true' && rangeOf('bike', 2026, 11, 1) === '2026-5-1 2026-10-31 false', [rangeOf('bike', 2026, 7, 1), rangeOf('bike', 2026, 10, 31), rangeOf('bike', 2026, 11, 1)]);
+  ok('seasonRange/seasonStart of another activity by id (the export uses it)', Network.seasonStart('bike').getMonth() === 4 && Network.seasonStart('ski').getMonth() === 10);
+  // the two seasons share the year with no gap and no overlap: which activity opens by default
+  const dflt = (y, m, d) => Network.ofSeason(new Date(y, m - 1, d));
+  ok('ofSeason: ski from 1 Nov to 30 Apr, bike from 1 May to 31 Oct (no gap, no overlap)', ['2026-10-31:bike', '2026-11-1:ski', '2026-12-25:ski', '2027-1-1:ski', '2027-4-30:ski', '2027-5-1:bike', '2027-8-15:bike'].every(s => { const [d, n] = s.split(':'); const [y, m, dd] = d.split('-').map(Number); return dflt(y, m, dd) === n; }));
+  ok('config: no old season fields left (statsSince, seasonMonths)', !JSON.stringify(APP_CONFIG.networks).match(/statsSince|seasonMonths/));
+  const label = (net, y, m, d) => { startOf(net, y, m, d); return Network.seasonLabel(Network.seasonRange()); };
+  ok('seasonLabel: running season says "en cours", an ended one says "Dernière saison" with both dates', /^Saison en cours \(depuis le /.test(label('ski', 2026, 2, 10)) && /^Dernière saison \(.* – /.test(label('ski', 2026, 7, 15)), [label('ski', 2026, 2, 10), label('ski', 2026, 7, 15)]);
   document.getElementById('out').textContent = out.join('\n');
 })();
 </script>

@@ -1682,13 +1682,15 @@
     // DATA EXPORT
     // ========================================
 
+    // The export starts, by default, at the start of the latest season of the chosen activity
+    // (ski 1 Nov, bike 1 May); for "all activities", at the earliest of them. Editable.
     function initializeExportDate() {
-      const today = new Date();
-      let year = today.getFullYear();
-      if (today.getMonth() < 8) year--;
-      document.getElementById('export-start-date').value = new Date(year, 8, 1).toISOString().split('T')[0];
+      const chosen = document.getElementById('export-network').value;
+      const starts = (chosen ? [chosen] : NETWORK_IDS).map(id => Network.seasonStart(id));
+      const start = new Date(Math.min(...starts.map(d => d.getTime())));
+      const pad = n => String(n).padStart(2, '0');
+      document.getElementById('export-start-date').value = `${start.getFullYear()}-${pad(start.getMonth() + 1)}-${pad(start.getDate())}`;
     }
-
     function showExportStatus(message, type = 'info') {
       const el = document.getElementById('export-status');
       el.textContent = message;
@@ -2213,6 +2215,7 @@ Marie Tremblay,marie.tremblay@example.com,MotDePasse456,admin,,true,true,true,fa
 
           loadUsers();
           initializeExportDate();
+          document.getElementById('export-network').addEventListener('change', initializeExportDate);
           document.getElementById('search-users').addEventListener('input', debounce(filterAndRenderUsers, 300));
           document.getElementById('filter-status').addEventListener('change', filterAndRenderUsers);
           document.getElementById('filter-network').addEventListener('change', filterAndRenderUsers);

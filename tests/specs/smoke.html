@@ -51,6 +51,12 @@
     }
     if (sys) {
       // Données: the Entretien logs are exported too (JSON keeps the logs; CSV has one row per work entry)
+      // the export starts at the start of the activity's latest season (ski 1 Nov, bike 1 May); "all" = the earliest
+      const ymd = d => [d.getFullYear(), String(d.getMonth() + 1).padStart(2, '0'), String(d.getDate()).padStart(2, '0')].join('-');
+      const netSel = document.getElementById('export-network'), startInput = document.getElementById('export-start-date');
+      const pick = v => { netSel.value = v; netSel.dispatchEvent(new Event('change')); return startInput.value; };
+      ok('export: start date = start of the latest season (all activities: the earliest; ski: 1 Nov; bike: 1 May)', pick('') === ymd(new Date(Math.min(+Network.seasonStart('ski'), +Network.seasonStart('bike')))) && pick('ski') === ymd(Network.seasonStart('ski')) && pick('bike') === ymd(Network.seasonStart('bike')) && /-11-01$/.test(pick('ski')) && /-05-01$/.test(pick('bike')), [pick(''), pick('ski'), pick('bike')]);
+      pick('');
       const files = {}; downloadFile = (content, name) => { files[name] = content; };
       ['trail-inspections', 'shelter-inspections', 'infractions', 'signalisations'].forEach(id => { document.getElementById('export-' + id).checked = false; });
       document.getElementById('export-start-date').value = '2020-01-01';
