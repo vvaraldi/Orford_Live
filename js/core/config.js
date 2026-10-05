@@ -153,9 +153,12 @@ const APP_CONFIG = {
       publicTitle: 'État des sentiers de vélo de montagne',
       statsSince: { month: 5, day: 1 }, // 1 May
       mapCenter: { lat: 45.310, lon: -72.230 }, // same point as ski: both maps cover Mont Orford
-      // TO COMPLETE: the bike fault types and practices (placeholders for now)
       infractions: {
-        faults: { 'autres': 'Autres (voir commentaire)' },
+        faults: {
+          'acces-non-accredite': 'Utilise une piste sans droit d\'accès accrédité',
+          'deterioration': 'Détériore les pistes / signalisation',
+          'autres': 'Autre (voir commentaires)'
+        },
         practices: { 'velo': 'Vélo', 'autres': 'Autres' }
       }
     }

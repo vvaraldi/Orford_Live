@@ -66,10 +66,12 @@
   });
   let auto = 0;
   function query(name) {
+    const clauses = [];   // the where() clauses of this query, logged in window.__queries (the mock itself never filters)
     const api = {
-      where: () => api, orderBy: () => api, limit: () => api,
+      where: (field, op, value) => { clauses.push([field, op, value]); return api; }, orderBy: () => api, limit: () => api,
       get: async () => {
         window.__reads = (window.__reads || []).concat(name);
+        window.__queries = (window.__queries || []).concat([{ name, where: clauses.slice() }]);
         if (name === 'sectors' && Q.get('sectorsFail') === '1') throw new Error('permission-denied');
         const snap = snapOf(window.__data[name] || []); snap.docs.forEach(d => { d.ref.__name = name; }); return snap;
       },

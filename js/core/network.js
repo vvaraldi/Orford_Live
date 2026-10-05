@@ -95,6 +95,19 @@ const Network = (function () {
   const matches = doc => of(doc) === currentId;
   const filter = docs => docs.filter(matches);
 
+  /**
+   * Start of the current season of the current activity: the latest occurrence of its
+   * `statsSince` (config.js: ski 1 September, bike 1 May) that has already been reached.
+   * The same rule for every activity. Pages that would otherwise read a whole collection
+   * (dashboard, history) only read from here on; the statistics page navigates by season.
+   */
+  function seasonStart() {
+    const since = (config() && config().statsSince) || { month: 1, day: 1 };
+    const now = api.now();
+    const thisYear = new Date(now.getFullYear(), since.month - 1, since.day);
+    return thisYear <= now ? thisYear : new Date(now.getFullYear() - 1, since.month - 1, since.day);
+  }
+
   /** A path from the site root ("assets/map/Ski-Touring_Map.png") as a URL valid from the current page. */
   function url(path) {
     return siteUrl(path); // config.js: independent of where the site is hosted
@@ -103,7 +116,7 @@ const Network = (function () {
   const api = {
     ids, ofSeason, setUser, usePublic, set,
     current, config, feature,
-    of, matches, filter, url,
+    of, matches, filter, url, seasonStart,
     // Replaceable in tests
     now: () => new Date(),
     reload: () => window.location.reload()

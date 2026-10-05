@@ -318,12 +318,9 @@
     }
 
     // The start of the CURRENT (offset 0) season: this year's statsSince if already reached,
-    // else last year's.
+    // else last year's (the shared rule, network.js).
     function currentSeasonStart() {
-      const { statsSince } = Network.config();
-      const now = new Date();
-      const thisYear = new Date(now.getFullYear(), statsSince.month - 1, statsSince.day);
-      return thisYear <= now ? thisYear : new Date(now.getFullYear() - 1, statsSince.month - 1, statsSince.day);
+      return Network.seasonStart();
     }
 
     function seasonBounds(offset) {

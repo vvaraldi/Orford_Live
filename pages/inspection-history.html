@@ -134,7 +134,8 @@
           <div class="form-group">
             <label class="form-label" for="date-filter">Période</label>
             <select class="form-select" id="date-filter">
-              <option value="all">Toutes les dates</option>
+              <option value="season" id="season-option">Saison en cours</option>
+              <option value="all">Toutes les saisons</option>
               <option value="today">Aujourd'hui</option>
               <option value="week">7 derniers jours</option>
               <option value="month">30 derniers jours</option>
@@ -297,8 +298,8 @@
       document.getElementById('location-filter').addEventListener('change', applyFilters);
       document.getElementById('inspector-filter').addEventListener('change', applyFilters);
       document.getElementById('search-input').addEventListener('input', debounce(applyFilters, 300));
-      document.getElementById('start-date').addEventListener('change', applyFilters);
-      document.getElementById('end-date').addEventListener('change', applyFilters);
+      document.getElementById('start-date').addEventListener('change', filterWithHistory);
+      document.getElementById('end-date').addEventListener('change', filterWithHistory);
       document.getElementById('reset-filters').addEventListener('click', resetFilters);
       document.getElementById('apply-filters').addEventListener('click', applyFilters);
       document.getElementById('page-size').addEventListener('change', e => { pageSize = parseInt(e.target.value); currentPage = 1; updateDisplay(); });
@@ -320,7 +321,16 @@
       return (...args) => { clearTimeout(timer); timer = setTimeout(() => fn(...args), delay); };
     }
 
-    async function loadAllData() {
+    // Only the current season is read at first (Network.seasonStart, same rule for ski and bike); the
+    // whole history is read once, the first time a period needing it is chosen (see historyNeedsFull).
+    let loadedFullHistory = false;
+
+    async function loadAllData(full = false) {
+      loadedFullHistory = full;
+      const since = full ? null : firebase.firestore.Timestamp.fromDate(Network.seasonStart());
+      const readInspections = name => (since ? db.collection(name).where('date', '>=', since).orderBy('date', 'desc') : db.collection(name)).get();
+      document.getElementById('season-option').textContent =
+        `Saison en cours (depuis le ${Network.seasonStart().toLocaleDateString('fr-CA', { day: 'numeric', month: 'short', year: 'numeric' })})`;
       try {
         // Load trails (this activity's only, of the kind currently shown - kind.js + header switcher)
         const trailsSnap = await db.collection('trails').get();
@@ -342,7 +352,7 @@
         inspSnap.forEach(doc => inspectors.set(doc.id, doc.data().name));
 
         // Load trail inspections
-        const trailInspSnap = await db.collection('trail_inspections').get();
+        const trailInspSnap = await readInspections('trail_inspections');
         const trailInsp = trailInspSnap.docs.filter(doc => trails.has(doc.data().trail_id)).map(doc => { // this activity's trails only
           const d = doc.data();
           const trail = trails.get(d.trail_id);
@@ -367,7 +377,7 @@
         });
 
         // Load shelter inspections
-        const shelterInspDocs = shelters.size ? (await db.collection('shelter_inspections').get()).docs : [];
+        const shelterInspDocs = shelters.size ? (await readInspections('shelter_inspections')).docs : [];
         const shelterInsp = shelterInspDocs.filter(doc => shelters.has(doc.data().shelter_id)).map(doc => { // this activity's shelters only
           const d = doc.data();
           const shelter = shelters.get(d.shelter_id);
@@ -410,11 +420,13 @@
 
       // Inspector filter
       const inspectorFilter = document.getElementById('inspector-filter');
+      const chosenInspector = inspectorFilter.value;
       const uniqueInspectors = [...new Set(allInspections.map(i => i.inspector))].filter(Boolean).sort();
       inspectorFilter.innerHTML = '<option value="all">Tous les inspecteurs</option>';
       uniqueInspectors.forEach(name => {
         inspectorFilter.innerHTML += `<option value="${escapeHtml(name)}">${escapeHtml(name)}</option>`;
       });
+      if ([...inspectorFilter.options].some(o => o.value === chosenInspector)) inspectorFilter.value = chosenInspector;
     }
 
     function updateLocationFilter() {
@@ -445,11 +457,31 @@
     function handleDateFilterChange() {
       const value = document.getElementById('date-filter').value;
       document.getElementById('custom-date-range').classList.toggle('show', value === 'custom');
-      applyFilters();
+      filterWithHistory();
+    }
+
+    // Does the chosen period reach back before the current season, which is all that is loaded at first?
+    function historyNeedsFull() {
+      const value = document.getElementById('date-filter').value;
+      const seasonStart = Network.seasonStart();
+      if (value === 'all') return true;
+      if (value === 'month') return new Date(new Date().getFullYear(), new Date().getMonth() - 1, new Date().getDate()) < seasonStart;
+      if (value === 'week') return new Date(Date.now() - 7 * 24 * 60 * 60 * 1000) < seasonStart;
+      if (value === 'custom') {
+        const start = document.getElementById('start-date').value;
+        return !start || new Date(start) < seasonStart;
+      }
+      return false; // season, today
+    }
+
+    // Apply the filters, reading the full history first (once) when the period needs it
+    async function filterWithHistory() {
+      if (historyNeedsFull() && !loadedFullHistory) await loadAllData(true); // ends with applyFilters()
+      else applyFilters();
     }
 
     function resetFilters() {
-      document.getElementById('date-filter').value = 'all';
+      document.getElementById('date-filter').value = 'season';
       document.getElementById('type-filter').value = 'all';
       document.getElementById('location-filter').value = 'all';
       document.getElementById('inspector-filter').value = 'all';
@@ -485,6 +517,8 @@
         const now = new Date();
         if (dateFilter === 'today') {
           if (!isSameDay(inspDate, now)) return false;
+        } else if (dateFilter === 'season') {
+          if (inspDate < Network.seasonStart()) return false;
         } else if (dateFilter === 'week') {
           const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
           if (inspDate < weekAgo) return false;

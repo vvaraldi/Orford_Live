@@ -62,6 +62,21 @@
   const saved = JSON.parse(localStorage.getItem('orford-kind') || 'null');
   ok('set(): a valid different kind is persisted (tied to the network) and reloads', reloads === 1 && saved && saved.network === 'ski' && saved.kind === 'downhill', [reloads, saved]);
 
+  // ---- Network.seasonStart: one rule for every activity (statsSince: ski 1 Sept, bike 1 May) ----
+  const startOf = (net, y, m, d) => {
+    Network.now = () => new Date(y, m - 1, d);
+    clear();
+    localStorage.setItem('orford-network', J({ id: net, season: Network.ofSeason() }));
+    asSystemAdmin();
+    const s = Network.seasonStart();
+    return [s.getFullYear(), s.getMonth() + 1, s.getDate()].join('-');
+  };
+  ok('seasonStart, ski, on 4 Oct 2026: 1 Sept 2026', startOf('ski', 2026, 10, 4) === '2026-9-1', startOf('ski', 2026, 10, 4));
+  ok('seasonStart, ski, on 10 Feb 2026: 1 Sept 2025 (the season is still the previous winter)', startOf('ski', 2026, 2, 10) === '2025-9-1', startOf('ski', 2026, 2, 10));
+  ok('seasonStart, ski, exactly on 1 Sept: that very day', startOf('ski', 2026, 9, 1) === '2026-9-1', startOf('ski', 2026, 9, 1));
+  ok('seasonStart, bike, on 4 Oct 2026: 1 May 2026', startOf('bike', 2026, 10, 4) === '2026-5-1', startOf('bike', 2026, 10, 4));
+  ok('seasonStart, bike, on 10 Feb 2026: 1 May 2025', startOf('bike', 2026, 2, 10) === '2025-5-1', startOf('bike', 2026, 2, 10));
+
   document.getElementById('out').textContent = out.join('\n');
 })();
 </script>

@@ -14,7 +14,7 @@
 
   if (PAGE === 'infraction-report') {
     ok('sectors of this activity only', J(opts(sectorSelect)) === J(bike ? ['', 'sentiers-velo'] : SKI_SECTORS), opts(sectorSelect));
-    ok('fault types come from this activity\'s config', J(opts(faultSelect)) === J(bike ? ['', 'autres'] : ['', 'downhill', 'saut-dangereux', 'ski-hors-piste', 'ski-piste-fermee', 'saut-des-chaises', 'manoeuvre-dangereuse', 'autres']), opts(faultSelect));
+    ok('fault types come from this activity\'s config', J(opts(faultSelect)) === J(bike ? ['', 'acces-non-accredite', 'deterioration', 'autres'] : ['', 'downhill', 'saut-dangereux', 'ski-hors-piste', 'ski-piste-fermee', 'saut-des-chaises', 'manoeuvre-dangereuse', 'autres']), opts(faultSelect));
     ok('practices come from this activity\'s config', J(opts(practiceSelect)) === J(bike ? ['', 'velo', 'autres'] : ['', 'ski', 'snowboard', 'raquette', 'autres']), opts(practiceSelect));
     const mine = opts(reportSelector).filter(v => v !== 'new');
     ok('past reports of this activity only (legacy = ski)', J(mine.sort()) === J(bike ? ['INFB'] : ['INF1', 'INF2', 'INF3', 'INF4']), mine);
@@ -103,7 +103,7 @@
     const ids = [...document.querySelectorAll('#infractions-tbody tr[data-id]')].map(r => r.dataset.id).sort();
     ok('lists this activity\'s infractions only (old and new format together)', J(ids) === J(bike ? ['INFB'] : ['INF1', 'INF2', 'INF3', 'INF4']), ids);
     if (bike) {
-      ok('bike labels: fault shown from the bike config', document.querySelector('#infractions-tbody tr[data-id=INFB]').textContent.includes('Autres (voir commentaire)'), document.querySelector('#infractions-tbody tr[data-id=INFB]').textContent);
+      ok('bike labels: fault shown from the bike config', document.querySelector('#infractions-tbody tr[data-id=INFB]').textContent.includes('Autre (voir commentaires)'), document.querySelector('#infractions-tbody tr[data-id=INFB]').textContent);
     } else {
       ok('ski fault label shown', [...document.querySelectorAll('#infractions-tbody tr')].some(r => r.textContent.includes('Saut dangereux')));
       const text = id => document.querySelector(`#infractions-tbody tr[data-id=${id}]`).textContent;

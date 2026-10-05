@@ -54,6 +54,13 @@
       ok('Inspection view: the hint speaks of trails' + (bike ? '' : ' and shelters'), !document.getElementById('map-hint').hidden && /un sentier/.test(document.getElementById('map-hint').textContent) && /ou un abri/.test(document.getElementById('map-hint').textContent) === !bike, document.getElementById('map-hint').textContent);
       ok('right-click on a trail of unknown status: the trail only, the status is left to the form', reportUrlForTrail({ id: 'x' }, true) === 'inspection-trail-report.html?trail=x', reportUrlForTrail({ id: 'x' }, true));
       ok('the old quick-toggle context menu is gone', !document.getElementById('context-menu') && typeof setTrailStatus === 'undefined');
+      // 2.2: the dashboard reads the current season, never a whole inspection collection
+      const seasonMs = +Network.seasonStart();
+      const inspectionReads = (window.__queries || []).filter(q => /^(trail|shelter)_inspections$/.test(q.name));
+      ok('dashboard: every inspection read has a start date (no whole-collection read)', inspectionReads.length > 0 && inspectionReads.every(q => q.where.some(w => w[0] === 'date' && w[1] === '>=')), inspectionReads);
+      ok('dashboard: the main trail-inspections read starts exactly at the season start', inspectionReads.some(q => q.name === 'trail_inspections' && q.where.some(w => +w[2] === seasonMs)), inspectionReads);
+      ok('dashboard: shelter inspections are read only where shelters exist', inspectionReads.some(q => q.name === 'shelter_inspections') === !bike, inspectionReads.map(q => q.name));
+      ok('dashboard: the season is stated next to the map title', /saison depuis le/.test(document.getElementById('season-note').textContent), document.getElementById('season-note').textContent);
       if (!bike) {
         // same for a shelter marker: the shelter report with that shelter preselected
         const shelterMarker = document.querySelector('.map-marker--shelter');
@@ -217,6 +224,19 @@
 
   if (PAGE === 'inspection-history' && !downhill) {
     ok('history lists this activity\'s inspections of the shown kind, INCLUDING the one on a hidden trail (history is kept)', allInspections.length === (bike ? 1 : 4) && (bike || allInspections.some(i => i.id === 'IA1' && i.location === 'Ancien sentier')), allInspections.map(i => i.id + ':' + i.location));
+    // 2.2: Historique opens on the current season; the whole history is read once, only when a period needs it
+    const seasonMs = +Network.seasonStart();
+    const histReads = () => (window.__queries || []).filter(q => /^(trail|shelter)_inspections$/.test(q.name));
+    ok('history: opens on the current season, and only that season is read', document.getElementById('date-filter').value === 'season' && /Saison en cours \(depuis le/.test(document.getElementById('season-option').textContent) && histReads().length > 0 && histReads().every(q => q.where.some(w => w[0] === 'date' && w[1] === '>=' && +w[2] === seasonMs)), histReads());
+    const dateFilter = document.getElementById('date-filter');
+    const readsBefore = histReads().length;
+    dateFilter.value = 'today'; dateFilter.dispatchEvent(new Event('change')); await wait(400);
+    ok('history: a period inside the season (today) reads nothing more', histReads().length === readsBefore, [histReads().length, readsBefore]);
+    dateFilter.value = 'all'; dateFilter.dispatchEvent(new Event('change')); await wait(600);
+    ok('history: "Toutes les saisons" reads the whole history, once', histReads().slice(readsBefore).some(q => q.name === 'trail_inspections' && q.where.length === 0) && allInspections.length === (bike ? 1 : 4), histReads().slice(readsBefore));
+    const readsAfterAll = histReads().length;
+    dateFilter.value = 'month'; dateFilter.dispatchEvent(new Event('change')); await wait(400);
+    ok('history: once the full history is loaded, other periods do not read again', histReads().length === readsAfterAll, [histReads().length, readsAfterAll]);
     ok('type filter has "shelter" only where shelters exist', (opts(document.getElementById('type-filter')).includes('shelter')) === !bike, opts(document.getElementById('type-filter')));
   }
 
