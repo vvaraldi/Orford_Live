@@ -262,6 +262,7 @@
     let sortDirection = 'desc';
     let filtersVisible = true;
     let isAdmin = false;
+    let isSystemAdmin = false; // deleting an inspection is reserved to the system admin
 
     // Elements
     const tableBody = document.getElementById('inspections-table');
@@ -281,6 +282,7 @@
         requiredPermission: 'allowInspection',
         onAuthenticated: async (userData) => {
           isAdmin = userData.role === 'admin' || userData.role === 'system_admin';
+          isSystemAdmin = userData.role === 'system_admin';
           // Show admin nav links if user is admin
           if (isAdmin) {
             document.querySelectorAll('.nav__link--admin, .mobile-nav__link--admin').forEach(el => el.style.display = '');
@@ -611,7 +613,7 @@
           <td>${escapeHtml(insp.inspector || 'Inconnu')}</td>
           <td>${conditionBadge}</td>
           <td><span class="badge badge-secondary">📷 ${photoCount}</span></td>
-          <td><div class="action-btns"><button class="btn btn-sm btn-primary" onclick="viewDetails('${insp.id}')" title="Voir détails">👁️</button>${isAdmin ? `<button class="btn btn-sm btn-danger" onclick="deleteInspection('${insp.id}', event)" title="Supprimer">🗑️</button>` : ''}</div></td>
+          <td><div class="action-btns"><button class="btn btn-sm btn-primary" onclick="viewDetails('${insp.id}')" title="Voir détails">👁️</button>${isSystemAdmin ? `<button class="btn btn-sm btn-danger" onclick="deleteInspection('${insp.id}', event)" title="Supprimer">🗑️</button>` : ''}</div></td>
         </tr>`;
       }).join('');
 
@@ -774,8 +776,8 @@
         return;
       }
       
-      if (!isAdmin) {
-        console.log('Not admin, aborting');
+      if (!isSystemAdmin) {
+        console.log('Not system admin, aborting');
         return;
       }
       

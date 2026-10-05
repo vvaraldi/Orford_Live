@@ -92,7 +92,8 @@ service cloud.firestore {
       allow read: if true;
       allow create: if canWorkIn(recordNetwork(request.resource.data));
       allow update: if canWorkIn(recordNetwork(resource.data)) && sameNetwork();
-      allow delete: if isAdmin() && canWorkIn(recordNetwork(resource.data));
+      // Deleting a record is reserved to the system admin (admins archive / correct instead)
+      allow delete: if isSystemAdmin();
     }
 
     match /trail_inspections/{document} {
@@ -102,7 +103,8 @@ service cloud.firestore {
       allow update: if request.auth != null &&
           (request.auth.uid == resource.data.inspector_id || isAdmin()) &&
           canWorkIn(recordNetwork(resource.data)) && sameNetwork();
-      allow delete: if isAdmin() && canWorkIn(recordNetwork(resource.data));
+      // Deleting a record is reserved to the system admin (admins archive / correct instead)
+      allow delete: if isSystemAdmin();
     }
 
     match /shelter_inspections/{document} {
@@ -112,7 +114,8 @@ service cloud.firestore {
       allow update: if request.auth != null &&
           (request.auth.uid == resource.data.inspector_id || isAdmin()) &&
           canWorkIn(recordNetwork(resource.data)) && sameNetwork();
-      allow delete: if isAdmin() && canWorkIn(recordNetwork(resource.data));
+      // Deleting a record is reserved to the system admin (admins archive / correct instead)
+      allow delete: if isSystemAdmin();
     }
     
     // PROTECTED ACCESS
@@ -174,7 +177,8 @@ service cloud.firestore {
       allow update: if request.auth != null &&
           (request.auth.uid == resource.data.patrolId || isAdmin()) &&
           canWorkIn(recordNetwork(resource.data)) && sameNetwork();
-      allow delete: if isAdmin() && canWorkIn(recordNetwork(resource.data));
+      // Deleting a record is reserved to the system admin (admins archive / correct instead)
+      allow delete: if isSystemAdmin();
     }
     
     // SIGNALISATIONS
@@ -186,7 +190,8 @@ service cloud.firestore {
       allow update: if request.auth != null &&
           (request.auth.uid == resource.data.inspectorId || isAdmin()) &&
           canWorkIn(recordNetwork(resource.data)) && sameNetwork();
-      allow delete: if isAdmin() && canWorkIn(recordNetwork(resource.data));
+      // Deleting a record is reserved to the system admin (admins archive / correct instead)
+      allow delete: if isSystemAdmin();
     }
     
     // MAINTENANCE LOGS: a trail builder's own daily work log (bike network). One doc per
@@ -202,7 +207,8 @@ service cloud.firestore {
       allow update: if request.auth != null &&
           (request.auth.uid == resource.data.builderId || isAdmin()) &&
           canWorkIn(recordNetwork(resource.data)) && sameNetwork();
-      allow delete: if isAdmin() && canWorkIn(recordNetwork(resource.data));
+      // Deleting a record is reserved to the system admin (admins archive / correct instead)
+      allow delete: if isSystemAdmin();
     }
 
     // VOLUNTEERS: self-registration from the standalone QR page (maintenance-volunteer-register.html).
@@ -262,9 +268,9 @@ service firebase.storage {
                             request.resource.size < 15 * 1024 * 1024 &&
                             request.resource.contentType.matches('image/.*');
 
-      // Admin only: matches record deletion (inspection-history, inspection-admin orphan cleaner)
+      // System admin only: matches record deletion (inspection-history, inspection-admin orphan cleaner)
       allow delete: if request.auth != null &&
-                    firestore.get(/databases/(default)/documents/inspectors/$(request.auth.uid)).data.role in ['admin', 'system_admin'];
+                    firestore.get(/databases/(default)/documents/inspectors/$(request.auth.uid)).data.role == 'system_admin';
     }
 
     // Inspectors can delete files in their own folder: removing a photo while

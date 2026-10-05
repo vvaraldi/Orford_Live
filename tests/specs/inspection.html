@@ -23,7 +23,7 @@
     const saved = JSON.parse(localStorage.getItem('orford-network') || 'null');
     ok('clicking the switcher stores the other activity and reloads', window.__reloads === 1 && saved && saved.id === (bike ? 'ski' : 'bike'), [window.__reloads, saved]);
   } else {
-    ok('switcher hidden for a single-activity user', sw && sw.hidden === true);
+    if (Q.get('as') !== 'system') ok('switcher hidden for a single-activity user', sw && sw.hidden === true); // a system admin has every activity
   }
   const shelterLink = document.querySelector('.nav [data-requires="shelters"]');
   if (shelterLink) ok('shelter nav link follows the activity', (shelterLink.style.display === 'none') === bike, shelterLink.style.display);
@@ -224,6 +224,9 @@
 
   if (PAGE === 'inspection-history' && !downhill) {
     ok('history lists this activity\'s inspections of the shown kind, INCLUDING the one on a hidden trail (history is kept)', allInspections.length === (bike ? 1 : 4) && (bike || allInspections.some(i => i.id === 'IA1' && i.location === 'Ancien sentier')), allInspections.map(i => i.id + ':' + i.location));
+    // Deleting an inspection is reserved to the system admin (the Firestore rules say the same)
+    const deleteButtons = document.querySelectorAll('button[onclick^="deleteInspection"]').length;
+    ok(Q.get('as') === 'system' ? 'system admin: the inspections have the delete button' : 'admin / inspector: no delete button on any row', Q.get('as') === 'system' ? deleteButtons > 0 : deleteButtons === 0, deleteButtons);
     // 2.2: Historique opens on the current season; the whole history is read once, only when a period needs it
     const seasonMs = +Network.seasonStart();
     const histReads = () => (window.__queries || []).filter(q => /^(trail|shelter)_inspections$/.test(q.name));
