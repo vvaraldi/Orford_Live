@@ -19,12 +19,15 @@ positions, editing README.md, testing as a real user, etc.).
 | 2026-09-28 | 2026-09-28 19:47 → 23:39 (~3h53m, one continuous evening block; an ~11.4h gap before it separates it from a 1-2min morning check-in, not counted) | ~1h47m | ~2h09m |
 | 2026-09-29 | 2026-09-29 20:41 → 22:39 (~1h58m, one continuous evening block) | ~1h04m | ~1h34m |
 | 2026-10-02 | 2026-10-02 21:33 → 2026-10-03 00:02 (~2h29m, one continuous evening block running past midnight; a single stray event at 03:30 the same day is not counted) | ~1h22m | ~2h02m |
+| 2026-10-03 | 2026-10-03 00:02 → 00:03 (the last minute of the 2026-10-02 block) | ~1m | ~1m |
+| 2026-10-04 (afternoon) | 2026-10-04 18:07 → 18:29 (~22min) | ~14m | ~22m |
+| 2026-10-04 (evening) | 2026-10-04 21:08 → 23:48 (~2h40m, one continuous block, up to the moment of this estimate) | ~1h30m | ~2h25m |
 
 **Manual addition (not from chat timestamps):** +2h00m - customer/team meetings, morning of 2026-09-28 (before the day's chat activity started; per the Method note above, offline time isn't normally included, but you asked for this one to be logged).
 
-**Running total (active chat time + the meeting addition, all estimates so far): ~14h00m - 17h05m**
+**Running total (active chat time + the meeting addition, all estimates so far): ~15h45m - 19h55m**
 
-**Note:** the 2026-10-02 row is computed up to 2026-10-03 00:02, when this estimate was made; the
+**Note:** the 2026-10-04 (evening) row is computed up to 23:48, when this estimate was made; the
 session may have continued after that, and any further time will need a new row. 2026-09-23 (the
 Firebase backup/export session, ~5 min of chat) was missing from earlier estimates and is now
 included. Nothing was logged in the transcript on 2026-09-24 to 2026-09-27, 2026-09-30 or 2026-10-01.
@@ -69,6 +72,15 @@ to the system admin, Sentiers opening on the portal's activity, Import moved int
 CSV template checked against the user profile, Entretien added to the data export), making every link
 independent of where the site is hosted (`siteUrl()` plus a hosting test suite), and the unused-code
 audit and cleanup (dead functions, config blocks, CSS and `modal.css`).
+The 2026-10-03 / 2026-10-04 rows cover: the bike infraction fault list, limiting what the dashboard and
+Historique read to the current season, splitting Signalisations into Montée / Descente (report form,
+dashboard map, management; admins can correct a report's sector and trail), one season definition for
+ski (1 Nov - 30 Apr) and bike (1 May - 31 Oct) used by the dashboard, history, statistics and export,
+the bike season wording, the "relocate a photo on the map" feature in all four apps (click-to-GPS dialog,
+pasted coordinates, reset to the original, tracking, owner/admin only, saved with the form in the report
+forms), deletion of inspections, infractions, signalisations and Entretien logs reserved to the system
+admin, trails and shelters hidden rather than deleted (new "Abris" panel), "Enregistrer et fermer" and a
+Photos column in Infractions > Gestion, and the matching tests.
 
 Next time an estimate is added, keep the same method (or note if it changed) so the numbers stay
 comparable across rows.
