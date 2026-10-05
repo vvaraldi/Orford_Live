@@ -271,7 +271,7 @@
           const sheltersSnap = await db.collection('shelters').get();
           sheltersSnap.forEach(doc => {
             const shelter = { id: doc.id, ...doc.data() };
-            if (Network.matches(shelter)) allShelters.push(shelter);
+            if (Network.matches(shelter) && !TrailService.isArchived(shelter)) allShelters.push(shelter); // a hidden shelter is gone from the map
           });
         }
 

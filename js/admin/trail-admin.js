@@ -36,6 +36,7 @@ const TrailAdmin = (function () {
     mapId: null,       // the map currently shown
     trails: [],        // every trail of every activity: { id, ...data }
     sectors: [],       // every sector of every activity (SectorService.loadAll)
+    shelters: [],      // every shelter of every activity: { id, ...data }
     selected: new Set(), // trail ids ticked for a bulk sector assignment
     editing: null,     // { id: string|null, trail: object|null } while the editor is open
     placing: false,    // the next click on the map sets the position
@@ -71,6 +72,13 @@ const TrailAdmin = (function () {
       showMessage('Erreur lors du chargement des sentiers.', 'error');
       state.trails = [];
     }
+    try {
+      const shelters = await window.db.collection('shelters').get();
+      state.shelters = shelters.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    } catch (error) {
+      console.error('Error loading shelters:', error);
+      state.shelters = [];
+    }
     renderAll();
   }
 
@@ -89,6 +97,7 @@ const TrailAdmin = (function () {
     renderList();
     renderOrphanBanner();
     renderSectorPanel();
+    renderShelterPanel();
     drawMarkers();
   }
 
@@ -577,6 +586,49 @@ const TrailAdmin = (function () {
     } catch (error) {
       console.error('Error restoring the trail:', error);
       showMessage(`Impossible de restaurer le sentier : ${error.message || 'erreur inconnue'}`, 'error');
+    }
+  }
+
+  // ---- Shelters: hide / restore (never deleted: inspections point to them by id) ------------------------------------
+  function renderShelterPanel() {
+    const panel = $('shelter-panel');
+    if (!panel) return;
+    const config = APP_CONFIG.networks[state.network];
+    panel.hidden = !(config && config.features && config.features.shelters);
+    const body = $('shelter-rows');
+    body.replaceChildren();
+    state.shelters
+      .filter(s => Network.of(s) === state.network)
+      .sort((a, b) => String(a.name || a.id).localeCompare(String(b.name || b.id), 'fr'))
+      .forEach(shelter => {
+        const hidden = TrailService.isArchived(shelter);
+        const row = el('tr', hidden ? 'is-archived' : '');
+        row.dataset.id = shelter.id;
+        const action = el('td');
+        const button = el('button', 'btn btn-secondary btn-sm', hidden ? 'Restaurer' : 'Masquer');
+        button.type = 'button';
+        button.addEventListener('click', () => setShelterHidden(shelter, !hidden, button));
+        action.appendChild(button);
+        row.append(el('td', '', shelter.name || shelter.id), el('td', '', hidden ? 'Masqué' : 'Visible'), action);
+        body.appendChild(row);
+      });
+  }
+
+  async function setShelterHidden(shelter, hide, button) {
+    const name = shelter.name || shelter.id;
+    if (hide && !window.confirm(`Masquer l'abri « ${name} » ?\n\nIl disparaîtra de la carte et du formulaire de rapport d'abri. Son historique d'inspections est conservé, et vous pourrez le restaurer.`)) return;
+    setButtonLoading(button, true, '...');
+    try {
+      const del = firebase.firestore.FieldValue.delete();
+      await window.db.collection('shelters').doc(shelter.id).update(hide
+        ? { archived: true, archivedAt: firebase.firestore.FieldValue.serverTimestamp(), archivedBy: userId }
+        : { archived: del, archivedAt: del, archivedBy: del });
+      showMessage(`Abri « ${name} » ${hide ? 'masqué' : 'restauré'}.`, 'success');
+      await load();
+    } catch (error) {
+      console.error('Error hiding the shelter:', error);
+      showMessage(`Impossible de modifier l'abri : ${error.message || 'erreur inconnue'}`, 'error');
+      setButtonLoading(button, false);
     }
   }
 

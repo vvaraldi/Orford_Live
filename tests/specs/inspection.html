@@ -66,6 +66,9 @@
         const shelterMarker = document.querySelector('.map-marker--shelter');
         ok('right-click on a shelter: shelter report with the shelter preselected', reportUrlForShelter(allShelters[0]) === 'inspection-shelter-report.html?shelter=shelter_1', reportUrlForShelter(allShelters[0]));
         ok('the shelter marker has the right-click handler', !!shelterMarker && typeof shelterMarker.oncontextmenu === 'function');
+        window.__data.shelters[0].archived = true; await loadDashboardData();
+        ok('a hidden (archived) shelter is gone from the dashboard map', document.querySelectorAll('.map-marker--shelter').length === 0 && allShelters.length === 0, allShelters);
+        delete window.__data.shelters[0].archived; await loadDashboardData();
         ok('Inspection view: the hint speaks of shelters', !document.getElementById('map-hint').hidden && /un abri/.test(document.getElementById('map-hint').textContent), document.getElementById('map-hint').textContent);
       }
       // Statut view as a plain inspector (not admin): right-click on trails still works, the bulk buttons stay hidden
@@ -214,6 +217,9 @@
       ok('ski, downhill: form replaced by a "not in this view" notice', document.getElementById('shelter-inspection-form').style.display === 'none' && document.body.textContent.includes("Il n'y a pas d'abris en vue « Descente »"), document.body.textContent);
     } else {
       ok('ski: shelter list', J(opts(shelterSelect)) === J(['', 'shelter_1']), opts(shelterSelect));
+      window.__data.shelters[0].archived = true; await loadShelters();
+      ok('a hidden (archived) shelter is no longer offered in the report form', J(opts(shelterSelect)) === J(['']), opts(shelterSelect));
+      delete window.__data.shelters[0].archived; await loadShelters();
       shelterSelect.value = 'shelter_1';
       ['condition', 'cleanliness', 'accessibility'].forEach(n => { form.querySelector(`input[name="${n}"]`).checked = true; });
       await handleSubmit({ preventDefault() {} });

@@ -275,6 +275,7 @@
         snapshot.forEach(doc => {
           const s = doc.data();
           if (!Network.matches(s)) return; // this activity's shelters only
+          if (s.archived === true) return; // a hidden shelter is no longer inspected (its history is kept)
           const opt = document.createElement('option');
           opt.value = doc.id;
           opt.textContent = s.name;

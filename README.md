@@ -11,12 +11,11 @@
 
 3. Improve the user experience
 #	Priority	Item
-3.1 High For the orphelins files (photos) does this function in Inspections loop through all the picture... what ever the apps and activity ?
-
-3.2 Low add an Admin page showing two tabs (like in Inspections) : Statistiques & Gestion des données.
+3.1 Low add an Admin page showing two tabs (like in Inspections) : Statistiques & Gestion des données.
 - first tab should show by season the same type of stats as Inspections (Remove the box "Photo la plus éloignée du centre de la carte" and its code within Inspections (not needed anymore))
 - second tab should do the same as in Inspections
 
+3.2 High For the orphelins files (photos) does this function in Inspections loop through all the picture... what ever the apps and activity ?
 
 3.3	Low	Accessibility audit pass
 

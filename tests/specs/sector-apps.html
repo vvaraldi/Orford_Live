@@ -108,6 +108,10 @@
 
   if (PAGE === 'infraction-admin') {
     const ids = [...document.querySelectorAll('#infractions-tbody tr[data-id]')].map(r => r.dataset.id).sort();
+    const headCells = [...document.querySelectorAll('table thead th')].map(th => th.textContent.trim());
+    const photoCell = id => { const row = document.querySelector(`#infractions-tbody tr[data-id=${id}]`); return row && row.children[headCells.indexOf('Photos')].textContent.trim(); };
+    ok('a "Photos" column (like Signalisations) between the location and the patrol officer', J(headCells.slice(3, 6)) === J(['Localisation', 'Photos', 'Patrouilleur']), headCells);
+    ok('the column shows the number of photos of each infraction', bike ? photoCell('INFB') === '📷 0' : (photoCell('INF2') === '📷 1' && photoCell('INF1') === '📷 0'), [photoCell('INF1'), photoCell('INF2'), photoCell('INFB')]);
     ok('lists this activity\'s infractions only (old and new format together)', J(ids) === J(bike ? ['INFB'] : ['INF1', 'INF2', 'INF3', 'INF4']), ids);
     if (bike) {
       ok('bike labels: fault shown from the bike config', document.querySelector('#infractions-tbody tr[data-id=INFB]').textContent.includes('Autre (voir commentaires)'), document.querySelector('#infractions-tbody tr[data-id=INFB]').textContent);

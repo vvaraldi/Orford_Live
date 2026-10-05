@@ -78,14 +78,17 @@ service cloud.firestore {
                           .hasOnly(['status', 'lastUpdated', 'lastInspectionId']));
       allow create: if isAdmin() && canWorkIn(recordNetwork(request.resource.data)) &&
                        (isSystemAdmin() || !('sector' in request.resource.data));
-      allow delete: if isAdmin() && canWorkIn(recordNetwork(resource.data));
+      // Never deleted from the app: a trail that is gone is hidden (archived: true), its history stays
+      allow delete: if false;
     }
 
     match /shelters/{document} {
       allow read: if true;
-      allow update: if canWorkIn(recordNetwork(resource.data)) && sameNetwork();
+      // Admins only (hide / restore: archived). Inspectors never change a shelter.
+      allow update: if isAdmin() && canWorkIn(recordNetwork(resource.data)) && sameNetwork();
       allow create: if isAdmin() && canWorkIn(recordNetwork(request.resource.data));
-      allow delete: if isAdmin() && canWorkIn(recordNetwork(resource.data));
+      // Never deleted from the app: a shelter that is gone is hidden (archived: true), its history stays
+      allow delete: if false;
     }
 
     match /inspections/{document} {

@@ -665,6 +665,17 @@
           </div>
         </details>
 
+        <!-- Shelters (activities that have them): hidden, never deleted -->
+        <details class="trail-panel" id="shelter-panel" hidden>
+          <summary>Abris de cette activité</summary>
+          <div class="trail-table-wrap">
+            <table class="trail-table">
+              <thead><tr><th>Nom</th><th>Statut</th><th></th></tr></thead>
+              <tbody id="shelter-rows"></tbody>
+            </table>
+          </div>
+        </details>
+
         <!-- System admin: assign a sector to the ticked trails -->
         <div class="trail-bulk" id="trail-bulk">
           <select class="form-select" id="trail-bulk-sector" aria-label="Secteur à attribuer"></select>

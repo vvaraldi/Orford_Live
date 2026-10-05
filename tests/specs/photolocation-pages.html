@@ -130,7 +130,14 @@
     click(editLink(links($('modal-body'))[0])); await wait(300);
     typeIn('45.3, -72.2'); click(saveBtn()); await wait(600);
     const u = updates('infractions')[0];
-    ok('saved in infractions/INF2: photos[0] and offenderImageCoordinates', !!u && near(u.photos[0].coordinates.latitude, 45.3) && near(u.offenderImageCoordinates.latitude, 45.3) && !('coordinates' in u), u);
+    // "Enregistrer et fermer": saving the admin's changes closes the window
+    document.getElementById('detail-modal').classList.contains('is-active') || openDetail('INF2');
+    window.__writes.length = 0;
+    document.getElementById('admin-comments').value = 'vu';
+    await saveChanges(); await wait(300);
+    ok('saving the admin changes closes the window (save and close)', !document.getElementById('detail-modal').classList.contains('is-active') && /Enregistrer et fermer/.test(document.getElementById('save-btn').textContent) && updates('infractions').length === 1 && updates('infractions')[0].adminComments === 'vu', [document.getElementById('detail-modal').className, updates('infractions')]);
+    window.__writes.length = 0;
+    ok('saved in infractions/INF2: photos[0] and offenderImageCoordinates',!!u && near(u.photos[0].coordinates.latitude, 45.3) && near(u.offenderImageCoordinates.latitude, 45.3) && !('coordinates' in u), u);
   }
 
   // =================================================================================================

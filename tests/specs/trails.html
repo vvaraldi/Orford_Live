@@ -182,6 +182,23 @@
     ok('bike map (1600 px), title, marker labels', $('trail-image').naturalWidth === 1600 && /Carte : Vélo/.test($('trail-map-title').textContent) && J(markers().sort()) === J(['2', '7']), [$('trail-image').naturalWidth, markers()]);
     ok('bike: no banner (no trail without a sector)', $('trail-orphan-banner').hidden === true);
   }
+  // ---- shelters: hidden, never deleted ----
+  if (AS_SYS) {
+    choose($('trail-network'), 'ski'); await wait(500);
+    const shelterRows = () => [...document.querySelectorAll('#shelter-rows tr')].map(tr => ({ id: tr.dataset.id, name: tr.children[0].textContent, status: tr.children[1].textContent, button: tr.children[2].textContent, hiddenRow: tr.classList.contains('is-archived') }));
+    ok('ski: the shelters panel lists the activity\'s shelter as visible, with a "Masquer" button', $('shelter-panel').hidden === false && J(shelterRows().map(r => [r.name, r.status, r.button])) === J([['Abri Nord', 'Visible', 'Masquer']]), shelterRows());
+    window.__writes.length = 0;
+    document.querySelector('#shelter-rows button').click(); await wait(600);
+    const hideWrite = window.__writes.find(x => x[0] === 'shelters' && x[2] === 'update');
+    ok('"Masquer": the shelter is archived (flag, who, when), not removed', !!hideWrite && hideWrite[1] === 'shelter_1' && hideWrite[3].archived === true && hideWrite[3].archivedBy === 'u1' && !!hideWrite[3].archivedAt, window.__writes);
+    ok('the shelter is then listed as hidden, with a "Restaurer" button', J(shelterRows().map(r => [r.status, r.button, r.hiddenRow])) === J([['Masqué', 'Restaurer', true]]), shelterRows());
+    window.__writes.length = 0;
+    document.querySelector('#shelter-rows button').click(); await wait(600);
+    const showWrite = window.__writes.find(x => x[0] === 'shelters' && x[2] === 'update');
+    ok('"Restaurer": the archive fields are cleared', !!showWrite && showWrite[3].archived === 'DEL' && showWrite[3].archivedAt === 'DEL' && showWrite[3].archivedBy === 'DEL', showWrite);
+    choose($('trail-network'), 'bike'); await wait(500);
+    ok('bike has no shelters: no panel', $('shelter-panel').hidden === true);
+  }
   ok('no script errors at the end', window.__errs.length === 0, window.__errs);
   $('out').textContent = out.join('\n');
 })().catch(e => { document.getElementById('out').textContent = 'HARNESS ERROR ' + e.stack; });

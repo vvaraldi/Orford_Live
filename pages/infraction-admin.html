@@ -107,12 +107,13 @@
                   <th>Contrevenant</th>
                   <th>Infraction</th>
                   <th>Localisation</th>
+                  <th>Photos</th>
                   <th>Patrouilleur</th>
                   <th>Statut</th>
                 </tr>
               </thead>
               <tbody id="infractions-tbody">
-                <tr><td colspan="6" style="text-align:center;">Chargement...</td></tr>
+                <tr><td colspan="7" style="text-align:center;">Chargement...</td></tr>
               </tbody>
             </table>
           </div>
@@ -133,7 +134,7 @@
       </div>
       <div class="modal__footer">
         <button class="btn btn-warning" id="archive-btn">Archiver</button>
-        <button class="btn btn-primary" id="save-btn">Enregistrer les modifications</button>
+        <button class="btn btn-primary" id="save-btn">Enregistrer et fermer</button>
         <button class="btn btn-secondary" id="close-btn">Fermer</button>
       </div>
     </div>
@@ -228,7 +229,7 @@
 
     async function loadInfractions() {
       const tbody = document.getElementById('infractions-tbody');
-      tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;">Chargement...</td></tr>';
+      tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;">Chargement...</td></tr>';
       
       try {
         let query = db.collection('infractions').orderBy('createdAt', 'desc');
@@ -247,7 +248,7 @@
         renderInfractions();
       } catch (e) {
         console.error('Error loading infractions:', e);
-        tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:var(--color-danger);">Erreur de chargement</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:var(--color-danger);">Erreur de chargement</td></tr>';
       }
     }
 
@@ -255,7 +256,7 @@
       const tbody = document.getElementById('infractions-tbody');
       
       if (infractionsData.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;">Aucune infraction trouvée</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;">Aucune infraction trouvée</td></tr>';
         return;
       }
       
@@ -283,6 +284,7 @@
             <td>${escapeHtml(inf.offenderName || '-')}</td>
             <td>${FAULT_LABELS[inf.fault] || inf.fault || '-'}</td>
             <td>${escapeHtml(location)}</td>
+            <td><span class="badge badge-secondary">📷 ${PhotoService.photosFrom(inf).length}</span></td>
             <td>${escapeHtml(inf.patrolName || '-')}</td>
             <td>${status}</td>
           </tr>
@@ -426,6 +428,7 @@
         });
         
         showToast('Modifications enregistrées', 'success');
+        closeModal(); // save and close
         loadInfractions();
       } catch (e) {
         console.error('Error saving:', e);

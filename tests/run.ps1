@@ -24,7 +24,7 @@
 #>
 param(
   [string[]]$Only,
-  [int]$Budget = 15000,
+  [int]$Budget = 30000, # virtual time: a spec that waits a lot (Sentiers) needs the margin, normal runs are not slower
   [switch]$Quiet
 )
 
