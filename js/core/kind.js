@@ -4,8 +4,9 @@
  * Some activities inspect more than one kind of trail, each with its own map (ski:
  * uphill on the touring map, downhill on the ski-downhill map: see
  * APP_CONFIG.networks.<id>.inspectionKinds). Kind.current() is the one the inspection
- * pages (dashboard, trail report, shelter report, history, admin) show; the header
- * switcher (js/core/layout.js, inspection pages only) lets an inspector switch it,
+ * pages (dashboard, trail report, shelter report, history, admin) and the signalisation pages
+ * (report, dashboard, management) show; the header
+ * switcher (js/core/layout.js, those two apps only) lets a user switch it,
  * remembered like orford-network / orford-theme. An activity with only one kind
  * (bike) never shows a switcher and Kind.current() is simply that one kind.
  *

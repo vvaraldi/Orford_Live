@@ -12,8 +12,9 @@
  *
  * The trails of a sector are the `trails` records whose `sector` is this sector's id (or one of
  * its aliases), of the sector's activity, not hidden (archived). Every kind counts (uphill,
- * downhill, lift): the forms are for all skiing together. The sector is set on each trail by a
- * system admin (Administration > Sentiers).
+ * downhill, lift). Infractions offer them all together; the Signalisations pages only show the view
+ * selected in the header (Montée = uphill, Descente = downhill + lift: kindsInView in
+ * trail-service.js). The sector is set on each trail by a system admin (Administration > Sentiers).
  *
  * A report stores the sector id, the trail name (text) and, when the trail came from a trail
  * record, its id (trailId). Old reports only have the name: readTrail() / selectTrail() below
@@ -128,14 +129,18 @@
 
   /**
    * Fills a <select> with a sector's trails (value = trail id, the number is added only when two
-   * names would look the same). kind (optional): only that kind's trails - the inspection app
-   * uses this to offer only the kind currently shown (Kind.current()); infractions/signalisations
-   * leave it out, since those are for every kind of the sector together.
+   * names would look the same). kind (optional): one kind, or an array of kinds - only those
+   * trails. The inspection and signalisation apps use this to offer only the view currently
+   * shown (Kind.current(); signalisations pass TrailService.viewKinds(), as Descente covers
+   * downhill and lift); infractions leave it out, since they are for every kind together.
    */
   function fillTrails(select, sector, placeholder, kind) {
     var options = [new Option(placeholder, '')];
     var items = sector && sector.items ? sector.items : [];
-    if (kind) items = items.filter(function (i) { return i.kind === kind; });
+    if (kind) {
+      var kinds = [].concat(kind);
+      items = items.filter(function (i) { return kinds.indexOf(i.kind) !== -1; });
+    }
     var seen = {};
     items.forEach(function (i) { var k = norm(i.name); seen[k] = (seen[k] || 0) + 1; });
     items.forEach(function (i) {
@@ -147,6 +152,39 @@
       options.push(option);
     });
     select.replaceChildren.apply(select, options);
+  }
+
+  /**
+   * The kind of trail a report is about, or null when it cannot be told: by its trailId (any trail
+   * record, even a hidden one), else by its name within its sector (old reports that only kept
+   * the name). `trails` is loadTrails().
+   */
+  function kindOfReport(sectors, trails, report) {
+    var kindOf = function (t) { return t.kind || (t.network === 'bike' ? 'bike' : 'uphill'); };
+    var byId = report.trailId && trails.filter(function (t) { return t.id === report.trailId; })[0];
+    if (byId) return kindOf(byId);
+    var sector = find(sectors, report.sector);
+    var wanted = norm(report.trail);
+    var byName = sector && wanted && sector.items.filter(function (i) { return norm(i.name) === wanted; })[0];
+    return byName ? byName.kind : null;
+  }
+
+  /**
+   * The reports that belong to the given kinds (an array, or null = all). A report whose kind
+   * cannot be told (old report, its trail no longer exists) is kept: it must never disappear.
+   */
+  function inKinds(sectors, trails, reports, kinds) {
+    if (!kinds) return reports;
+    return reports.filter(function (r) {
+      var kind = kindOfReport(sectors, trails, r);
+      return !kind || kinds.indexOf(kind) !== -1;
+    });
+  }
+
+  /** The sectors holding at least one trail of the given kinds (an array, or null = all). */
+  function withKinds(sectors, kinds) {
+    if (!kinds) return sectors;
+    return sectors.filter(function (s) { return s.items.some(function (i) { return kinds.indexOf(i.kind) !== -1; }); });
   }
 
   /** What is picked in a trail <select>: { id, name }. id is null for a name-only (old) report. */
@@ -205,6 +243,9 @@
     nameOf: nameOf,
     fillSectors: fillSectors,
     fillTrails: fillTrails,
+    kindOfReport: kindOfReport,
+    inKinds: inKinds,
+    withKinds: withKinds,
     readTrail: readTrail,
     selectSector: selectSector,
     selectTrail: selectTrail

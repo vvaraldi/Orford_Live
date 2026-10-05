@@ -2,17 +2,14 @@
 
 2. Improve the code
 #	Priority	Item
-2.0 Manage Infraction with different fault type for ski touring, velo and downhill
 2.1 Manage Signalisations for ski touring, velo and downhill
 2.2 Documentation / README & deployment guide
-2.2	Low-Medium	Watch client-side full-collection reads
 2.3	Low	Trim legacy back-compat branches
 
 3. Improve the user experience
 #	Priority	Item
-3.6	Medium	Get real feedback on the bike issue checklist
-3.7	Low	Season label wording for bike
-3.8	Low	Accessibility audit pass
+3.1	Low	Season label wording for bike
+3.2	Low	Accessibility audit pass
 
 
 Quick line to popy paste at the end of each session :

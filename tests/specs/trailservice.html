@@ -5,6 +5,7 @@
 <script src="/js/core/config.js"></script>
 <script src="/js/core/network.js"></script>
 <script src="/js/services/trail-service.js"></script>
+<script src="/js/services/sector-service.js"></script>
 <script>
 (() => {
   const out = []; const J = JSON.stringify;
@@ -60,6 +61,27 @@
   ok('nextId: prefix by kind, one more than the highest', T.nextId('uphill', ['trail_1', 'trail_11', 'bike_2']) === 'trail_12' && T.nextId('downhill', ['trail_1']) === 'run_1' && T.nextId('bike', ['bike_1', 'bike_2']) === 'bike_3');
   ok('config: no old difficulty words left in the scales', !JSON.stringify(APP_CONFIG.difficultyScales).match(/easy|medium|hard/));
 
+  // views of the header Montée / Descente switch (Signalisations): kinds that share a map
+  ok('views: Montée = uphill alone; Descente = downhill AND lift (same map); bike = bike', J(T.kindsInView('uphill', 'ski')) === J(['uphill']) && J(T.kindsInView('downhill', 'ski')) === J(['downhill', 'lift']) && J(T.kindsInView('lift', 'ski')) === J(['downhill', 'lift']) && J(T.kindsInView('bike', 'bike')) === J(['bike']), [T.kindsInView('uphill', 'ski'), T.kindsInView('downhill', 'ski'), T.kindsInView('bike', 'bike')]);
+  ok('views: no Kind module -> no filtering (null)', T.viewKinds() === null);
+
+  // which view a report belongs to
+  const sectors = [{ id: 'mont-orford', aliases: [], items: [{ id: 'trail_2', name: 'Adams', kind: 'uphill' }, { id: 'run_2', name: 'Maxi', kind: 'downhill' }] }, { id: 'vide', aliases: [], items: [] }];
+  const trails = [{ id: 'trail_2', kind: 'uphill', network: 'ski' }, { id: 'run_2', kind: 'downhill', network: 'ski' }, { id: 'run_old', kind: 'downhill', network: 'ski', archived: true }, { id: 'trail_1', network: 'ski' }];
+  const S = SectorService;
+  ok('report kind: by trailId (also a hidden trail, also a trail with no kind = uphill)', S.kindOfReport(sectors, trails, { trailId: 'run_2' }) === 'downhill' && S.kindOfReport(sectors, trails, { trailId: 'run_old' }) === 'downhill' && S.kindOfReport(sectors, trails, { trailId: 'trail_1' }) === 'uphill');
+  ok('report kind: an old report with only a name is found by name in its sector (accents and case ignored)', S.kindOfReport(sectors, trails, { sector: 'mont-orford', trail: 'MAXI' }) === 'downhill');
+  ok('report kind: unknown when the trail cannot be found', S.kindOfReport(sectors, trails, { sector: 'mont-orford', trail: 'Magog' }) === null && S.kindOfReport(sectors, trails, {}) === null);
+  const reports = [{ id: 'a', trailId: 'trail_2' }, { id: 'b', trailId: 'run_2' }, { id: 'c', sector: 'mont-orford', trail: 'Magog' }];
+  ok('inKinds: Montée keeps uphill + the unknown one; Descente keeps downhill + the unknown one; null keeps all', J(S.inKinds(sectors, trails, reports, ['uphill']).map(r => r.id)) === J(['a', 'c']) && J(S.inKinds(sectors, trails, reports, ['downhill', 'lift']).map(r => r.id)) === J(['b', 'c']) && S.inKinds(sectors, trails, reports, null).length === 3);
+  ok('withKinds: only the sectors holding a trail of those kinds', J(S.withKinds(sectors, ['uphill']).map(s => s.id)) === J(['mont-orford']) && S.withKinds(sectors, ['bike']).length === 0 && S.withKinds(sectors, null).length === 2);
+  const sel = document.createElement('select');
+  S.fillTrails(sel, sectors[0], '--', ['downhill', 'lift']);
+  ok('fillTrails accepts a list of kinds', J([...sel.options].map(o => o.value)) === J(['', 'run_2']));
+  S.fillTrails(sel, sectors[0], '--', 'uphill');
+  ok('fillTrails still accepts one kind', J([...sel.options].map(o => o.value)) === J(['', 'trail_2']));
+  S.fillTrails(sel, sectors[0], '--');
+  ok('fillTrails without a kind offers every kind', [...sel.options].length === 3);
   document.getElementById('out').textContent = out.join('\n');
 })();
 </script>

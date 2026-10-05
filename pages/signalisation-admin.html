@@ -65,6 +65,7 @@
 <body data-theme="light" data-module="signalisation" data-nav="signalisation" data-page="signalisation-admin">
   <script src="../js/core/config.js"></script>
   <script src="../js/core/network.js"></script>
+  <script src="../js/core/kind.js"></script>
   <script src="../js/core/layout.js"></script>
   <div id="loading" class="page-loading"><div class="loading-spinner"></div><p class="loading-text">Chargement...</p></div>
 
@@ -196,6 +197,7 @@
     let filterTrail = '';
     let sortBy = 'date';
     let sectors = []; // this activity's sectors, with their trails (SectorService.load)
+    let allTrails = []; // every trail record (even hidden): tells which view (Montée / Descente) a report belongs to
     let filtersVisible = true;
 
     // A trail identifies a report by id when it has one, else by name (old reports)
@@ -243,7 +245,9 @@
     async function loadSectors() {
       try {
         sectors = await SectorService.load();
-        SectorService.fillSectors(document.getElementById('filter-sector'), sectors, 'Tous les secteurs');
+        allTrails = await SectorService.loadTrails();
+        // Montée / Descente (header switch): only the sectors and reports of the view shown
+        SectorService.fillSectors(document.getElementById('filter-sector'), SectorService.withKinds(sectors, TrailService.viewKinds()), 'Tous les secteurs');
       } catch (e) {
         console.error('Error loading sectors:', e);
       }
@@ -294,6 +298,8 @@
           if (!showArchived && data.archived === true) return;
           reportsData.push(data);
         });
+        // Only the view shown (Montée / Descente); a report whose trail cannot be told stays in both
+        reportsData = SectorService.inKinds(sectors, allTrails, reportsData, TrailService.viewKinds());
 
         updateTrailFilterOptions();
         renderReports();

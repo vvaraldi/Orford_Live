@@ -7,6 +7,7 @@
   const PAGE = Q.get('page');
   const opts = el => [...el.options].map(o => o.value);
   const bike = NET === 'bike' || (NET === 'both' && Q.get('choice') === 'bike');
+  const downhill = Q.get('kind') === 'downhill';
   await wait(800);
   ok('current activity is ' + (bike ? 'bike' : 'ski'), Network.current() === (bike ? 'bike' : 'ski'), Network.current());
   ok('confirm() and alert() are the browser\'s own synchronous ones (ui.js must not replace them with Promise-returning dialogs)', /\[native code\]/.test(Function.prototype.toString.call(window.confirm)) && /\[native code\]/.test(Function.prototype.toString.call(window.alert)) && typeof confirmDialog === 'function');
@@ -78,25 +79,31 @@
   }
 
   if (PAGE === 'signalisation-report') {
-    ok('sectors of this activity only', J(opts(sectorSelect)) === J(bike ? ['', 'sentiers-velo'] : SKI_SECTORS), opts(sectorSelect));
+    ok('sectors: only those with trails of the view shown (Montée / Descente)', J(opts(sectorSelect)) === J(bike ? ['', 'sentiers-velo'] : ['', 'mont-orford']), opts(sectorSelect));
     const mine = opts(reportSelector).filter(v => v !== 'new');
-    ok('past reports of this activity only (legacy = ski)', J(mine.sort()) === J(bike ? ['SIGB'] : ['SIG1', 'SIG2']), mine);
+    ok('past reports of this activity and view (an old report whose trail is unknown shows in both)', J(mine.sort()) === J(bike ? ['SIGB'] : (downhill ? ['SIG1', 'SIG2'] : ['SIG1'])), mine);
     if (!bike) {
+      sectorSelect.value = 'mont-orford'; populateTrails();
+      ok(downhill ? 'Descente: the sector offers its downhill runs (and lifts), not the uphill trail' : 'Montée: the sector offers its uphill trail only', J(opts(trailSelect)) === J(downhill ? ['', 'run_2', 'run_1'] : ['', 'trail_2']), opts(trailSelect));
       reportSelector.value = 'SIG1'; handleReportChange();
-      ok('old report: alias selects the current sector, name kept as "(ancienne piste)" since no list has it any more', sectorSelect.value === 'mont-giroux-nord' && trailSelect.value === 'legacy:Magog', [sectorSelect.value, trailSelect.value]);
+      ok('old report: alias selects the current sector (kept selectable although it has no trail in this view), name kept as "(ancienne piste)" since no list has it any more', sectorSelect.value === 'mont-giroux-nord' && trailSelect.value === 'legacy:Magog', [sectorSelect.value, trailSelect.value]);
       await handleModify();
       let u = window.__writes.filter(x => x[0] === 'signalisations' && x[2] === 'update');
       ok('modify saves the canonical sector, the name, trailId null, and never sends "network"', u.length === 1 && u[0][3].sector === 'mont-giroux-nord' && u[0][3].trail === 'Magog' && u[0][3].trailId === null && !('network' in u[0][3]), u);
       window.__writes.length = 0; resetForm();
-      reportSelector.value = 'SIG2'; handleReportChange();
-      ok('new-format report: selected by its trailId', sectorSelect.value === 'mont-orford' && trailSelect.value === 'run_2', [sectorSelect.value, trailSelect.value]);
-      window.__writes.length = 0; resetForm();
+      if (downhill) {
+        reportSelector.value = 'SIG2'; handleReportChange();
+        ok('new-format report: selected by its trailId', sectorSelect.value === 'mont-orford' && trailSelect.value === 'run_2', [sectorSelect.value, trailSelect.value]);
+        window.__writes.length = 0; resetForm();
+      }
     }
+    const newTrail = bike ? 'bike_1' : (downhill ? 'run_2' : 'trail_2');
     sectorSelect.value = bike ? 'sentiers-velo' : 'mont-orford';
-    populateTrails(); trailSelect.value = bike ? 'bike_1' : 'run_2'; statusSelect.value = 'ouverte';
+    populateTrails(); trailSelect.value = newTrail; statusSelect.value = 'ouverte';
     await handleSubmit({ preventDefault() {} });
     const w = window.__writes.filter(x => x[0] === 'signalisations' && x[2] === 'add');
-    ok('a new report is saved with the current network, the trail name and the trailId', w.length === 1 && w[0][3].network === (bike ? 'bike' : 'ski') && w[0][3].trail === (bike ? 'Piste verte' : 'Maxi') && w[0][3].trailId === (bike ? 'bike_1' : 'run_2'), w);
+    const names = { bike_1: 'Piste verte', run_2: 'Maxi', trail_2: 'Adams' };
+    ok('a new report is saved with the current network, the trail name and the trailId', w.length === 1 && w[0][3].network === (bike ? 'bike' : 'ski') && w[0][3].trail === names[newTrail] && w[0][3].trailId === newTrail, w);
   }
 
   if (PAGE === 'infraction-admin') {
@@ -113,31 +120,28 @@
 
   if (PAGE === 'signalisation-admin') {
     const ids = [...document.querySelectorAll('#reports-tbody tr[data-id]')].map(r => r.dataset.id).sort();
-    ok('lists this activity\'s reports only (legacy = ski)', J(ids) === J(bike ? ['SIGB'] : ['SIG1', 'SIG2']), ids);
-    ok('sector filter offers this activity\'s sectors only', J(opts(document.getElementById('filter-sector'))) === J(bike ? ['', 'sentiers-velo'] : SKI_SECTORS), opts(document.getElementById('filter-sector')));
+    ok('lists this activity\'s reports of the view shown (an old report whose trail is unknown shows in both)', J(ids) === J(bike ? ['SIGB'] : (downhill ? ['SIG1', 'SIG2'] : ['SIG1'])), ids);
+    ok('sector filter offers the sectors that have trails in the view shown', J(opts(document.getElementById('filter-sector'))) === J(bike ? ['', 'sentiers-velo'] : ['', 'mont-orford']), opts(document.getElementById('filter-sector')));
   }
 
   if (PAGE === 'signalisation-resume') {
     const ids = [...document.querySelectorAll('#reports-tbody tr[data-id]')].map(r => r.dataset.id).sort();
-    ok('lists this activity\'s active reports only (legacy = ski)', J(ids) === J(bike ? ['SIGB'] : ['SIG1', 'SIG2']), ids);
+    ok('lists this activity\'s active reports of the view shown (an old report whose trail is unknown shows in both)', J(ids) === J(bike ? ['SIGB'] : (downhill ? ['SIG1', 'SIG2'] : ['SIG1'])), ids);
     const img = document.getElementById('map-image');
     const swBtns = () => [...document.querySelectorAll('#map-switch button')];
     if (bike) {
       ok('bike: one geolocalisation map, no switch', document.getElementById('map-switch').hidden === true && img.src.endsWith('assets/map/Bike_Geolocalisation_Map_web.jpg'), img.src);
       ok('bike map loads: no missing flag', !document.getElementById('map-wrapper').classList.contains('is-missing'));
     } else {
-      ok('ski: no map is calibrated yet -> the default is the downhill geolocalisation map (first of the activity\'s report maps)', img.src.endsWith('assets/map/Ski-Downhill_Geolocalisation-map_web.jpg'), img.src);
-      ok('ski: a switch with both geolocalisation maps (downhill, touring); no markers without a calibration', document.getElementById('map-switch').hidden === false && J(swBtns().map(b => b.textContent)) === J(['📍 Ski - Descente (géolocalisation)', '📍 Ski - Montée (géolocalisation)']) && document.querySelectorAll('.map-marker').length === 0 && /Carte non calibrée/.test(document.getElementById('map-count').textContent), swBtns().map(b => b.textContent));
+      const want = downhill ? 'Ski-Downhill_Geolocalisation-map_web.jpg' : 'Ski-Touring_geolocalisation_Map_web.jpg';
+      ok('ski, ' + (downhill ? 'Descente' : 'Montée') + ': the view\'s own geolocalisation map, and no map switch (one map per view)', img.src.endsWith(want) && document.getElementById('map-switch').hidden === true, [img.src, document.getElementById('map-switch').hidden]);
+      ok('ski: no map is calibrated yet -> no markers, explanation shown', document.querySelectorAll('.map-marker').length === 0 && /Carte non calibrée/.test(document.getElementById('map-count').textContent), document.getElementById('map-count').textContent);
+      // both geolocalisation maps get calibrated (as the system admin does in Administration > Cartes): SIG2 (a downhill run, has a GPS position) belongs to Descente only
+      window.__data.maps = [{ id: 'ski-geo', mode: 'affine', width: 800, height: 700, points: [ { x: 0, y: 0, lat: 45.296611, lon: -72.243361 }, { x: 800, y: 0, lat: 45.325861, lon: -72.249972 }, { x: 0, y: 700, lat: 45.299444, lon: -72.205667 }] }, { id: 'ski-downhill-geo', mode: 'affine', width: 1404, height: 932, points: [ { x: 0, y: 0, lat: 45.33, lon: -72.26 }, { x: 1404, y: 0, lat: 45.33, lon: -72.20 }, { x: 0, y: 932, lat: 45.29, lon: -72.26 }] }];
+      await MapService.load(true); renderMapMarkers();
+      ok('markers: the downhill report SIG2 is placed in Descente, not in Montée', document.querySelectorAll('.map-marker').length === (downhill ? 1 : 0) && (downhill ? /1 rapport\(s\) avec localisation/ : /0 rapport\(s\) avec localisation/).test(document.getElementById('map-count').textContent), [document.querySelectorAll('.map-marker').length, document.getElementById('map-count').textContent]);
 
-      // the touring geolocalisation map gets calibrated (as the system admin does in Administration > Cartes)
-      window.__data.maps = [{ id: 'ski-geo', mode: 'affine', width: 800, height: 700, points: [
-        { x: 0, y: 0, lat: 45.296611, lon: -72.243361 }, { x: 800, y: 0, lat: 45.325861, lon: -72.249972 }, { x: 0, y: 700, lat: 45.299444, lon: -72.205667 }] }];
-      await MapService.load(true);
-      ok('reportMaps: the default is the DOWNHILL GEO map even though only the touring geo map is calibrated', MapService.reportMaps().default === 'ski-downhill-geo' && J(MapService.reportMaps().usable) === J(['ski-geo']) && J(MapService.reportMaps().all) === J(['ski-downhill-geo', 'ski-geo']), MapService.reportMaps());
-      swBtns().find(b => /Montée/.test(b.textContent)).click(); await wait(500);
-      ok('switch to the touring geo map: image, active button and the report marker (SIG2 has a GPS position)', img.src.endsWith('assets/map/Ski-Touring_geolocalisation_Map_web.jpg') && swBtns().find(b => /Montée/.test(b.textContent)).classList.contains('btn-primary') && document.querySelectorAll('.map-marker').length === 1 && /1 rapport\(s\) avec localisation/.test(document.getElementById('map-count').textContent), [img.src, document.querySelectorAll('.map-marker').length, document.getElementById('map-count').textContent]);
-      swBtns().find(b => /Descente/.test(b.textContent)).click(); await wait(500);
-      ok('switch back to the downhill geo map (not calibrated): no marker, explanation shown', img.src.endsWith('assets/map/Ski-Downhill_Geolocalisation-map_web.jpg') && document.querySelectorAll('.map-marker').length === 0 && /Carte non calibrée/.test(document.getElementById('map-count').textContent));
+      if (!downhill) { // the shared location pop-up does not depend on the view: tested once
 
       // ---- the location pop-up (shared module) ----
       const opened = []; const realOpen = window.open; window.open = (...a) => { opened.push(a[0]); };
@@ -167,7 +171,12 @@
       PhotoMapModal.close(); openPhotoLocationModal(45.312, -72.231);
       ok('the map picked with the switch is kept for the next position', mimg.getAttribute('src').endsWith('Ski-Downhill_Geolocalisation-map_web.jpg'), mimg.getAttribute('src'));
       window.open = realOpen;
+      }
     }
+  }
+  if (/^signalisation-/.test(PAGE)) {
+    const sw = document.getElementById('kind-switch');
+    ok(bike ? 'bike: no Montée / Descente switch in the header' : 'ski: the Montée / Descente switch is in the header and shows the view (' + (downhill ? 'Descente' : 'Montée') + ')', bike ? sw.hidden === true : (sw.hidden === false && sw.textContent.includes(downhill ? 'Descente' : 'Montée')), sw.textContent);
   }
   document.getElementById('out').textContent = out.join('\n');
 })().catch(e => { document.getElementById('out').textContent = 'HARNESS ERROR ' + e.stack; });

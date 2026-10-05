@@ -77,6 +77,7 @@
 <body data-theme="light" data-module="signalisation" data-nav="signalisation" data-page="signalisation-resume">
   <script src="../js/core/config.js"></script>
   <script src="../js/core/network.js"></script>
+  <script src="../js/core/kind.js"></script>
   <script src="../js/core/layout.js"></script>
   <div id="loading" class="page-loading"><div class="loading-spinner"></div><p class="loading-text">Chargement...</p></div>
 
@@ -198,6 +199,7 @@
     let reportsData = [];
     let currentReportId = null;
     let sectors = []; // this activity's sectors, with their trails (SectorService.load)
+    let allTrails = []; // every trail record (even hidden): tells which view (Montée / Descente) a report belongs to
     // Filters: options are built from what's actually in reportsData, so a choice always
     // narrows to something non-empty. Apply to both the map markers and the table.
     let filterSector = '';
@@ -262,7 +264,19 @@
       filterTrail = trailSelect.value;
     }
 
-    // The map shown (ski: the downhill or the touring map, switchable). GPS -> pixel on that map;
+    // Montée / Descente (header switch, like Inspections): the dashboard shows the reports of the view
+    // shown, on that view's own map - so no map switch is needed any more. Descente covers downhill
+    // runs and lifts (same map). A report whose trail cannot be told (old report) shows in both views.
+    const inView = list => SectorService.inKinds(sectors, allTrails, list, TrailService.viewKinds());
+    function viewMaps() {
+      const offered = MapService.reportMaps().all;
+      const kinds = TrailService.viewKinds();
+      if (!kinds) return offered;
+      const wanted = [...new Set(kinds.map(k => TrailService.geoMapIdOf(k)))].filter(id => offered.includes(id));
+      return wanted.length ? wanted : offered;
+    }
+
+    // The map shown (ski: the downhill or the touring map). GPS -> pixel on that map;
     // null when the map has no calibration.
     let resumeMap = null;
     const gpsToPixel = (lat, lon) => MapService.gpsToPixel(lat, lon, resumeMap);
@@ -281,11 +295,12 @@
           }
           try {
             sectors = await SectorService.load();
+            allTrails = await SectorService.loadTrails();
           } catch (e) {
             console.error('Error loading sectors:', e);
           }
           await MapService.load(); // the GPS calibrations (markers below need them)
-          resumeMap = MapService.reportMaps().default;
+          resumeMap = viewMaps()[0] || MapService.reportMaps().default;
           buildMapSwitch();
           MapService.showImage(document.getElementById('map-image'), resumeMap);
 
@@ -320,6 +335,7 @@
           const data = { id: doc.id, ...doc.data() };
           if (Network.matches(data)) reportsData.push(data); // this activity's reports only
         });
+        reportsData = inView(reportsData);
 
         updateFilterOptions();
         renderMapMarkers();
@@ -336,6 +352,7 @@
               reportsData.push({ id: doc.id, ...data });
             }
           });
+          reportsData = inView(reportsData);
           updateFilterOptions();
           renderMapMarkers();
           renderReportsTable();
@@ -348,7 +365,7 @@
 
     // One button per map of the activity (only when there are several)
     function buildMapSwitch() {
-      const { all } = MapService.reportMaps();
+      const all = viewMaps();
       const box = document.getElementById('map-switch');
       box.replaceChildren();
       box.hidden = all.length < 2;

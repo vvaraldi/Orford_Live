@@ -191,13 +191,13 @@
   });
 
   // ---- Kind switcher (uphill/downhill for ski) ---------------------------------------------
-  // Only on inspection pages, and only when the activity inspects more than one kind (kind.js
-  // fires "kindReady" once network.js knows the activity). Switching reloads the page, like the
-  // activity switch above, so every inspection page (dashboard, trail/shelter report, history,
-  // admin) picks it up the same way without each one needing its own toggle.
+  // Only on the inspection and signalisation pages, and only when the activity has more than one
+  // kind (kind.js fires "kindReady" once network.js knows the activity). Switching reloads the
+  // page, like the activity switch above, so every page of those two apps picks it up the same
+  // way without each one needing its own toggle.
   document.addEventListener('kindReady', event => {
     const { current, ids } = event.detail;
-    if (nav !== APP_CONFIG.nav.inspection || ids.length < 2) return;
+    if ((nav !== APP_CONFIG.nav.inspection && nav !== APP_CONFIG.nav.signalisation) || ids.length < 2) return;
 
     const label = id => TrailService.kindLabel(id);
     const icon = id => { const m = APP_CONFIG.maps[TrailService.mapIdOf(id)]; return m ? m.icon : ''; };
