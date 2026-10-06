@@ -8,6 +8,7 @@
 
 3. Improve the user experience
 #	Priority	Item
+3.1 the link to the portal should be only on the logo and the text REGIS but not over the name of the app if the user inside an app.
 3.2 medium add a number max of users per page (25 to start) in the list displaid in the administration app tab "utilisateurs"
 3.3	Low	Accessibility audit pass
 

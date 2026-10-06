@@ -154,7 +154,9 @@ const StorageCleanup = (function () {
       try {
         const meta = await file.ref.getMetadata();
         created = meta && meta.timeCreated ? new Date(meta.timeCreated).getTime() : null;
+        file.size = meta && meta.size ? Number(meta.size) : null;
       } catch (error) { /* no metadata: judged on the path alone */ }
+      file.created = created; // shown in the list, so an orphan can be checked before deleting
       if (created && Date.now() - created < minAge) tooRecent.push(file); else orphans.push(file);
     }
 
@@ -252,7 +254,22 @@ const StorageCleanup = (function () {
             (last.mostlyOrphans ? '<p style="color: var(--color-danger);">Attention : plus de la moitié des fichiers sont orphelins. Vérifiez la liste avant de supprimer.</p>' : '') +
             note(esc(counts)) +
             `<details style="margin-top: 0.5rem;"><summary style="cursor: pointer; color: var(--theme-accent);">Voir la liste des fichiers orphelins</summary>
-              <ul style="font-size: 0.8rem; max-height: 200px; overflow-y: auto; margin-top: 0.5rem; padding-left: 1.5rem;">${last.orphans.map(f => `<li>${esc(f.path)}</li>`).join('')}</ul></details>`);
+              <ul style="font-size: 0.8rem; max-height: 240px; overflow-y: auto; margin-top: 0.5rem; padding-left: 1.5rem;">${last.orphans.map((f, i) => {
+                const when = f.created ? ` — ${esc(new Date(f.created).toLocaleDateString('fr-CA'))}` : '';
+                const size = f.size ? ` — ${Math.max(1, Math.round(f.size / 1024))} Ko` : '';
+                return `<li>${esc(f.path)}${when}${size} — <a href="#" data-view="${i}">voir la photo</a></li>`;
+              }).join('')}</ul></details>`);
+          // "voir la photo": opens the file in a new tab, to check it before deleting
+          $('results').querySelectorAll('[data-view]').forEach(link => link.addEventListener('click', async event => {
+            event.preventDefault();
+            try {
+              const file = last && last.orphans[Number(link.dataset.view)];
+              if (file) window.open(await file.ref.getDownloadURL(), '_blank', 'noopener');
+            } catch (error) {
+              console.warn('Cannot open the photo:', error);
+              window.alert('Impossible d\'ouvrir cette photo : ' + (error.message || 'erreur inconnue'));
+            }
+          }));
           $('delete').disabled = false;
         }
       } catch (error) {

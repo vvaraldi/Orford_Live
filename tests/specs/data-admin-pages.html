@@ -93,6 +93,12 @@
     click(document.querySelector('#da-orphans [data-role=scan]')); await wait(800);
     const results = document.querySelector('#da-orphans [data-role=results]').textContent;
     ok('scan: the real photo is matched by its PATH (other bucket, other token), 1 orphan found, the new file ignored', /1<\/strong>/.test(document.querySelector('#da-orphans [data-role=results]').innerHTML) && /3 fichier\(s\) dans le stockage/.test(results) && /1 fichier\(s\) récent\(s\) ignoré/.test(results) && /200_orphan/.test(results) && !/100_real/.test(results), results);
+    // the orphan can be looked at before deleting: its date, and a link that opens the photo
+    const viewLink = document.querySelector('#da-orphans [data-view]');
+    const opened = []; const realOpen = window.open; window.open = (u) => { opened.push(u); };
+    if (viewLink) click(viewLink); await wait(300);
+    window.open = realOpen;
+    ok('the list shows each orphan\'s date and a "voir la photo" link that opens it', !!viewLink && /\d{4}-\d{2}-\d{2}/.test(results) && opened.length === 1 && opened[0].includes(encodeURIComponent(folder + '/200_orphan.jpg')), [results, opened]);
     click(document.querySelector('#da-orphans [data-role=delete]')); await wait(800);
     ok('delete: only the orphan is removed (after a confirmation); the real and the recent files stay', J(window.__storageDeleted) === J([folder + '/200_orphan.jpg']) && confirms.length === 1 && J(window.__storageFiles.map(f => f.path).sort()) === J([folder + '/100_real.jpg', folder + '/300_justnow.jpg']), [window.__storageDeleted, confirms.length]);
 
