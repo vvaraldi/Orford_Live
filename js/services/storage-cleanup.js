@@ -240,7 +240,8 @@ const StorageCleanup = (function () {
             note(`Stockage utilisé par l'application : <strong>${esc(mine || 'inconnu')}</strong>` + (last.bucketsInRecords.length ? ` • Les enregistrements pointent vers : <strong>${esc(last.bucketsInRecords.join(', '))}</strong>` : '')) +
             (other.length ? note('⚠️ Les photos sont dans un autre stockage que celui de l\'application (migration ?). Il faut analyser ce stockage-là.') : '') +
             (last.samplePaths.length ? note(`Exemples de chemins référencés : ${esc(last.samplePaths.join(' • '))}`) : '') +
-            (last.listErrors.length ? note(`Erreurs de lecture : ${esc(last.listErrors.join(' • '))}`) : ''));
+            (last.listErrors.length ? note(`Erreurs de lecture : ${esc(last.listErrors.join(' • '))}`) : '') +
+            (last.listErrors.length ? note('💡 Si l\'erreur est « HTTP 400 » ou « 403 » : dans la console Firebase > Storage > Règles, le texte doit commencer par la ligne <code>rules_version = \'2\';</code> (indispensable pour lister les fichiers), puis être publié.') : ''));
         } else if (last.suspicious) {
           show(`<p style="color: var(--color-danger);">⛔ Analyse suspecte : aucun des ${last.files} fichiers ne correspond à un enregistrement.</p>` +
             note('Les liens enregistrés ne correspondent pas aux fichiers (stockage déplacé ou migré ?). Par sécurité, la suppression est bloquée.') + note(esc(counts)));

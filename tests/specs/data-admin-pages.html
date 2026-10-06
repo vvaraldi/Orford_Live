@@ -69,6 +69,13 @@
     await DataAdmin.refresh();
     ok('without Chart.js: an explanation is shown, the cards are still drawn, the clean-up tools stay', /Chart\.js/.test($('da-error').textContent) && document.querySelectorAll('#da-cards .stat-card').length >= 6 && visible(document.querySelector('#da-orphans [data-role=scan]')), $('da-error').textContent);
     window.Chart = realChart;
+    // the Storage rules hint appears when the listing itself failed (HTTP 400: rules version 1)
+    const realRef = window.storage.ref;
+    window.storage.ref = () => ({ listAll: async () => { throw Object.assign(new Error('Firebase Storage: An unknown error occurred (storage/unknown)'), { code: 'storage/unknown', status_: 400 }); } });
+    click(document.querySelector('#da-orphans [data-role=scan]')); await wait(800);
+    const hint = document.querySelector('#da-orphans [data-role=results]').textContent;
+    ok('listing fails with HTTP 400: the error is shown with the rules_version hint, nothing can be deleted', /HTTP 400/.test(hint) && /rules_version = '2'/.test(hint) && document.querySelector('#da-orphans [data-role=delete]').disabled === true, hint);
+    window.storage.ref = realRef;
     const stat = label => { const el = [...document.querySelectorAll('#da-overview .db-stat')].find(e => e.querySelector('.db-stat__label').textContent === label); return el && el.querySelector('.db-stat__value').textContent; };
     ok('overview: counts of EVERY activity, not only the current one', PAGE === 'infraction-stats' ? stat('Infractions') === '5' && stat('Photos') === '1'
       : PAGE === 'signalisation-stats' ? stat('Signalisations') === '3' && stat('Photos') === '2'

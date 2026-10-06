@@ -261,6 +261,10 @@ service cloud.firestore {
   }
 }
 
+// ===== CLOUD STORAGE RULES =====
+// Paste THIS PART (from the next line) into Firebase console > Storage > Rules, including the
+// rules_version line: listing files (the orphan clean-up in the Admin pages) only works with version 2.
+rules_version = '2';
 service firebase.storage {
   match /b/{bucket}/o {
     match /{allPaths=**} {
