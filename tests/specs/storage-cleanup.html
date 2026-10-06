@@ -22,7 +22,7 @@
   const ref = path => ({
     fullPath: path,
     listAll: async () => {
-      if (LIST_FAIL) throw new Error('network error');
+      if (LIST_FAIL) throw (LIST_FAIL instanceof Error ? LIST_FAIL : new Error('network error'));
       const prefix = path.replace(/\/$/, '') + '/'; const items = [], prefixes = new Set();
       FILES.filter(f => f.path.startsWith(prefix)).forEach(f => { const rest = f.path.slice(prefix.length), s = rest.indexOf('/'); if (s === -1) items.push(ref(f.path)); else prefixes.add(prefix + rest.slice(0, s)); });
       return { items, prefixes: [...prefixes].map(ref) };
@@ -70,6 +70,10 @@
   LIST_FAIL = true;
   r = await SC.scan('inspection');
   ok('a folder that cannot be listed is reported (not silently "0 files")', r.noFiles === true && r.listErrors.length === 2 && /network error/.test(r.listErrors[0]), r.listErrors);
+  // the server's own answer is shown when the SDK gives one (a bare storage/unknown hides the real reason)
+  LIST_FAIL = Object.assign(new Error('Firebase Storage: An unknown error occurred (storage/unknown)'), { code: 'storage/unknown', status_: 404, serverResponse: '{"error":{"code":404,"message":"Not Found."}}' });
+  r = await SC.scan('inspection');
+  ok('list error details: code, HTTP status and the server response are all shown', /\[storage\/unknown\]/.test(r.listErrors[0]) && /HTTP 404/.test(r.listErrors[0]) && /Not Found/.test(r.listErrors[0]), r.listErrors[0]);
   LIST_FAIL = false;
   setup({ trail_inspections: [], shelter_inspections: [], inspections: [] }, []);
   r = await SC.scan('inspection');

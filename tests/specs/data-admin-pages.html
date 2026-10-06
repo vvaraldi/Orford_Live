@@ -58,7 +58,17 @@
   // Gestion des données (system admin)
   // =================================================================================================
   if (SYS) {
-    const mgmt = () => $('da-tab-management');
+    // The tab really opens: clicking "Gestion des données" shows its panel (the orphan box included) and hides the statistics
+    const visible = el => !!el && el.offsetParent !== null;
+    ok('statistics panel visible, management panel hidden to start with', visible($('da-pane-statistics')) && !visible($('da-pane-management')));
+    click($('da-tab-management')); await wait(200);
+    ok('clicking "Gestion des données" opens its panel: delete tool and orphan box visible, statistics hidden', visible($('da-pane-management')) && visible($('da-delete-before')) && visible(document.querySelector('#da-orphans [data-role=scan]')) && !visible($('da-pane-statistics')), [visible($('da-pane-management')), visible(document.querySelector('#da-orphans [data-role=scan]'))]);
+    ok('tab buttons and panels have different ids (no duplicate id)', ['da-tab-management', 'da-pane-management', 'da-pane-statistics'].every(id => document.querySelectorAll('#' + id).length === 1));
+    // a problem drawing the charts must not hide the clean-up tools
+    const realChart = window.Chart; window.Chart = undefined;
+    await DataAdmin.refresh();
+    ok('without Chart.js: an explanation is shown, the cards are still drawn, the clean-up tools stay', /Chart\.js/.test($('da-error').textContent) && document.querySelectorAll('#da-cards .stat-card').length >= 6 && visible(document.querySelector('#da-orphans [data-role=scan]')), $('da-error').textContent);
+    window.Chart = realChart;
     const stat = label => { const el = [...document.querySelectorAll('#da-overview .db-stat')].find(e => e.querySelector('.db-stat__label').textContent === label); return el && el.querySelector('.db-stat__value').textContent; };
     ok('overview: counts of EVERY activity, not only the current one', PAGE === 'infraction-stats' ? stat('Infractions') === '5' && stat('Photos') === '1'
       : PAGE === 'signalisation-stats' ? stat('Signalisations') === '3' && stat('Photos') === '2'

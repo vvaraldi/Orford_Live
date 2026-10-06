@@ -81,6 +81,20 @@ const StorageCleanup = (function () {
     try { return (APP_CONFIG.firebase.storageBucket || '').replace(/^gs:\/\//, '') || null; } catch (e) { return null; }
   }
 
+  /**
+   * What a Storage error says, with the server's own answer when there is one (a bare "storage/unknown"
+   * hides the real reason: HTTP status and payload tell, for instance, a missing bucket from a blocked request).
+   */
+  function describeError(error) {
+    if (!error) return 'erreur inconnue';
+    const parts = [error.code ? `[${error.code}]` : '', error.message || ''];
+    const status = error.status_ !== undefined ? error.status_ : (error.customData && error.customData.status);
+    if (status !== undefined) parts.push(`HTTP ${status}`);
+    const response = error.serverResponse || (error.customData && error.customData.serverResponse);
+    if (response) parts.push(`Réponse du serveur : ${String(response).slice(0, 400)}`);
+    return parts.filter(Boolean).join(' ');
+  }
+
   const storage = () => window.storage || firebase.storage();
 
   async function listFiles(ref, out) {
@@ -128,7 +142,7 @@ const StorageCleanup = (function () {
       } catch (error) {
         if (error && error.code === 'storage/unauthorized') throw error; // listing not allowed: say so
         console.warn('Dossier non analysé :', folder, error);
-        listErrors.push(`${folder} : ${(error && error.message) || 'erreur'}`);
+        listErrors.push(`${folder} : ${describeError(error)}`);
       }
     }
 

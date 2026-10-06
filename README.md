@@ -8,7 +8,7 @@
 
 3. Improve the user experience
 #	Priority	Item
-3.1 medium add a number max of users per page (25 to start) in the list displaid in the administration app tab "utilisateurs"
+3.2 medium add a number max of users per page (25 to start) in the list displaid in the administration app tab "utilisateurs"
 3.3	Low	Accessibility audit pass
 
 

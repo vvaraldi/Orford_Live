@@ -100,7 +100,7 @@ const DataAdmin = (function () {
         <button type="button" class="tab-btn" data-tab="management" id="da-tab-management" style="display: none;">🗄️ Gestion des données</button>
       </div>
 
-      <div class="tab-content active" id="da-tab-statistics">
+      <div class="tab-content active" id="da-pane-statistics">
         <div class="season-nav">
           <button type="button" class="season-nav__btn" id="da-season-prev" aria-label="Saison précédente" title="Saison précédente">◀</button>
           <span class="season-nav__label" id="da-season-label">-</span>
@@ -112,7 +112,7 @@ const DataAdmin = (function () {
         <div id="da-rankings"></div>
       </div>
 
-      <div class="tab-content" id="da-tab-management">
+      <div class="tab-content" id="da-pane-management">
         <div class="management-section">
           <div class="management-section__title">📊 État de la base de données</div>
           <div class="management-section__desc" id="da-overview-desc"></div>
@@ -143,7 +143,7 @@ const DataAdmin = (function () {
       document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
       document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
       btn.classList.add('active');
-      $(`da-tab-${btn.dataset.tab}`).classList.add('active');
+      $(`da-pane-${btn.dataset.tab}`).classList.add('active'); // (the button is da-tab-*, the panel da-pane-*)
     }));
     $('da-season-prev').addEventListener('click', () => changeSeason(1));
     $('da-season-next').addEventListener('click', () => changeSeason(-1));
@@ -160,9 +160,13 @@ const DataAdmin = (function () {
       records = [];
       message('Erreur lors du chargement des données', 'error');
     }
-    renderCards();
-    renderCharts();
-    renderRankings();
+    // Each part on its own: one that fails does not take the others down
+    [['cartes', renderCards], ['graphiques', renderCharts], ['classements', renderRankings]].forEach(([name, draw]) => {
+      try { draw(); } catch (error) {
+        console.error(`Error drawing the ${name}:`, error);
+        message(`Impossible d'afficher les ${name} : ${error.message}`, 'error');
+      }
+    });
   }
 
   function renderCards() {
@@ -198,6 +202,7 @@ const DataAdmin = (function () {
   }
 
   function renderCharts() {
+    if (typeof Chart === 'undefined') throw new Error('la bibliothèque de graphiques (Chart.js) n\'est pas chargée');
     const root = $('da-charts');
     if (!root.dataset.built) {
       // One block per chart; consecutive `half` charts share a row
@@ -333,15 +338,26 @@ const DataAdmin = (function () {
         // (needs the activity, known only now)
         $('da-delete-desc').textContent = `Supprime ${cfg.management.deleteOld.noun} et leurs photos avant la date spécifiée, pour l'activité « ${Network.config().name} » uniquement. Un fichier de sauvegarde sera téléchargé automatiquement avant la suppression.`;
         if (cfg.notice) { const text = cfg.notice(); if (text) $('da-notice').innerHTML = `<div class="alert alert-warning show">${escapeHtml(text)}</div>`; }
-        if (cfg.onReady) await cfg.onReady(userData);
-        applySeason();
-        await refresh();
-        // Deleting is reserved to the system admin (the Firestore and Storage rules say the same)
+        // Data management first, and on its own: a problem drawing the statistics (a chart script that
+        // did not load, say) must never hide the clean-up tools. Deleting is reserved to the system admin
+        // (the Firestore and Storage rules say the same).
         if (userData.role === 'system_admin') {
           $('da-tab-management').style.display = '';
-          StorageCleanup.mount($('da-orphans'), cfg.management.orphanApp, { onDone: loadOverview });
-          await loadOverview();
+          if (typeof StorageCleanup === 'undefined') {
+            $('da-orphans').innerHTML = '<div class="alert alert-danger show">Outil de nettoyage indisponible : le fichier js/services/storage-cleanup.js n\'est pas chargé (déploiement incomplet ou cache : rechargez la page avec Ctrl+F5).</div>';
+          } else {
+            StorageCleanup.mount($('da-orphans'), cfg.management.orphanApp, { onDone: loadOverview });
+          }
         }
+        try {
+          if (cfg.onReady) await cfg.onReady(userData);
+          applySeason();
+          await refresh();
+        } catch (error) {
+          console.error('Error drawing the statistics:', error);
+          message('Erreur lors de l\'affichage des statistiques : ' + error.message, 'error');
+        }
+        if (userData.role === 'system_admin') await loadOverview();
       },
       onAccessDenied: () => { window.location.href = cfg.deniedUrl || '../index.html'; }
     });
