@@ -85,6 +85,12 @@
     click(document.querySelector('#da-orphans [data-role=scan]')); await wait(800);
     ok('suspicious scan (no file matches a record): warned, and deletion stays disabled', /Analyse suspecte/.test(document.querySelector('#da-orphans [data-role=results]').textContent) && document.querySelector('#da-orphans [data-role=delete]').disabled === true && window.__storageDeleted.length === 0);
 
+    // ---- records point to photos, but no file at all is found (photos in another bucket): "analyse impossible" ----
+    window.__storageFiles = [];
+    click(document.querySelector('#da-orphans [data-role=scan]')); await wait(800);
+    const impossible = document.querySelector('#da-orphans [data-role=results]').textContent;
+    ok('no file found while photos are referenced: "Analyse impossible", says it does NOT mean "no orphans", shows the bucket in the records, deletion blocked', /Analyse impossible/.test(impossible) && /ne veut PAS dire/.test(impossible) && /other\.appspot\.com/.test(impossible) && document.querySelector('#da-orphans [data-role=delete]').disabled === true && !/Aucun fichier orphelin/.test(impossible), impossible);
+
     // ---- delete old records: preview, backup, photos then record ----
     const clickBackup = HTMLAnchorElement.prototype.click; HTMLAnchorElement.prototype.click = function () { window.__backups = (window.__backups || []).concat(this.download || ''); };
     URL.createObjectURL = () => 'blob:test'; URL.revokeObjectURL = () => {};

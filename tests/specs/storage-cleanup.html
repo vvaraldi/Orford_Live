@@ -15,12 +15,14 @@
   const url = (path, host, token) => `https://${host || 'firebasestorage.googleapis.com/v0/b/proj.appspot.com'}/o/${encodeURIComponent(path)}?alt=media&token=${token || 't1'}`;
 
   // ---- a fake Firestore and Storage ----
-  let DATA = {}, FILES = [], DELETED = [], FAIL_READ = null;
+  let DATA = {}, FILES = [], DELETED = [], FAIL_READ = null, LIST_FAIL = false;
+  window.APP_CONFIG = { firebase: { storageBucket: 'proj.appspot.com' } };
   const snapOf = rows => ({ size: rows.length, forEach: fn => rows.forEach(r => fn({ id: r.id, data: () => r })) });
   window.db = { collection: name => ({ get: async () => { if (FAIL_READ === name) throw new Error('permission-denied'); return snapOf(DATA[name] || []); } }) };
   const ref = path => ({
     fullPath: path,
     listAll: async () => {
+      if (LIST_FAIL) throw new Error('network error');
       const prefix = path.replace(/\/$/, '') + '/'; const items = [], prefixes = new Set();
       FILES.filter(f => f.path.startsWith(prefix)).forEach(f => { const rest = f.path.slice(prefix.length), s = rest.indexOf('/'); if (s === -1) items.push(ref(f.path)); else prefixes.add(prefix + rest.slice(0, s)); });
       return { items, prefixes: [...prefixes].map(ref) };
@@ -58,6 +60,20 @@
   FAIL_READ = 'trail_inspections';
   let failure = null; try { await SC.scan('inspection'); } catch (e) { failure = e.message; }
   ok('a record collection that cannot be read stops the scan (never "everything is an orphan")', failure === 'permission-denied', failure);
+
+  // ---- records point to photos but NO file is found (the photos live in another bucket): never "no orphans" ----
+  setup({ trail_inspections: [{ id: 'T1', photos: [{ url: url('inspections/trails/R1/0-a.jpg', 'firebasestorage.googleapis.com/v0/b/OLD.appspot.com') }, { url: url('inspections/trails/R1/1-b.jpg', 'firebasestorage.googleapis.com/v0/b/OLD.appspot.com') }] }] }, []);
+  r = await SC.scan('inspection');
+  ok('records point to 2 photos, no file found: "noFiles" (nothing can be judged), no orphan, not "all clear"', r.noFiles === true && r.referenced === 2 && r.files === 0 && r.orphans.length === 0, [r.noFiles, r.referenced, r.files]);
+  ok('diagnostic: the bucket the records point to, the bucket the app uses, and sample paths', J(r.bucketsInRecords) === J(['OLD.appspot.com']) && r.configuredBucket === 'proj.appspot.com' && r.samplePaths[0] === 'inspections/trails/R1/0-a.jpg', [r.bucketsInRecords, r.configuredBucket, r.samplePaths]);
+  setup({ trail_inspections: [{ id: 'T1', photos: [{ url: url('inspections/trails/R1/0-a.jpg') }] }] }, ['inspections/trails/R1/0-a.jpg']);
+  LIST_FAIL = true;
+  r = await SC.scan('inspection');
+  ok('a folder that cannot be listed is reported (not silently "0 files")', r.noFiles === true && r.listErrors.length === 2 && /network error/.test(r.listErrors[0]), r.listErrors);
+  LIST_FAIL = false;
+  setup({ trail_inspections: [], shelter_inspections: [], inspections: [] }, []);
+  r = await SC.scan('inspection');
+  ok('nothing referenced and no file: a genuine "nothing to clean" (not flagged)', r.noFiles === false && r.suspicious === false && r.orphans.length === 0);
 
   // ---- the other apps: their folders and where their records point ----
   setup({ infractions: [{ id: 'I1', photos: [{ url: url('infractions/u1/1_a.jpg') }], offenderQRImageUrl: url('infractions/u1/2_qrcode.jpg') }, { id: 'I2', offenderImageUrl: url('infractions/u2/old.jpg') }] },

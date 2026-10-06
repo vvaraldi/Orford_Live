@@ -3,20 +3,12 @@
 
 2. Improve the code
 #	Priority	Item
-2.2 Medium Documentation / README & deployment guide
-
-2.3	Low	Trim legacy back-compat branches
-
-
+2.1 Medium Documentation / README & deployment guide
+2.2	Low	Trim legacy back-compat branches
 
 3. Improve the user experience
 #	Priority	Item
-3.1 Low add an Admin page showing two tabs (like in Inspections) : Statistiques & Gestion des données.
-- first tab should show by season the same type of stats as Inspections (Remove the box "Photo la plus éloignée du centre de la carte" and its code within Inspections (not needed anymore))
-- second tab should do the same as in Inspections
-
-3.2 High For the orphelins files (photos) does this function in Inspections loop through all the picture... what ever the apps and activity ?
-
+3.1 medium add a number max of users per page (25 to start) in the list displaid in the administration app tab "utilisateurs"
 3.3	Low	Accessibility audit pass
 
 

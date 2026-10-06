@@ -17,6 +17,9 @@
  * Safeguards (deletion is irreversible)
  *   - Files younger than 2 hours are skipped: they may belong to a report being written right now.
  *   - The old `inspections` collection counts as a reference for Inspections.
+ *   - If records point to photos but NO file is found in the folders at all (another bucket after a
+ *     migration, another folder, listing impossible), nothing can be judged: the tool says so and
+ *     shows which bucket the records point to versus the one the app uses - never "no orphans".
  *   - If not a single file matches a record, the analysis is "suspicious" (links and files do not
  *     belong together): deletion is refused. If more than half of the files are orphans, a second,
  *     stronger confirmation is asked.
@@ -67,6 +70,17 @@ const StorageCleanup = (function () {
     try { return decodeURIComponent(match[1]); } catch (e) { return null; }
   }
 
+  /** The bucket a download URL points to (".../v0/b/<bucket>/o/..."), or null. */
+  function bucketOfUrl(url) {
+    const match = typeof url === 'string' ? url.match(/\/v0\/b\/([^/]+)\/o\//) : null;
+    return match ? match[1] : null;
+  }
+
+  /** The bucket this app reads and writes (config.js firebase.storageBucket), or null when unknown. */
+  function configuredBucket() {
+    try { return (APP_CONFIG.firebase.storageBucket || '').replace(/^gs:\/\//, '') || null; } catch (e) { return null; }
+  }
+
   const storage = () => window.storage || firebase.storage();
 
   async function listFiles(ref, out) {
@@ -90,6 +104,7 @@ const StorageCleanup = (function () {
     // 1. every path some record refers to. A failed read must stop here: with an incomplete
     //    list, real photos would look like orphans.
     const valid = new Set();
+    const buckets = new Set(), samples = [];
     let referenced = 0;
     for (const name of app.collections) {
       progress(`Lecture des enregistrements (${name})…`);
@@ -97,19 +112,23 @@ const StorageCleanup = (function () {
       snapshot.forEach(doc => app.urls(doc.data()).forEach(url => {
         referenced++;
         const path = pathOfUrl(url);
-        if (path) valid.add(path);
+        if (path) { valid.add(path); if (samples.length < 3) samples.push(path); }
+        const bucket = bucketOfUrl(url);
+        if (bucket) buckets.add(bucket);
       }));
     }
 
     // 2. every file of the app's folders
     progress('Analyse du stockage Firebase…');
     const files = [];
+    const listErrors = [];
     for (const folder of app.folders) {
       try {
         await listFiles(storage().ref(folder), files);
       } catch (error) {
         if (error && error.code === 'storage/unauthorized') throw error; // listing not allowed: say so
         console.warn('Dossier non analysé :', folder, error);
+        listErrors.push(`${folder} : ${(error && error.message) || 'erreur'}`);
       }
     }
 
@@ -135,6 +154,14 @@ const StorageCleanup = (function () {
       tooRecent,
       // Not one file belongs to a record: links and files do not match (e.g. storage moved) - never delete on that
       suspicious: files.length >= 5 && matched === 0,
+      // Records point to photos but not one file was found in the folders: the files are somewhere else
+      // (another bucket, another folder) or could not be listed. Nothing can be judged: never "no orphans".
+      noFiles: referenced > 0 && files.length === 0,
+      // Where the records say the photos are, versus where this app looks
+      bucketsInRecords: [...buckets],
+      configuredBucket: configuredBucket(),
+      samplePaths: samples,
+      listErrors,
       // Most files orphan: possible, but worth a second look before deleting
       mostlyOrphans: files.length >= 10 && candidates.length / files.length > 0.5
     };
@@ -191,7 +218,16 @@ const StorageCleanup = (function () {
         last = await scan(appId, { onProgress: text => show(`<p>🔍 ${esc(text)}</p>`) });
         const counts = `${last.referenced} photo(s) référencée(s) • ${last.files} fichier(s) dans le stockage` +
           (last.tooRecent.length ? ` • ${last.tooRecent.length} fichier(s) récent(s) ignoré(s)` : '');
-        if (last.suspicious) {
+        if (last.noFiles) {
+          const mine = last.configuredBucket;
+          const other = last.bucketsInRecords.filter(b => b !== mine);
+          show(`<p style="color: var(--color-danger);">⛔ Analyse impossible : ${last.referenced} photo(s) sont référencées, mais AUCUN fichier n'a été trouvé dans le stockage (dossiers : ${esc(app.folders.join(', '))}).</p>` +
+            note('Cela ne veut PAS dire qu\'il n\'y a pas d\'orphelins : l\'outil ne voit simplement pas vos photos. La suppression est bloquée.') +
+            note(`Stockage utilisé par l'application : <strong>${esc(mine || 'inconnu')}</strong>` + (last.bucketsInRecords.length ? ` • Les enregistrements pointent vers : <strong>${esc(last.bucketsInRecords.join(', '))}</strong>` : '')) +
+            (other.length ? note('⚠️ Les photos sont dans un autre stockage que celui de l\'application (migration ?). Il faut analyser ce stockage-là.') : '') +
+            (last.samplePaths.length ? note(`Exemples de chemins référencés : ${esc(last.samplePaths.join(' • '))}`) : '') +
+            (last.listErrors.length ? note(`Erreurs de lecture : ${esc(last.listErrors.join(' • '))}`) : ''));
+        } else if (last.suspicious) {
           show(`<p style="color: var(--color-danger);">⛔ Analyse suspecte : aucun des ${last.files} fichiers ne correspond à un enregistrement.</p>` +
             note('Les liens enregistrés ne correspondent pas aux fichiers (stockage déplacé ou migré ?). Par sécurité, la suppression est bloquée.') + note(esc(counts)));
         } else if (last.orphans.length === 0) {
@@ -234,6 +270,6 @@ const StorageCleanup = (function () {
     });
   }
 
-  return { APPS, pathOfUrl, scan, remove, mount };
+  return { APPS, pathOfUrl, bucketOfUrl, scan, remove, mount };
 })();
 window.StorageCleanup = StorageCleanup;
