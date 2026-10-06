@@ -118,8 +118,6 @@ const APP_CONFIG = {
   //   features      what the network has: shelters, snowCondition (ski-only inspection field)
   //   infractions   the fault types and practices offered on the infraction form (id -> label)
   //   publicTitle   what the public status page calls this activity's trails
-  //   mapCenter     GPS centre of the activity's map (distance-from-centre photo check); none = skipped.
-  //                 Ski and bike use the same point: both maps cover Mont Orford.
   networks: {
     ski: {
       id: 'ski', name: 'Ski', icon: '⛷️',
@@ -130,7 +128,6 @@ const APP_CONFIG = {
       inspectionKinds: ['uphill', 'downhill'],
       features: { shelters: true, snowCondition: true },
       publicTitle: 'État des sentiers de randonnée alpine',
-      mapCenter: { lat: 45.310, lon: -72.230 },
       infractions: {
         faults: {
           'downhill': 'Downhill',
@@ -153,7 +150,6 @@ const APP_CONFIG = {
       inspectionKinds: ['bike'],
       features: { shelters: false, snowCondition: false },
       publicTitle: 'État des sentiers de vélo de montagne',
-      mapCenter: { lat: 45.310, lon: -72.230 }, // same point as ski: both maps cover Mont Orford
       infractions: {
         faults: {
           'acces-non-accredite': 'Utilise une piste sans droit d\'accès accrédité',
@@ -261,7 +257,8 @@ const APP_CONFIG = {
       title: 'Infractions',
       items: [
         { id: 'infraction-report', label: 'Rapport', icon: '📝', href: 'pages/infraction-report.html' },
-        { id: 'infraction-admin', label: 'Gestion', icon: '📋', href: 'pages/infraction-admin.html', admin: true }
+        { id: 'infraction-admin', label: 'Gestion', icon: '📋', href: 'pages/infraction-admin.html', admin: true },
+        { id: 'infraction-stats', label: 'Admin', icon: '⚙️', href: 'pages/infraction-stats.html', admin: true }
       ]
     },
     signalisation: {
@@ -269,14 +266,16 @@ const APP_CONFIG = {
       items: [
         { id: 'signalisation-resume', label: 'Tableau de bord', icon: '🗺️', href: 'pages/signalisation-resume.html' },
         { id: 'signalisation-report', label: 'Rapport', icon: '📝', href: 'pages/signalisation-report.html' },
-        { id: 'signalisation-admin', label: 'Gestion', icon: '📋', href: 'pages/signalisation-admin.html', admin: true }
+        { id: 'signalisation-admin', label: 'Gestion', icon: '📋', href: 'pages/signalisation-admin.html', admin: true },
+        { id: 'signalisation-stats', label: 'Admin', icon: '⚙️', href: 'pages/signalisation-stats.html', admin: true }
       ]
     },
     maintenance: {
       title: 'Entretien',
       items: [
         { id: 'maintenance-report', label: 'Journal', icon: '📝', href: 'pages/maintenance-report.html' },
-        { id: 'maintenance-admin', label: 'Gestion', icon: '📋', href: 'pages/maintenance-admin.html', admin: true }
+        { id: 'maintenance-admin', label: 'Gestion', icon: '📋', href: 'pages/maintenance-admin.html', admin: true },
+        { id: 'maintenance-stats', label: 'Admin', icon: '⚙️', href: 'pages/maintenance-stats.html', admin: true }
       ]
     },
     support: {

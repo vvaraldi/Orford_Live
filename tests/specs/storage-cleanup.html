@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html><head><meta charset="utf-8"><title>StorageCleanup tests</title></head>
+<body>
+<pre id="out">running...</pre>
+<script src="/js/services/photo-service.js"></script>
+<script src="/js/services/storage-cleanup.js"></script>
+<script>
+// The orphan-file tool: how a file is judged (by PATH, not by URL), the safeguards, and each app's folders.
+(async () => {
+  const out = []; const J = JSON.stringify;
+  const ok = (n, c, x) => out.push((c ? 'PASS ' : 'FAIL ') + n + (c ? '' : ' :: ' + J(x)));
+  const SC = StorageCleanup;
+  const HOUR = 3600 * 1000;
+  const old = Date.now() - 48 * HOUR;
+  const url = (path, host, token) => `https://${host || 'firebasestorage.googleapis.com/v0/b/proj.appspot.com'}/o/${encodeURIComponent(path)}?alt=media&token=${token || 't1'}`;
+
+  // ---- a fake Firestore and Storage ----
+  let DATA = {}, FILES = [], DELETED = [], FAIL_READ = null;
+  const snapOf = rows => ({ size: rows.length, forEach: fn => rows.forEach(r => fn({ id: r.id, data: () => r })) });
+  window.db = { collection: name => ({ get: async () => { if (FAIL_READ === name) throw new Error('permission-denied'); return snapOf(DATA[name] || []); } }) };
+  const ref = path => ({
+    fullPath: path,
+    listAll: async () => {
+      const prefix = path.replace(/\/$/, '') + '/'; const items = [], prefixes = new Set();
+      FILES.filter(f => f.path.startsWith(prefix)).forEach(f => { const rest = f.path.slice(prefix.length), s = rest.indexOf('/'); if (s === -1) items.push(ref(f.path)); else prefixes.add(prefix + rest.slice(0, s)); });
+      return { items, prefixes: [...prefixes].map(ref) };
+    },
+    getMetadata: async () => ({ timeCreated: new Date((FILES.find(f => f.path === path) || {}).created || old).toISOString() }),
+    delete: async () => { DELETED.push(path); FILES = FILES.filter(f => f.path !== path); }
+  });
+  window.storage = { ref };
+  const setup = (data, files) => { DATA = data; FILES = files.map(f => (typeof f === 'string' ? { path: f, created: old } : f)); DELETED = []; FAIL_READ = null; };
+
+  // ---- paths from URLs ----
+  ok('path of a download URL (decoded)', SC.pathOfUrl(url('infractions/u1/1699_a b.jpg')) === 'infractions/u1/1699_a b.jpg', SC.pathOfUrl(url('infractions/u1/1699_a b.jpg')));
+  ok('same path whatever the host and the token (a migrated project)', SC.pathOfUrl(url('x/y.jpg', 'firebasestorage.googleapis.com/v0/b/old.appspot.com', 'AAA')) === SC.pathOfUrl(url('x/y.jpg', 'firebasestorage.googleapis.com/v0/b/new.firebasestorage.app', 'BBB')));
+  ok('not a storage URL: no path', SC.pathOfUrl('photo.jpg') === null && SC.pathOfUrl(null) === null && SC.pathOfUrl('https://example.com/a.jpg') === null);
+
+  // ---- Inspections: both folders, the old collection counts, tokens/hosts do not matter ----
+  setup({
+    trail_inspections: [{ id: 'T1', photos: [{ url: url('inspections/trails/R1/0-a.jpg', 'firebasestorage.googleapis.com/v0/b/OLD.appspot.com', 'OLDTOKEN'), filename: 'a.jpg' }, 'x-legacy-string-not-a-storage-url'] }],
+    shelter_inspections: [{ id: 'S1', photos: [{ url: url('inspections/shelters/R2/0-c.jpg') }] }],
+    inspections: [{ id: 'OLD1', photos: [url('inspections/trails/R3/0-oldrecord.jpg')] }]      // the old collection
+  }, ['inspections/trails/R1/0-a.jpg', 'inspections/shelters/R2/0-c.jpg', 'inspections/trails/R3/0-oldrecord.jpg', 'inspections/trails/R9/0-gone.jpg', { path: 'inspections/trails/R8/0-justnow.jpg', created: Date.now() - 600000 }, 'infractions/u1/not-mine.jpg']);
+  let r = await SC.scan('inspection');
+  ok('inspection: 5 files in its folders (not the other apps\' ones), 3 match a record (old collection included, URL token/host ignored)', r.files === 5 && r.matched === 3, [r.files, r.matched]);
+  ok('inspection: the only orphan is the old unreferenced file; the one uploaded 10 minutes ago is left alone', J(r.orphans.map(f => f.path)) === J(['inspections/trails/R9/0-gone.jpg']) && J(r.tooRecent.map(f => f.path)) === J(['inspections/trails/R8/0-justnow.jpg']), [r.orphans.map(f => f.path), r.tooRecent.map(f => f.path)]);
+  ok('inspection: not flagged suspicious / mostly orphans', r.suspicious === false && r.mostlyOrphans === false);
+
+  // ---- the safeguards ----
+  setup({ trail_inspections: [{ id: 'T1', photos: [{ url: url('inspections/trails/ELSEWHERE/a.jpg') }] }] }, Array.from({ length: 6 }, (_, i) => `inspections/trails/R${i}/0-f.jpg`));
+  r = await SC.scan('inspection');
+  ok('no file matches any record: "suspicious" (links and files do not belong together), 6 candidates', r.suspicious === true && r.matched === 0 && r.orphans.length === 6, [r.suspicious, r.matched, r.orphans.length]);
+  setup({ trail_inspections: [{ id: 'T1', photos: [url('inspections/trails/R0/0-f.jpg'), url('inspections/trails/R1/0-f.jpg'), url('inspections/trails/R2/0-f.jpg')] }] }, Array.from({ length: 12 }, (_, i) => `inspections/trails/R${i}/0-f.jpg`));
+  r = await SC.scan('inspection');
+  ok('more than half of the files orphan: "mostlyOrphans" asks for a second confirmation (not suspicious: some match)', r.mostlyOrphans === true && r.suspicious === false && r.orphans.length === 9, [r.mostlyOrphans, r.suspicious, r.orphans.length]);
+  setup({ trail_inspections: [] }, ['inspections/trails/R0/0-f.jpg']);
+  FAIL_READ = 'trail_inspections';
+  let failure = null; try { await SC.scan('inspection'); } catch (e) { failure = e.message; }
+  ok('a record collection that cannot be read stops the scan (never "everything is an orphan")', failure === 'permission-denied', failure);
+
+  // ---- the other apps: their folders and where their records point ----
+  setup({ infractions: [{ id: 'I1', photos: [{ url: url('infractions/u1/1_a.jpg') }], offenderQRImageUrl: url('infractions/u1/2_qrcode.jpg') }, { id: 'I2', offenderImageUrl: url('infractions/u2/old.jpg') }] },
+    ['infractions/u1/1_a.jpg', 'infractions/u1/2_qrcode.jpg', 'infractions/u2/old.jpg', 'infractions/u1/9_orphan.jpg', 'signalisations/u1/5_s.jpg']);
+  r = await SC.scan('infraction');
+  ok('infraction: photos, QR images and the old single-photo field count as references; only its own folder is scanned', r.files === 4 && r.matched === 3 && J(r.orphans.map(f => f.path)) === J(['infractions/u1/9_orphan.jpg']), [r.files, r.matched, r.orphans.map(f => f.path)]);
+  setup({ signalisations: [{ id: 'S1', photos: [{ url: url('signalisations/u1/5_s.jpg') }] }, { id: 'S2', photoUrl: url('signalisations/u3/old.jpg') }] }, ['signalisations/u1/5_s.jpg', 'signalisations/u3/old.jpg', 'signalisations/u1/6_orphan.jpg', 'infractions/u1/1_a.jpg']);
+  r = await SC.scan('signalisation');
+  ok('signalisation: its folder; photos and the old photoUrl field count', r.files === 3 && J(r.orphans.map(f => f.path)) === J(['signalisations/u1/6_orphan.jpg']), [r.files, r.orphans.map(f => f.path)]);
+  setup({ maintenance_logs: [{ id: 'L1', entries: [{ photos: [{ url: url('maintenance/u1/1_a.jpg') }] }, { photos: [{ url: url('maintenance/u1/2_b.jpg') }, { url: url('maintenance/u1/3_c.jpg') }] }, { photos: [] }] }] }, ['maintenance/u1/1_a.jpg', 'maintenance/u1/2_b.jpg', 'maintenance/u1/3_c.jpg', 'maintenance/u1/4_orphan.jpg']);
+  r = await SC.scan('maintenance');
+  ok('maintenance: photos inside every work entry count; the orphan is found', r.files === 4 && r.matched === 3 && J(r.orphans.map(f => f.path)) === J(['maintenance/u1/4_orphan.jpg']), [r.files, r.matched, r.orphans.map(f => f.path)]);
+  ok('the four apps are all covered', J(Object.keys(SC.APPS).sort()) === J(['infraction', 'inspection', 'maintenance', 'signalisation']));
+
+  // ---- removing ----
+  const result = await SC.remove(r.orphans);
+  ok('remove deletes exactly the files it is given', result.deleted === 1 && result.failed === 0 && J(DELETED) === J(['maintenance/u1/4_orphan.jpg']), [result, DELETED]);
+
+  document.getElementById('out').textContent = out.join('\n');
+})().catch(e => { document.getElementById('out').textContent = 'HARNESS ERROR ' + e.stack; });
+</script>
+</body></html>

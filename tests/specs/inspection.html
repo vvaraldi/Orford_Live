@@ -259,11 +259,9 @@
     ok('season start follows the activity\'s season (bike 1 May, ski 1 Nov)', seasonStart.getMonth() === (bike ? 4 : 10) && seasonStart.getDate() === 1, seasonStart);
     const range = Network.seasonRange();
     ok('the season ends on its last day (bike 31 Oct, ski 30 Apr)', range.end.getMonth() === (bike ? 9 : 3) && range.end.getDate() === (bike ? 31 : 30), range.end);
-    ok('bike and ski share the same map centre', MAP_CENTER && MAP_CENTER.lat === 45.31 && MAP_CENTER.lon === -72.23, MAP_CENTER);
+    ok('the \"photo furthest from the map centre\" box and its code are gone', !document.getElementById('outlier-photo-container') && typeof renderOutlierPhoto === 'undefined' && typeof haversineDistance === 'undefined' && typeof MAP_CENTER === 'undefined' && APP_CONFIG.networks.ski.mapCenter === undefined);
     const card = document.getElementById('stat-shelter-inspections').closest('.stat-card');
     ok('shelter statistic hidden without shelters', (card.style.display === 'none') === bike);
-    // bike now has a map centre too, so the outlier check runs; this mock's bike inspection has no photo
-    if (bike) ok('bike: outlier check runs (map centre set) but finds no GPS photo in this mock', document.getElementById('outlier-photo-container').textContent.includes('Aucune photo'), document.getElementById('outlier-photo-container').textContent);
   }
 
   if (PAGE === 'inspection-admin' && downhill) {
@@ -274,10 +272,12 @@
     // "Gestion des données" text must say plainly what each tool reaches, so nobody assumes a
     // delete is limited to whatever kind is selected in the header when it plainly is not.
     const deleteDesc = document.getElementById('delete-desc').textContent;
-    const orphanDesc = document.getElementById('orphan-desc').textContent;
     const dbDesc = document.getElementById('db-desc').textContent;
     ok('delete tool: says which activity, and (for ski) that it covers every kind regardless of the header', deleteDesc.includes(`« ${Network.config().name} »`) && (bike ? !/Montée|Descente/.test(deleteDesc) : /Montée et Descente/.test(deleteDesc) && /vue sélectionnée/.test(deleteDesc)), deleteDesc);
-    ok('orphan cleanup: says it is NOT scoped to the current activity (reads the whole database)', /TOUTES les activités/.test(orphanDesc) && orphanDesc.includes(`« ${Network.config().name} »`), orphanDesc);
+    // the orphan clean-up is the shared tool (storage-cleanup.js), drawn for the system admin only
+    const orphanSection = document.getElementById('orphan-section');
+    if (Q.get('as') === 'system') ok('orphan cleanup: drawn for the system admin, says it covers ALL activities and the folders of Inspections', /TOUTES les activités/.test(orphanSection.textContent) && /Nettoyage des fichiers orphelins/.test(orphanSection.textContent) && !!orphanSection.querySelector('[data-role=scan]'), orphanSection.textContent);
+    else ok('orphan cleanup: not drawn for a plain admin (deleting is for the system admin)', orphanSection.children.length === 0);
     ok('db stats: says it is NOT scoped to the current activity either', /TOUTES les données stockées/.test(dbDesc) && /tous réseaux confondus/.test(dbDesc), dbDesc);
 
     // ---- season navigator (Statistiques tab): mirrors the app's own season math so the

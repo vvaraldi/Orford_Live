@@ -1,0 +1,111 @@
+<pre id="out" style="position:fixed;left:0;bottom:0;background:#fff;color:#000;font-size:11px;z-index:99999">running...</pre>
+<script>
+// The Admin pages of Infractions, Signalisations and Entretien: statistics of the season, and (system admin)
+// the data management tab with its orphan-photo clean-up.
+(async () => {
+  const out = []; const J = JSON.stringify;
+  const ok = (n, c, x) => out.push((c ? 'PASS ' : 'FAIL ') + n + (c ? '' : ' :: ' + J(x)));
+  const wait = ms => new Promise(r => setTimeout(r, ms));
+  const PAGE = Q.get('page');
+  const SYS = Q.get('as') === 'system';
+  const bike = NET === 'bike' || Q.get('choice') === 'bike';
+  const downhill = Q.get('kind') === 'downhill';
+  const $ = id => document.getElementById(id);
+  const click = el => el.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
+  await wait(1500);
+  ok('no script errors on load', window.__errs.length === 0, window.__errs);
+
+  // ---- helpers: what the page shows ----
+  const cards = () => Object.fromEntries([...document.querySelectorAll('#da-cards .stat-card')].map(c => [c.querySelector('.stat-card__label').textContent, c.querySelector('.stat-card__value').textContent]));
+  const rankRows = n => [...document.querySelectorAll(`#da-ranking-${n} tbody tr`)].map(tr => [...tr.children].slice(1).map(td => td.textContent));
+  const chartLabels = id => (Chart.getChart($('da-chart-' + id)) || { data: { labels: [] } }).data.labels;
+  const chartValues = id => (Chart.getChart($('da-chart-' + id)) || { data: { datasets: [{ data: [] }] } }).data.datasets[0].data;
+  const tabs = () => [...document.querySelectorAll('.tab-btn')].map(b => b.textContent.trim());
+
+  // ---- shared by the three pages ----
+  ok('two tabs like Inspections: Statistiques, and Gestion des données (system admin only)', tabs().length === 2 && /Statistiques/.test(tabs()[0]) && /Gestion des données/.test(tabs()[1]) && ($('da-tab-management').style.display !== 'none') === SYS, [tabs(), $('da-tab-management').style.display]);
+  ok('the season navigator shows the activity\'s own season, "Next" disabled on the latest one', $('da-season-label').textContent === Network.seasonLabel(Network.seasonRange()) && $('da-season-next').disabled === true, $('da-season-label').textContent);
+  ok('the statistics are drawn: cards, charts and ranking tables', document.querySelectorAll('#da-cards .stat-card').length >= 6 && document.querySelectorAll('#da-charts canvas, #da-charts .chart-empty').length >= 3 && document.querySelectorAll('#da-rankings .data-table').length >= 1);
+
+  // =================================================================================================
+  if (PAGE === 'infraction-stats') {
+    const c = cards();
+    ok(bike ? 'bike: 1 infraction, no photo' : 'ski: 4 infractions (the bike one is not counted), 1 photo, 1 patrol officer, 4.0 each', bike ? c['Total infractions'] === '1' && c['Photos téléversées'] === '0' : c['Total infractions'] === '4' && c['Photos téléversées'] === '1' && c['Patrouilleurs actifs'] === '1' && c['Moy. infractions/patrouilleur'] === '4.0', c);
+    ok('hidden/archived/off-piste cards count 0 here', c['Archivées'] === '0' && c['Hors-piste'] === '0', c);
+    ok('fault types chart (this activity\'s labels, most frequent first)', bike ? J(chartLabels('faults')) === J(['Autre (voir commentaires)']) : J(chartLabels('faults')) === J(['Downhill', 'Saut dangereux']) && J(chartValues('faults')) === J([3, 1]), [chartLabels('faults'), chartValues('faults')]);
+    ok('patrol officers ranking: name, infractions, photos, off-piste', J(rankRows(0)) === J(bike ? [['Test', '1', '0', '0']] : [['Test', '4', '1', '0']]), rankRows(0));
+  }
+  if (PAGE === 'signalisation-stats') {
+    const c = cards();
+    // Montée (default) shows the uphill view: only the old report whose trail is unknown (SIG1); Descente adds SIG2 (2 photos)
+    ok(bike ? 'bike: 1 signalisation' : (downhill ? 'Descente: 2 signalisations (the unknown-trail one shows in both views), 2 photos' : 'Montée: 1 signalisation (the downhill one is in the other view)'), bike ? c['Total signalisations'] === '1' : (downhill ? c['Total signalisations'] === '2' && c['Photos téléversées'] === '2' : c['Total signalisations'] === '1' && c['Photos téléversées'] === '0'), c);
+    ok('active / resolved / status cards', bike || (c['Actives (non résolues)'] === c['Total signalisations'] && c['Résolues'] === '0' && c['Statut « Fermée »'] === (downhill ? '1' : '0') && c['Délai moyen de résolution'] === '-'), c);
+    ok('status chart uses the statuses\' names', chartLabels('status').every(l => ['Ouverte', 'Attention requise', 'Fermée', 'Sans statut'].includes(l)) && chartLabels('status').length >= 1, chartLabels('status'));
+    ok('inspectors ranking: one row, with the count of signalisations', rankRows(0).length === 1 && rankRows(0)[0][0] === 'Test', rankRows(0));
+  }
+  if (PAGE === 'maintenance-stats') {
+    const c = cards();
+    if (!bike) {
+      ok('ski: a notice says Entretien is for the bike activity, and nothing is counted', /uniquement l'activité Vélo/.test($('da-notice').textContent) && c['Journaux de travail'] === '0', [$('da-notice').textContent, c]);
+    } else {
+      ok('bike: 1 log, 2 work entries, 2 photos, 1 builder, 2 volunteers (2 presences), 2 trails worked', c['Journaux de travail'] === '1' && c['Travaux effectués'] === '2' && c['Photos téléversées'] === '2' && c['Artisans de sentiers actifs'] === '1' && c['Bénévoles différents'] === '2' && c['Présences de bénévoles'] === '2' && c['Sentiers travaillés'] === '2', c);
+      ok('builders ranking (logs, work entries, photos) and volunteers ranking', J(rankRows(0)) === J([['Test', '1', '2', '2']]) && J(rankRows(1).map(r => r[0]).sort()) === J(['Ann', 'Bob']), [rankRows(0), rankRows(1)]);
+      ok('trails chart: one work entry per trail', J(chartValues('trails')) === J([1, 1]), chartValues('trails'));
+    }
+  }
+
+  // =================================================================================================
+  // Gestion des données (system admin)
+  // =================================================================================================
+  if (SYS) {
+    const mgmt = () => $('da-tab-management');
+    const stat = label => { const el = [...document.querySelectorAll('#da-overview .db-stat')].find(e => e.querySelector('.db-stat__label').textContent === label); return el && el.querySelector('.db-stat__value').textContent; };
+    ok('overview: counts of EVERY activity, not only the current one', PAGE === 'infraction-stats' ? stat('Infractions') === '5' && stat('Photos') === '1'
+      : PAGE === 'signalisation-stats' ? stat('Signalisations') === '3' && stat('Photos') === '2'
+      : stat('Journaux') === '1' && stat('Travaux') === '2' && stat('Photos') === '2', [...document.querySelectorAll('#da-overview .db-stat')].map(e => e.textContent));
+    ok('the delete tool and the orphan tool are both there', !!$('da-delete-before') && !!document.querySelector('#da-orphans [data-role=scan]') && /TOUTES les activités/.test($('da-orphans').textContent), $('da-orphans').textContent.slice(0, 80));
+
+    // ---- orphans: one real photo + one unreferenced old file + one just uploaded ----
+    const folder = { 'infraction-stats': 'infractions/u1', 'signalisation-stats': 'signalisations/u1', 'maintenance-stats': 'maintenance/u1' }[PAGE];
+    const realUrl = 'https://firebasestorage.googleapis.com/v0/b/other.appspot.com/o/' + encodeURIComponent(folder + '/100_real.jpg') + '?alt=media&token=ANYTHING';
+    if (PAGE === 'infraction-stats') window.__data.infractions.find(i => i.id === 'INF2').photos[0].url = realUrl;
+    if (PAGE === 'signalisation-stats') window.__data.signalisations.find(i => i.id === 'SIG2').photos[0].url = realUrl;
+    if (PAGE === 'maintenance-stats') window.__data.maintenance_logs[0].entries[0].photos[0].url = realUrl;
+    window.__storageFiles = [{ path: folder + '/100_real.jpg', created: Date.now() - 48 * 3600e3 }, { path: folder + '/200_orphan.jpg', created: Date.now() - 48 * 3600e3 }, { path: folder + '/300_justnow.jpg', created: Date.now() - 60e3 }];
+    const confirms = []; window.confirm = m => { confirms.push(m); return true; };
+    click(document.querySelector('#da-orphans [data-role=scan]')); await wait(800);
+    const results = document.querySelector('#da-orphans [data-role=results]').textContent;
+    ok('scan: the real photo is matched by its PATH (other bucket, other token), 1 orphan found, the new file ignored', /1<\/strong>/.test(document.querySelector('#da-orphans [data-role=results]').innerHTML) && /3 fichier\(s\) dans le stockage/.test(results) && /1 fichier\(s\) récent\(s\) ignoré/.test(results) && /200_orphan/.test(results) && !/100_real/.test(results), results);
+    click(document.querySelector('#da-orphans [data-role=delete]')); await wait(800);
+    ok('delete: only the orphan is removed (after a confirmation); the real and the recent files stay', J(window.__storageDeleted) === J([folder + '/200_orphan.jpg']) && confirms.length === 1 && J(window.__storageFiles.map(f => f.path).sort()) === J([folder + '/100_real.jpg', folder + '/300_justnow.jpg']), [window.__storageDeleted, confirms.length]);
+
+    // ---- the suspicious case: nothing matches -> deletion blocked ----
+    window.__storageFiles = Array.from({ length: 6 }, (_, i) => ({ path: folder + '/9' + i + '_x.jpg', created: Date.now() - 72 * 3600e3 }));
+    window.__storageDeleted.length = 0;
+    click(document.querySelector('#da-orphans [data-role=scan]')); await wait(800);
+    ok('suspicious scan (no file matches a record): warned, and deletion stays disabled', /Analyse suspecte/.test(document.querySelector('#da-orphans [data-role=results]').textContent) && document.querySelector('#da-orphans [data-role=delete]').disabled === true && window.__storageDeleted.length === 0);
+
+    // ---- delete old records: preview, backup, photos then record ----
+    const clickBackup = HTMLAnchorElement.prototype.click; HTMLAnchorElement.prototype.click = function () { window.__backups = (window.__backups || []).concat(this.download || ''); };
+    URL.createObjectURL = () => 'blob:test'; URL.revokeObjectURL = () => {};
+    $('da-delete-before').value = '2020-01-01'; $('da-delete-before').dispatchEvent(new Event('change')); await wait(500);
+    const expected = PAGE === 'infraction-stats' ? 4 : PAGE === 'signalisation-stats' ? 2 : 1;   // this activity's records only (the mock does not filter by date)
+    const expectedSys = PAGE === 'maintenance-stats' && !bike ? 0 : expected;
+    ok('delete old: the preview counts this activity\'s records only', Number($('da-delete-count').textContent) === (bike ? (PAGE === 'maintenance-stats' ? 1 : 1) : expectedSys) && $('da-delete-btn').disabled === (Number($('da-delete-count').textContent) === 0), [$('da-delete-count').textContent, $('da-delete-btn').disabled]);
+    if (!$('da-delete-btn').disabled) {
+      window.__writes.length = 0; confirms.length = 0;
+      const toDelete = Number($('da-delete-count').textContent);
+      click($('da-delete-btn')); await wait(900);
+      const deletes = window.__writes.filter(x => x[2] === 'delete');
+      ok('delete old: a backup file is offered, then each record is deleted (confirmed once)', confirms.length === 1 && (window.__backups || []).some(n => /^backup-/.test(n)) && deletes.length === toDelete && toDelete >= 1, [deletes.length, toDelete, window.__backups, confirms.length]);
+      ok('delete old: nothing of the other activity was touched', deletes.every(x => !/^(INFB|SIGB)$/.test(x[1])), deletes);
+    }
+    HTMLAnchorElement.prototype.click = clickBackup;
+  } else {
+    // a plain admin: the data management tab (delete, orphans) does not exist for them
+    ok('plain admin: no orphan or delete tool drawn', !document.querySelector('#da-orphans [data-role=scan]') && $('da-tab-management').style.display === 'none');
+  }
+
+  document.getElementById('out').textContent = out.join('\n');
+})().catch(e => { document.getElementById('out').textContent = 'HARNESS ERROR ' + e.stack; });
+</script>

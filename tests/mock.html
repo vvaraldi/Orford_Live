@@ -82,6 +82,7 @@
           id, __name: name, __id: id,
           update: async d => { window.__writes.push([name, id, 'update', d]); const row = (window.__data[name] || []).find(r => r.id === id); if (row) Object.assign(row, d); },
           set: async d => { window.__writes.push([name, id, 'set', d]); },
+          delete: async () => { window.__writes.push([name, id, 'delete']); window.__data[name] = (window.__data[name] || []).filter(r => r.id !== id); },
           get: async () => { const row = (window.__data[name] || []).find(r => r.id === id); return { exists: !!row, id, data: () => { if (!row) return {}; const { id: _i, ...r } = row; return r; } }; }
         };
       },
@@ -90,7 +91,25 @@
     return api;
   }
   window.db = { collection: query, runTransaction: async fn => fn({ get: ref => ref.get(), update: (ref, d) => ref.update(d) }), batch: () => { const ops = []; return { set: (ref, d) => ops.push([ref.__name, ref.__id, 'set', d]), update: (ref, d) => ops.push([ref.__name, ref.__id, 'update', d]), commit: async () => { window.__writes.push(['batch', ops]); } }; } };
-  window.storage = { ref: () => ({}), refFromURL: () => ({ delete: async () => {} }) };
+  // Storage: window.__storageFiles = [{ path, created: Date }] is what "exists"; folders are listed from it
+  window.__storageFiles = [];
+  window.__storageDeleted = [];
+  const storageRef = path => ({
+    fullPath: path, name: path.split('/').pop(),
+    listAll: async () => {
+      const prefix = path.replace(/\/$/, '') + '/';
+      const items = [], prefixes = new Set();
+      window.__storageFiles.filter(f => f.path.startsWith(prefix)).forEach(f => {
+        const rest = f.path.slice(prefix.length), slash = rest.indexOf('/');
+        if (slash === -1) items.push(storageRef(f.path)); else prefixes.add(prefix + rest.slice(0, slash));
+      });
+      return { items, prefixes: [...prefixes].map(storageRef) };
+    },
+    getMetadata: async () => { const f = window.__storageFiles.find(x => x.path === path); return { timeCreated: f && f.created ? new Date(f.created).toISOString() : undefined }; },
+    delete: async () => { window.__storageDeleted.push(path); window.__storageFiles = window.__storageFiles.filter(f => f.path !== path); },
+    put: async () => ({}), getDownloadURL: async () => 'https://firebasestorage.googleapis.com/v0/b/test.appspot.com/o/' + encodeURIComponent(path) + '?alt=media&token=mock'
+  });
+  window.storage = { ref: storageRef, refFromURL: () => ({ delete: async () => {} }) };
   window.firebase = { auth: () => ({ currentUser: { uid: 'u1', email: 't@x' } }), storage: () => window.storage, firestore: { FieldValue: { serverTimestamp: () => 'TS', delete: () => 'DEL' }, Timestamp: { fromDate: d => d } } };
   var currentUser = { uid: 'u1', email: 't@x' };
   var currentUserData = {

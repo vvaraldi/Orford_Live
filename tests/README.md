@@ -56,6 +56,8 @@ DOM) - retry with `-Budget 20000` or so, not a sign of a real bug.
 | `specs/hosting.html` | none (loads `js/core/config.js` directly) | `siteUrl()` / `relativeSiteUrl()`: links are right from any address (domain root, sub-folder, a folder named `pages`, accents, local folder). |
 | `specs/photolocation.html` | none (loads the real services) | Placing / correcting a photo's GPS position: the hand-set record (`locationEdit`, original kept, reset), which document field is rewritten per module, who may edit (owner or admin), typed coordinates. |
 | `specs/photolocation-pages.html` | `photoloc-*` entries of `run.ps1`: the six detail views and the three report forms | The ✏️ / "Ajouter" links and the dialog on every page that offers it: click on the map -> GPS, typed coordinates, reset, Montée / Descente maps, owner vs other inspector vs admin, saved at once in the detail views and with the form in the report forms. |
+| `specs/storage-cleanup.html` | none (loads the real services, fake Firestore and Storage) | The orphan-file tool: files judged by PATH (not URL: other host/token), the safeguards (recent files, "suspicious" scans, mostly-orphans), the four apps' folders and where their records point (QR images, old fields, work entries). |
+| `specs/data-admin-pages.html` | `stats-*` entries of `run.ps1`: `infraction-stats`, `signalisation-stats`, `maintenance-stats` | The Admin pages: the two tabs, the season navigator, the statistics (cards, charts, rankings) and, for the system admin, the overview, the delete-old tool (backup, this activity only) and the orphan clean-up. |
 
 ## Adding a test
 
