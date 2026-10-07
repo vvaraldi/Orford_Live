@@ -9,6 +9,7 @@
 #	Priority	Item
 3.1	Low	Accessibility audit pass
 
+
 Quick line to popy paste at the end of each session :
 - Add/update the estimated time to the log. I go to sleep !
 
