@@ -1,6 +1,5 @@
 # REGIS
 
-
 2. Improve the code
 #	Priority	Item
 2.1 Medium Documentation / README & deployment guide
@@ -8,14 +7,10 @@
 
 3. Improve the user experience
 #	Priority	Item
-3.1 the link to the portal should be only on the logo and the text REGIS but not over the name of the app if the user inside an app.
-3.2 medium add a number max of users per page (25 to start) in the list displaid in the administration app tab "utilisateurs"
-3.3	Low	Accessibility audit pass
-
+3.1	Low	Accessibility audit pass
 
 Quick line to popy paste at the end of each session :
 - Add/update the estimated time to the log. I go to sleep !
-
 
 
 Bike :
