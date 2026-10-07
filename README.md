@@ -7,7 +7,9 @@
 
 3. Improve the user experience
 #	Priority	Item
+3.0 High Protect from Public form abuse. The volunteer page is the first place anyone can write to the database without logging in. It validates strictly, but it has no anti-spam protection (reCAPTCHA or App Check). A line saying this is not included would protect you if someone floods it. Can you put some protection limiting the number of volunteer application per minutes per hours per days and total
 3.1	Low	Accessibility audit pass
+
 
 
 Quick line to popy paste at the end of each session :
