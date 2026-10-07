@@ -22,12 +22,13 @@ positions, editing README.md, testing as a real user, etc.).
 | 2026-10-03 | 2026-10-03 00:02 → 00:03 (the last minute of the 2026-10-02 block) | ~1m | ~1m |
 | 2026-10-04 (afternoon) | 2026-10-04 18:07 → 18:29 (~22min) | ~14m | ~22m |
 | 2026-10-04 (evening) | 2026-10-04 21:08 → 23:48 (~2h40m, one continuous block, up to the moment of this estimate) | ~1h30m | ~2h25m |
+| 2026-10-05 (evening) | 2026-10-05 20:26 → 22:09 (~1h43m, one continuous block; includes the last half minute after the previous estimate, 23:48 the night before) | ~52m | ~1h29m |
 
 **Manual addition (not from chat timestamps):** +2h00m - customer/team meetings, morning of 2026-09-28 (before the day's chat activity started; per the Method note above, offline time isn't normally included, but you asked for this one to be logged).
 
-**Running total (active chat time + the meeting addition, all estimates so far): ~15h45m - 19h55m**
+**Running total (active chat time + the meeting addition, all estimates so far): ~16h35m - 21h25m**
 
-**Note:** the 2026-10-04 (evening) row is computed up to 23:48, when this estimate was made; the
+**Note:** the 2026-10-05 (evening) row is computed up to 22:09, when this estimate was made; the
 session may have continued after that, and any further time will need a new row. 2026-09-23 (the
 Firebase backup/export session, ~5 min of chat) was missing from earlier estimates and is now
 included. Nothing was logged in the transcript on 2026-09-24 to 2026-09-27, 2026-09-30 or 2026-10-01.
@@ -81,6 +82,13 @@ pasted coordinates, reset to the original, tracking, owner/admin only, saved wit
 forms), deletion of inspections, infractions, signalisations and Entretien logs reserved to the system
 admin, trails and shelters hidden rather than deleted (new "Abris" panel), "Enregistrer et fermer" and a
 Photos column in Infractions > Gestion, and the matching tests.
+The 2026-10-05 (evening) row covers: the Admin page (Statistiques + Gestion des données) for Infractions,
+Signalisations and Entretien, built on one shared engine (season statistics, delete old records with an
+automatic backup), removing the "photo furthest from the map centre" box from Inspections, and the fixed
+orphan-file clean-up shared by all four apps (files matched by path instead of URL, "analyse impossible"
+guard when no file can be listed, bucket diagnostic, preview of each orphan photo). Debugging with your
+real results led to two fixes: a tab/panel id clash that left the "Gestion des données" tab empty, and the
+missing `rules_version = '2'` line in the Storage rules, which is what blocked file listing.
 
 Next time an estimate is added, keep the same method (or note if it changed) so the numbers stay
 comparable across rows.

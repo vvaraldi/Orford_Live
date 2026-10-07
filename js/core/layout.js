@@ -75,16 +75,19 @@
   const logoIcon = brand.logoImage
     ? `<img class="logo__image" src="${url(brand.logoImage)}" alt="">`
     : `<span class="logo__icon">${brand.logo}</span>`;
-  const logoText = `<span class="logo__text">${brand.name}${nav.title ? `<span class="logo__sep">  -  </span><span class="logo__app">${nav.title}</span>` : ''}</span>`;
+  // Only the logo and the name (REGIS) lead back to the portal; the app's own name ("  -  Inspections")
+  // beside it is plain text, so clicking it inside an app does not leave the app.
+  const portalLink = `href="${url(PORTAL_HREF)}" title="Retour au portail"`;
+  const appPart = nav.title ? `<span class="logo__sep">  -  </span><span class="logo__app">${nav.title}</span>` : '';
 
   const html = `
     <a href="#main-content" class="skip-link">Aller au contenu principal</a>
 
     <header class="header">
-      <a class="logo" href="${url(PORTAL_HREF)}" title="Retour au portail" aria-label="Retour au portail">
-        ${logoIcon}
-        ${logoText}
-      </a>
+      <div class="logo">
+        <a class="logo__link" ${portalLink} aria-label="Retour au portail">${logoIcon}<span class="logo__text">${brand.name}</span></a>
+        ${appPart ? `<span class="logo__text logo__rest">${appPart}</span>` : ''}
+      </div>
 
       <nav class="nav">
         ${desktopLinks.length ? `${desktopLinks.join('\n        ')}
@@ -118,7 +121,10 @@
     <div class="mobile-nav__backdrop" id="mobile-nav-backdrop"></div>
     <nav class="mobile-nav" id="mobile-nav">
       <div class="mobile-nav__header">
-        <a class="mobile-nav__logo" href="${url(PORTAL_HREF)}" title="Retour au portail" aria-label="Retour au portail">${logoIcon}${logoText}</a>
+        <div class="mobile-nav__logo">
+          <a ${portalLink} tabindex="-1" aria-hidden="true">${logoIcon}</a>
+          <span class="logo__text"><a class="logo__name" ${portalLink} aria-label="Retour au portail">${brand.name}</a>${appPart}</span>
+        </div>
         <button class="mobile-nav__close" id="mobile-nav-close" aria-label="Fermer">${closeIcon}</button>
       </div>
 

@@ -9,6 +9,14 @@
   await wait(900);
   ok('no script errors on load', window.__errs.length === 0, window.__errs);
   ok('header rendered', !!document.querySelector('header.header') && !!document.getElementById('mobile-nav'));
+  // Only the logo and the name (REGIS) lead back to the portal; the app's name beside it is plain text
+  const logoLink = document.querySelector('header .logo__link');
+  const appName = document.querySelector('header .logo__app');
+  ok('header: logo + REGIS are the portal link, and the link holds nothing else', !!logoLink && /index\.html$/.test(logoLink.getAttribute('href')) && logoLink.textContent.trim() === APP_CONFIG.branding.name, logoLink && logoLink.textContent);
+  ok(appName ? 'header: the app name beside REGIS is NOT part of any link' : 'header: portal-level page, no app name', appName ? !appName.closest('a') && !logoLink.contains(appName) && appName.textContent === document.querySelector('header .logo__rest').textContent.replace(/\s*-\s*/, '') : !document.querySelector('header .logo__rest'), appName && appName.textContent);
+  const drawerName = document.querySelector('#mobile-nav .logo__name');
+  const drawerApp = document.querySelector('#mobile-nav .logo__app');
+  ok('mobile menu: the name is the portal link, the app name under it is not', !!drawerName && /index\.html$/.test(drawerName.getAttribute('href')) && drawerName.textContent === APP_CONFIG.branding.name && (!drawerApp || !drawerApp.closest('a')), [drawerName && drawerName.textContent, drawerApp && drawerApp.closest('a')]);
   ok('confirm() and alert() are the browser\'s own synchronous ones (ui.js must not replace them with Promise-returning dialogs)', /\[native code\]/.test(Function.prototype.toString.call(window.confirm)) && /\[native code\]/.test(Function.prototype.toString.call(window.alert)) && typeof confirmDialog === 'function');
   ok('current activity set (' + Network.current() + ')', !!Network.current());
 
