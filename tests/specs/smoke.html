@@ -39,6 +39,31 @@
       ok('a plain admin cannot open Sentiers even by script', !document.getElementById('trails-tab').classList.contains('is-active'));
       switchTab('users');
     }
+    // The users list is paginated: 25 per page to start, page-size selector, "Affichage de X à Y sur N"
+    {
+      const real = users.slice(); const sel = document.getElementById('users-page-size');
+      const rowsNow = () => document.querySelectorAll('#users-tbody tr').length;
+      const pager = document.getElementById('users-pagination'), info = document.getElementById('users-pagination-info');
+      ok('users list: page size selector offers 10/25/50/100, 25 by default', J([...sel.options].map(o => o.value)) === J(['10', '25', '50', '100']) && sel.value === '25' && usersPageSize === 25, [sel.value, usersPageSize]);
+      ok('users list: few users -> everything on one page, no pager', real.length > 25 || (pager.style.display === 'none' && rowsNow() === filteredUsers.length), [real.length, rowsNow(), pager.style.display]);
+      for (let i = 0; i < 60; i++) users.push({ id: 'fake' + i, name: 'Zed Fake ' + String(i).padStart(2, '0'), email: 'fake' + i + '@example.test', role: 'inspector', status: 'active', networks: ['ski', 'bike'] });
+      const total = users.length;
+      filterAndRenderUsers();
+      ok('users list: 25 rows per page and the pager is shown', rowsNow() === 25 && pager.style.display !== 'none' && info.textContent === `Affichage de 1 à 25 sur ${total}`, [rowsNow(), info.textContent]);
+      ok('users list: the total shown above the table stays the full filtered count', new RegExp('\\b' + total + '\\b').test(document.getElementById('users-count').textContent), document.getElementById('users-count').textContent);
+      goToUsersPage(2);
+      ok('users list: page 2 shows the next rows', usersPage === 2 && info.textContent === `Affichage de 26 à ${Math.min(50, total)} sur ${total}` && document.querySelector('#users-pagination-buttons .page-btn.active').textContent === '2', info.textContent);
+      filterAndRenderUsers(true);
+      ok('users list: refreshing after an edit stays on the current page', usersPage === 2, usersPage);
+      sel.value = '10'; sel.dispatchEvent(new Event('change'));
+      ok('users list: changing the page size goes back to page 1 with that many rows', usersPage === 1 && rowsNow() === 10 && info.textContent === `Affichage de 1 à 10 sur ${total}`, [usersPage, rowsNow(), info.textContent]);
+      const search = document.getElementById('search-users'); search.value = 'zed fake 0'; filterAndRenderUsers();
+      ok('users list: a search narrows the list and hides the pager when it fits on one page', filteredUsers.length === 10 && pager.style.display === 'none' && rowsNow() === 10, [filteredUsers.length, rowsNow(), pager.style.display]);
+      search.value = ''; filterAndRenderUsers(); goToUsersPage(Math.ceil(total / 10));
+      ok('users list: the last page shows the remainder', info.textContent === `Affichage de ${(Math.ceil(total / 10) - 1) * 10 + 1} à ${total} sur ${total}` && document.querySelector('#users-pagination-buttons .page-btn:last-child').disabled, info.textContent);
+      ok('users list: the export still takes every filtered user, not just the page', filteredUsers.length === total, filteredUsers.length);
+      users.length = 0; real.forEach(u => users.push(u)); sel.value = '25'; sel.dispatchEvent(new Event('change'));
+    }
     // The bulk import now lives in Utilisateurs, between the user list and the export box
     const kids = [...document.getElementById('users-tab').children];
     const at = sel => kids.findIndex(k => k.matches(sel));

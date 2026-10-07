@@ -91,6 +91,18 @@
 
     /* Sectors tab */
     
+    /* Pagination of the users list (same look as Inspections > Gestion) */
+    .page-size-select { display: flex; align-items: center; gap: 0.5rem; font-size: 0.875rem; }
+    .pagination-container { display: flex; align-items: center; justify-content: space-between; padding: 1rem 1.25rem; border-top: 1px solid var(--theme-border); flex-wrap: wrap; gap: 1rem; }
+    .pagination-info { font-size: 0.875rem; color: var(--theme-text-secondary); }
+    .pagination { display: flex; gap: 0.25rem; }
+    .page-btn { min-width: 36px; height: 36px; display: flex; align-items: center; justify-content: center; border: 1px solid var(--theme-border); border-radius: var(--radius-md); background: var(--theme-surface); color: var(--theme-text); cursor: pointer; font-size: 0.875rem; transition: all 0.15s; }
+    .page-btn:hover:not(:disabled) { border-color: var(--theme-accent); color: var(--theme-accent); }
+    .page-btn.active { background: var(--theme-accent); border-color: var(--theme-accent); color: white; }
+    .page-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+    .page-ellipsis { display: flex; align-items: center; padding: 0 0.25rem; color: var(--theme-text-secondary); }
+    @media (max-width: 768px) { .pagination-container { flex-direction: column; align-items: center; } }
+
     /* Tab styles */
     .admin-tabs {
       display: flex;
@@ -390,6 +402,15 @@
             <select class="form-select form-select--sm" id="filter-network" style="width: auto;">
               <option value="">Toutes les activités</option>
             </select>
+            <div class="page-size-select">
+              <label for="users-page-size">Afficher:</label>
+              <select class="form-select form-select--sm" id="users-page-size" style="width: auto;">
+                <option value="10">10</option>
+                <option value="25" selected>25</option>
+                <option value="50">50</option>
+                <option value="100">100</option>
+              </select>
+            </div>
             <button class="btn btn-primary" onclick="openAddUserModal()">
               <span>➕</span>
               <span>Ajouter</span>
@@ -412,6 +433,11 @@
             </thead>
             <tbody id="users-tbody"></tbody>
           </table>
+        </div>
+
+        <div class="pagination-container" id="users-pagination" style="display: none;">
+          <div class="pagination-info" id="users-pagination-info"></div>
+          <div class="pagination" id="users-pagination-buttons"></div>
         </div>
 
         <div class="empty-state" id="empty-state" style="display: none;">
@@ -1277,7 +1303,7 @@
           users.push({ id: doc.id, ...doc.data() });
         });
         updateStatistics();
-        filterAndRenderUsers();
+        filterAndRenderUsers(true); // a reload after an edit stays on the same page (the first load starts on page 1)
       } catch (error) {
         console.error('Error loading users:', error);
         showMessage('Erreur lors du chargement des utilisateurs.', 'error');
@@ -1292,7 +1318,14 @@
       document.getElementById('stat-admins').textContent = users.filter(u => u.role === 'admin' || u.role === 'system_admin').length;
     }
 
-    function filterAndRenderUsers() {
+    // The users list shows one page at a time (25 to start, like Inspections > Gestion)
+    let usersPage = 1;
+    let usersPageSize = 25;
+
+    // keepPage === true: the list was only refreshed (a user was edited, a badge clicked): stay on this page.
+    // Anything else (a search, a filter, the page size) starts again from page 1.
+    function filterAndRenderUsers(keepPage) {
+      if (keepPage !== true) usersPage = 1;
       const search = document.getElementById('search-users').value.toLowerCase();
       const statusFilter = document.getElementById('filter-status').value;
       const networkFilter = document.getElementById('filter-network').value;
@@ -1318,12 +1351,18 @@
       if (filteredUsers.length === 0) {
         tbody.innerHTML = '';
         emptyState.style.display = 'flex';
+        document.getElementById('users-pagination').style.display = 'none';
         return;
       }
 
       emptyState.style.display = 'none';
 
-      tbody.innerHTML = filteredUsers.map(user => {
+      // This page only (a page that no longer exists, after a filter or a deletion, falls back to the last one)
+      const totalPages = Math.max(1, Math.ceil(filteredUsers.length / usersPageSize));
+      if (usersPage > totalPages) usersPage = totalPages;
+      const pageUsers = filteredUsers.slice((usersPage - 1) * usersPageSize, usersPage * usersPageSize);
+
+      tbody.innerHTML = pageUsers.map(user => {
         let roleBadgeClass = 'badge-inspector';
         let roleLabel = 'Inspecteur';
         if (user.role === 'system_admin') {
@@ -1374,6 +1413,45 @@
           </td>
         </tr>
       `}).join('');
+
+      renderUsersPagination(totalPages);
+    }
+
+    function renderUsersPagination(totalPages) {
+      const box = document.getElementById('users-pagination');
+      if (totalPages <= 1) { box.style.display = 'none'; return; }
+      box.style.display = 'flex';
+
+      const first = (usersPage - 1) * usersPageSize + 1;
+      const last = Math.min(usersPage * usersPageSize, filteredUsers.length);
+      document.getElementById('users-pagination-info').textContent = `Affichage de ${first} à ${last} sur ${filteredUsers.length}`;
+
+      let html = `<button type="button" class="page-btn" aria-label="Page précédente" onclick="goToUsersPage(${usersPage - 1})" ${usersPage === 1 ? 'disabled' : ''}>‹</button>`;
+      const maxButtons = 5;
+      let startPage = Math.max(1, usersPage - Math.floor(maxButtons / 2));
+      let endPage = Math.min(totalPages, startPage + maxButtons - 1);
+      if (endPage - startPage < maxButtons - 1) startPage = Math.max(1, endPage - maxButtons + 1);
+      if (startPage > 1) {
+        html += `<button type="button" class="page-btn" onclick="goToUsersPage(1)">1</button>`;
+        if (startPage > 2) html += `<span class="page-ellipsis">…</span>`;
+      }
+      for (let i = startPage; i <= endPage; i++) {
+        html += `<button type="button" class="page-btn ${i === usersPage ? 'active' : ''}" onclick="goToUsersPage(${i})">${i}</button>`;
+      }
+      if (endPage < totalPages) {
+        if (endPage < totalPages - 1) html += `<span class="page-ellipsis">…</span>`;
+        html += `<button type="button" class="page-btn" onclick="goToUsersPage(${totalPages})">${totalPages}</button>`;
+      }
+      html += `<button type="button" class="page-btn" aria-label="Page suivante" onclick="goToUsersPage(${usersPage + 1})" ${usersPage === totalPages ? 'disabled' : ''}>›</button>`;
+      document.getElementById('users-pagination-buttons').innerHTML = html;
+    }
+
+    function goToUsersPage(page) {
+      const totalPages = Math.max(1, Math.ceil(filteredUsers.length / usersPageSize));
+      if (page < 1 || page > totalPages) return;
+      usersPage = page;
+      renderUsers();
+      document.getElementById('users-table').scrollIntoView({ behavior: 'smooth', block: 'start' });
     }
 
     // App permission badge (inspection / infraction / signalisation / maintenance)
@@ -1417,7 +1495,7 @@
           modifiedBy: currentUser.uid
         });
         user.networks = next;
-        filterAndRenderUsers();
+        filterAndRenderUsers(true);
         const net = APP_CONFIG.networks[networkId];
         showMessage(`${net.name} ${next.includes(networkId) ? 'ajouté' : 'retiré'} pour ${user.name || 'utilisateur'}.`, 'success');
       } catch (error) {
@@ -1441,7 +1519,7 @@
         const userIndex = users.findIndex(u => u.id === userId);
         if (userIndex !== -1) users[userIndex][field] = newValue;
 
-        filterAndRenderUsers();
+        filterAndRenderUsers(true);
         
         const user = users.find(u => u.id === userId);
         const fieldNames = { allowInspection: 'Inspection', allowInfraction: 'Infraction', allowSignalisation: 'Signalisation', allowMaintenance: 'Entretien' };
@@ -2227,9 +2305,13 @@ Marie Tremblay,marie.tremblay@example.com,MotDePasse456,admin,,true,true,true,fa
           loadUsers();
           initializeExportDate();
           document.getElementById('export-network').addEventListener('change', initializeExportDate);
-          document.getElementById('search-users').addEventListener('input', debounce(filterAndRenderUsers, 300));
-          document.getElementById('filter-status').addEventListener('change', filterAndRenderUsers);
-          document.getElementById('filter-network').addEventListener('change', filterAndRenderUsers);
+          document.getElementById('search-users').addEventListener('input', debounce(() => filterAndRenderUsers(), 300));
+          document.getElementById('filter-status').addEventListener('change', () => filterAndRenderUsers());
+          document.getElementById('filter-network').addEventListener('change', () => filterAndRenderUsers());
+          document.getElementById('users-page-size').addEventListener('change', e => {
+            usersPageSize = parseInt(e.target.value, 10) || 25;
+            filterAndRenderUsers();
+          });
         }
       });
     }
