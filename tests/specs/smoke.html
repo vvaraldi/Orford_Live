@@ -109,6 +109,24 @@
     const bikeAdmin = sys || NET === 'bike' || NET === 'both';
     const card = document.getElementById('links-volunteer-card');
     ok('volunteer registration card only for bike admins', card.hidden === !bikeAdmin, card.hidden);
+    // Bénévoles tab: the sign-up limits of the public registration page (counters, limits, switch, reset)
+    if (bikeAdmin) {
+      const val = id => document.getElementById(id).value;
+      const setVal = (id, v) => { document.getElementById(id).value = v; };
+      ok('Bénévoles tab: limits card shows the defaults (10 / 60 / 150 / 500, open) and the counters at zero', val('vl-per-minute') === '10' && val('vl-per-hour') === '60' && val('vl-per-day') === '150' && val('vl-total') === '500' && document.getElementById('vl-enabled').checked && /0 \/ 10/.test(document.getElementById('vl-status').textContent) && /0 \/ 500/.test(document.getElementById('vl-status').textContent), document.getElementById('vl-status').textContent);
+      const limitWrites = () => window.__writes.filter(w => w[0] === 'volunteerLimits');
+      const nativeConfirm = window.confirm; window.confirm = () => true;
+      setVal('vl-per-minute', '0'); document.getElementById('vl-save-btn').click(); await wait(100);
+      ok('invalid limit (0): nothing is saved', limitWrites().length === 0, limitWrites());
+      setVal('vl-per-minute', '5'); setVal('vl-per-hour', '30'); setVal('vl-per-day', '100'); setVal('vl-total', '300'); document.getElementById('vl-enabled').checked = false;
+      document.getElementById('vl-save-btn').click(); await wait(100);
+      const cfgW = limitWrites().find(w => w[1] === 'config');
+      ok('save: the config document gets the 4 limits as numbers and the switch', !!cfgW && cfgW[2] === 'set' && cfgW[3].perMinute === 5 && cfgW[3].perHour === 30 && cfgW[3].perDay === 100 && cfgW[3].total === 300 && cfgW[3].enabled === false, cfgW);
+      document.getElementById('vl-reset-btn').click(); await wait(100);
+      const stW = limitWrites().find(w => w[1] === 'state');
+      ok('reset: the counters document is rewritten with zeros (limits untouched)', !!stW && stW[3].total === 0 && stW[3].minuteCount === 0 && stW[3].hourCount === 0 && stW[3].dayCount === 0 && limitWrites().filter(w => w[1] === 'config').length === 1, stW);
+      window.confirm = nativeConfirm;
+    }
     if (bikeAdmin) {
       const vol = document.getElementById('link-volunteer');
       ok('volunteer link: clear text and clickable', /\/pages\/maintenance-volunteer-register\.html$/.test(vol.textContent) && vol.href === vol.textContent && vol.target === '_blank', vol.textContent);

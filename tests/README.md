@@ -58,6 +58,30 @@ DOM) - retry with `-Budget 20000` or so, not a sign of a real bug.
 | `specs/photolocation-pages.html` | `photoloc-*` entries of `run.ps1`: the six detail views and the three report forms | The ✏️ / "Ajouter" links and the dialog on every page that offers it: click on the map -> GPS, typed coordinates, reset, Montée / Descente maps, owner vs other inspector vs admin, saved at once in the detail views and with the form in the report forms. |
 | `specs/storage-cleanup.html` | none (loads the real services, fake Firestore and Storage) | The orphan-file tool: files judged by PATH (not URL: other host/token), the safeguards (recent files, "suspicious" scans, mostly-orphans), the four apps' folders and where their records point (QR images, old fields, work entries). |
 | `specs/data-admin-pages.html` | `stats-*` entries of `run.ps1`: `infraction-stats`, `signalisation-stats`, `maintenance-stats` | The Admin pages: the two tabs, the season navigator, the statistics (cards, charts, rankings) and, for the system admin, the overview, the delete-old tool (backup, this activity only) and the orphan clean-up. |
+| `specs/volunteer-limits.html` | none (loads `js/services/volunteer-limits.js`, a fake Firestore applying a JavaScript COPY of the rules) | The public sign-up limits: per minute / hour / day / total, the switch, admin reset and limits, a visitor racing another, wrong clocks, offline, the French messages, and what the rules must refuse (counters without a volunteer, jumps, restarts, reused ids...). |
+
+## The volunteer limits: what the tests cannot prove
+
+`volunteer-limits.html` runs the page logic against a JavaScript transcription of the rules
+(`volStateOk` / `volWindowOk` / the `volunteers` create rule in `assets/Rules for Firebase.txt`). It
+cannot run the REAL rules: after republishing them, try these in the Firebase console, Rules
+Playground (simulation type "create"/"update", **unauthenticated**, unless noted). The console also
+refuses to publish rules with a syntax error - read its message if it does.
+
+1. Batch-free checks cannot be simulated in the Playground (it tests one document at a time with the
+   state "after" the batch not available), so verify the whole path on the real page: register one
+   volunteer -> Administration > Bénévoles shows "1 / 10" for the minute and the volunteer in the list.
+2. Register 11 times within a minute (use the page, different names): the 11th shows
+   "Trop d'inscriptions en peu de temps...". A minute later it works again.
+3. Administration > Bénévoles: set "Par minute" to 1, save, register twice: the second is refused;
+   restore 10. Untick "Inscriptions ouvertes": the public page shows the closed notice; tick it again.
+4. "Réinitialiser les compteurs" sets everything back to 0 (the volunteers stay).
+5. Playground, unauthenticated: `create` on `/volunteers/test1` with valid fields and NO counters
+   change -> must be **denied**. `update` on `/volunteerLimits/config` -> **denied**. `get` on
+   `/volunteerLimits/state` -> allowed.
+6. If registrations are refused for everybody right after publishing, the rules text is the suspect:
+   restore the previous version from the Firebase console (Rules > history) and report what the page
+   and the browser console said.
 
 ## Adding a test
 

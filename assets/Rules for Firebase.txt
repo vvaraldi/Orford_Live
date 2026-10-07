@@ -222,6 +222,8 @@ service cloud.firestore {
     // registration (Administration > Bénévoles) once it is no longer needed for the season;
     // maintenance_logs store the volunteer's name directly (volunteerNames), not a reference to
     // this collection, so deleting one here never affects a past log. Nobody can update one.
+    // A registration also has to be COUNTED: the same write batch must have moved the sign-up
+    // counters (volunteerLimits/state, below) by +1 and named this volunteer in lastVolunteerId.
     match /volunteers/{volunteerId} {
       allow read: if request.auth != null;
       allow update: if false;
@@ -233,7 +235,57 @@ service cloud.firestore {
           request.resource.data.prenom is string && request.resource.data.prenom.size() > 0 && request.resource.data.prenom.size() <= 100 &&
           request.resource.data.network == 'bike' &&
           request.resource.data.agreementAccepted == true &&
-          request.resource.data.createdAt == request.time;
+          request.resource.data.createdAt == request.time &&
+          getAfter(/databases/$(database)/documents/volunteerLimits/state).data.lastVolunteerId == volunteerId;
+    }
+
+    // VOLUNTEER SIGN-UP LIMITS: the public registration page has no login, so the number of
+    // registrations is limited here, for all visitors together: per minute, per hour, per day and
+    // in total (js/services/volunteer-limits.js is the client side of this contract).
+    //   volunteerLimits/config  the limits and the on/off switch. Written by an admin (Administration >
+    //                           Bénévoles); while it is missing the defaults below apply (10 / 60 / 150 / 500).
+    //   volunteerLimits/state   the counters. Anyone may move them, but only by exactly +1 and only in
+    //                           the same write batch that creates the matching volunteer (existsAfter below),
+    //                           so they cannot be inflated alone. A window (minute / hour / day) starts at its
+    //                           first registration (start = server time, count 1) and counts +1 until it ends.
+    //                           An admin can write anything (reset to zero).
+    // Reading is public (the page reads the counters to build the next ones and to explain a refusal).
+    function volCfg() {
+      return exists(/databases/$(database)/documents/volunteerLimits/config)
+        ? get(/databases/$(database)/documents/volunteerLimits/config).data
+        : {};
+    }
+
+    // One window: still running -> same start, count + 1; ended (or never started) -> start = now, count 1.
+    function volWindowOk(o, n, start, count, secs, limit) {
+      let oStart = o.get(start, timestamp.date(2000, 1, 1));
+      let oCount = o.get(count, 0);
+      return n[count] <= limit &&
+             (request.time < oStart + duration.value(secs, 's')
+               ? (n[start] == oStart && n[count] == oCount + 1)
+               : (n[start] == request.time && n[count] == 1));
+    }
+
+    function volStateOk(c) {
+      let n = request.resource.data;
+      let o = resource == null ? {} : resource.data;
+      return c.get('enabled', true) == true &&
+             n.keys().hasOnly(['total', 'minuteStart', 'minuteCount', 'hourStart', 'hourCount', 'dayStart', 'dayCount', 'lastVolunteerId', 'updatedAt']) &&
+             n.keys().hasAll(['total', 'minuteStart', 'minuteCount', 'hourStart', 'hourCount', 'dayStart', 'dayCount', 'lastVolunteerId', 'updatedAt']) &&
+             n.updatedAt == request.time &&
+             n.total == o.get('total', 0) + 1 && n.total <= c.get('total', 500) &&
+             volWindowOk(o, n, 'minuteStart', 'minuteCount', 60, c.get('perMinute', 10)) &&
+             volWindowOk(o, n, 'hourStart', 'hourCount', 3600, c.get('perHour', 60)) &&
+             volWindowOk(o, n, 'dayStart', 'dayCount', 86400, c.get('perDay', 150)) &&
+             n.lastVolunteerId is string &&
+             existsAfter(/databases/$(database)/documents/volunteers/$(n.lastVolunteerId)) &&
+             !exists(/databases/$(database)/documents/volunteers/$(n.lastVolunteerId));
+    }
+
+    match /volunteerLimits/{docId} {
+      allow read: if true;
+      allow create, update: if docId == 'state' && volStateOk(volCfg());
+      allow write: if isAdmin() && canWorkIn('bike');
     }
 
     // REQUESTS

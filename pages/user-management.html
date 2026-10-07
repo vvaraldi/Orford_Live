@@ -141,6 +141,18 @@
       display: block;
     }
     
+    /* Bénévoles tab: sign-up limits of the public registration page */
+    #vl-section { margin-bottom: var(--space-md); }
+    .vl-status { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 0.75rem; margin-bottom: 1rem; }
+    .vl-stat { border: 1px solid var(--theme-border); border-radius: var(--radius-md); padding: 0.6rem 0.8rem; background: var(--theme-surface-alt); }
+    .vl-stat__label { font-size: 0.8rem; color: var(--theme-text-secondary); }
+    .vl-stat__value { font-size: 1.15rem; font-weight: 700; }
+    .vl-stat--full .vl-stat__value { color: var(--color-danger); }
+    .vl-stat__note { font-size: 0.75rem; color: var(--theme-text-secondary); }
+    .vl-closed { grid-column: 1 / -1; font-weight: 600; color: var(--color-danger); }
+    .vl-form { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 0.75rem; }
+    .vl-switch { display: flex; align-items: center; gap: 0.5rem; font-size: 0.9rem; margin-top: 0.25rem; }
+
     /* Liens et astuces tab */
     .links-card { margin-bottom: var(--space-md); }
     .links-row { display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap; }
@@ -589,6 +601,47 @@
 
     <!-- TAB: VOLUNTEERS (bike network) -->
     <div class="admin-tab-content" id="volunteers-tab">
+      <div class="data-export-section" id="vl-section">
+        <div class="data-export-section__header">
+          <span>🛡️</span>
+          <h3>Limites d'inscription</h3>
+        </div>
+        <p class="data-export-section__description">
+          La page d'inscription est publique (sans connexion) : ces limites, communes à tous les visiteurs, la protègent
+          contre les inscriptions en rafale. Quand une limite est atteinte, le visiteur lit un message clair. Les compteurs
+          d'une minute, d'une heure et d'une journée repartent d'eux-mêmes; le total se remet à zéro avec le bouton
+          « Réinitialiser les compteurs » (par exemple au début d'une saison).
+        </p>
+
+        <div id="vl-status" class="vl-status" aria-live="polite">Chargement…</div>
+
+        <div class="vl-form">
+          <div class="form-group">
+            <label class="form-label" for="vl-per-minute">Par minute</label>
+            <input type="number" class="form-input" id="vl-per-minute" min="1" max="100000" step="1">
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="vl-per-hour">Par heure</label>
+            <input type="number" class="form-input" id="vl-per-hour" min="1" max="100000" step="1">
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="vl-per-day">Par jour</label>
+            <input type="number" class="form-input" id="vl-per-day" min="1" max="100000" step="1">
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="vl-total">Au total</label>
+            <input type="number" class="form-input" id="vl-total" min="1" max="100000" step="1">
+          </div>
+        </div>
+        <label class="vl-switch"><input type="checkbox" id="vl-enabled" checked> Inscriptions ouvertes (décocher pour fermer la page d'inscription)</label>
+
+        <div style="display:flex; gap:0.75rem; align-items:center; margin-top:0.75rem; flex-wrap:wrap;">
+          <button type="button" class="btn btn-primary btn-sm" id="vl-save-btn">💾 Enregistrer les limites</button>
+          <button type="button" class="btn btn-secondary btn-sm" id="vl-reset-btn">♻️ Réinitialiser les compteurs</button>
+          <button type="button" class="btn btn-secondary btn-sm" id="vl-refresh-btn">🔄 Actualiser</button>
+        </div>
+      </div>
+
       <div class="data-export-section">
         <div class="data-export-section__header">
           <span>🙋</span>
@@ -1059,6 +1112,7 @@
   <script src="../js/core/firebase-loader.js"></script>
   <script src="../js/core/auth.js"></script>
   <script src="../js/services/sector-service.js"></script>
+  <script src="../js/services/volunteer-limits.js"></script>
   <script src="../js/services/map-service.js"></script>
   <script src="../js/admin/map-calibration.js"></script>
   <script src="../js/services/trail-service.js"></script>
@@ -1168,9 +1222,67 @@
     // VOLUNTEERS (bike network)
     // ========================================
 
+    // ---- Sign-up limits of the public registration page (rules: volunteerLimits, see js/services/volunteer-limits.js) ----
+    const VL_FIELDS = { perMinute: 'vl-per-minute', perHour: 'vl-per-hour', perDay: 'vl-per-day', total: 'vl-total' };
+
+    function renderVolunteerLimits(view) {
+      const stat = (label, w, note) => `<div class="vl-stat${w.used >= w.limit ? ' vl-stat--full' : ''}">
+          <div class="vl-stat__label">${label}</div>
+          <div class="vl-stat__value">${w.used} / ${w.limit}</div>
+          ${note ? `<div class="vl-stat__note">${note}</div>` : ''}</div>`;
+      const reset = w => w.resetAt ? `se remet à zéro vers ${new Date(w.resetAt).toLocaleTimeString('fr-CA', { hour: '2-digit', minute: '2-digit' })}` : '';
+      document.getElementById('vl-status').innerHTML =
+        (view.enabled ? '' : '<div class="vl-closed">⛔ Les inscriptions sont fermées (interrupteur ci-dessous).</div>') +
+        stat('Cette minute', view.minute, reset(view.minute)) +
+        stat('Cette heure', view.hour, reset(view.hour)) +
+        stat("Aujourd'hui (24 h)", view.day, reset(view.day)) +
+        stat('Total depuis la dernière remise à zéro', view.total, view.total.used >= view.total.limit ? 'Limite atteinte : réinitialiser pour rouvrir' : '');
+    }
+
+    async function loadVolunteerLimits() {
+      const status = document.getElementById('vl-status');
+      try {
+        const [cfg, st] = await Promise.all([VolunteerLimits.config(db), VolunteerLimits.readState(db)]);
+        Object.entries(VL_FIELDS).forEach(([key, id]) => { document.getElementById(id).value = cfg[key]; });
+        document.getElementById('vl-enabled').checked = cfg.enabled;
+        renderVolunteerLimits(VolunteerLimits.view(cfg, st, Date.now()));
+      } catch (e) {
+        console.error('Error loading the sign-up limits:', e);
+        status.textContent = "Impossible de lire les limites. Vérifiez que les règles Firebase à jour sont publiées (volunteerLimits).";
+      }
+    }
+
+    async function saveVolunteerLimits() {
+      const input = { enabled: document.getElementById('vl-enabled').checked };
+      Object.entries(VL_FIELDS).forEach(([key, id]) => { input[key] = document.getElementById(id).value; });
+      const parsed = VolunteerLimits.parseConfig(input);
+      if (!parsed.ok) { showMessage(Object.values(parsed.errors)[0], 'error'); return; }
+      try {
+        await VolunteerLimits.saveConfig(db, firebase, input);
+        showMessage('Limites d\'inscription enregistrées.', 'success');
+        loadVolunteerLimits();
+      } catch (e) {
+        console.error('Error saving the sign-up limits:', e);
+        showMessage("Erreur lors de l'enregistrement des limites.", 'error');
+      }
+    }
+
+    async function resetVolunteerLimits() {
+      if (!confirm("Remettre à zéro tous les compteurs d'inscription (minute, heure, jour et total) ? Les bénévoles déjà inscrits ne sont pas touchés.")) return;
+      try {
+        await VolunteerLimits.reset(db, firebase);
+        showMessage("Compteurs d'inscription remis à zéro.", 'success');
+        loadVolunteerLimits();
+      } catch (e) {
+        console.error('Error resetting the sign-up counters:', e);
+        showMessage('Erreur lors de la remise à zéro.', 'error');
+      }
+    }
+
     let volunteersData = [];
 
     async function loadVolunteersTab() {
+      loadVolunteerLimits();
       const loading = document.getElementById('volunteers-loading');
       const emptyState = document.getElementById('volunteers-empty-state');
       const tbody = document.getElementById('volunteers-tbody');
@@ -2298,6 +2410,9 @@ Marie Tremblay,marie.tremblay@example.com,MotDePasse456,admin,,true,true,true,fa
           document.getElementById('delete-selected-volunteers-btn').addEventListener('click', deleteSelectedVolunteers);
           document.getElementById('delete-all-volunteers-btn').addEventListener('click', deleteAllVolunteers);
           document.getElementById('refresh-volunteers-btn').addEventListener('click', loadVolunteersTab);
+          document.getElementById('vl-save-btn').addEventListener('click', saveVolunteerLimits);
+          document.getElementById('vl-reset-btn').addEventListener('click', resetVolunteerLimits);
+          document.getElementById('vl-refresh-btn').addEventListener('click', loadVolunteerLimits);
           document.getElementById('filter-network').insertAdjacentHTML('beforeend',
             NETWORK_IDS.map(id => `<option value="${id}">${APP_CONFIG.networks[id].icon} ${APP_CONFIG.networks[id].name}</option>`).join(''));
           document.getElementById('user-role').addEventListener('change', applyNetworkLocks);

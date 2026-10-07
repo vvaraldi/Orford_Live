@@ -1,0 +1,261 @@
+<!DOCTYPE html>
+<html><head><meta charset="utf-8"><title>VolunteerLimits tests</title></head>
+<body>
+<pre id="out">running...</pre>
+<script src="/js/services/volunteer-limits.js"></script>
+<script>
+// The public sign-up limits: the client logic (register / explain / admin) against a JavaScript copy of the
+// Firestore rules ("VOLUNTEER SIGN-UP LIMITS" in assets/Rules for Firebase.txt). The copy is NOT the real
+// rules engine: the checks at the end only keep the copy and the rules text in step; the real rules must be
+// tried in the Firebase console's Rules Playground after publishing (see tests/README.md).
+(async () => {
+  const out = []; const J = JSON.stringify;
+  const ok = (n, c, x) => out.push((c ? 'PASS ' : 'FAIL ') + n + (c ? '' : ' :: ' + J(x)));
+  const VL = VolunteerLimits;
+  const MIN = 60 * 1000, HOUR = 60 * MIN, DAY = 24 * HOUR;
+  const T0 = Date.UTC(2026, 5, 15, 14, 0, 0);          // the server's clock at the start of a scenario
+
+  // ---------- a JavaScript copy of the rules + a fake Firestore that applies them ----------
+  const TS = { __serverTimestamp: true };
+  const ts = n => ({ toMillis: () => n });
+  const ms = t => (t && typeof t.toMillis === 'function') ? t.toMillis() : t;
+  const STATE_KEYS = ['total', 'minuteStart', 'minuteCount', 'hourStart', 'hourCount', 'dayStart', 'dayCount', 'lastVolunteerId', 'updatedAt'];
+  const get = (d, k, dflt) => d[k] === undefined ? dflt : d[k];
+
+  let docs, server, skew, commits, beforeCommit, alwaysDeny, readFails, auto;
+  function reset(opts) {
+    docs = {}; server = { now: T0 }; skew = 0; commits = 0; beforeCommit = null; alwaysDeny = false; readFails = false; auto = 0;
+    if (opts && opts.config) docs['volunteerLimits/config'] = opts.config;
+    VL._setNow(() => server.now + skew);
+  }
+
+  // volStateOk / volWindowOk / the volunteers create rule, transcribed one for one
+  function stateRuleOk(op, before, after, now) {
+    const c = before['volunteerLimits/config'] || {}, n = op.data, o = before['volunteerLimits/state'] || {};
+    if (get(c, 'enabled', true) !== true) return false;
+    if (Object.keys(n).some(k => !STATE_KEYS.includes(k)) || STATE_KEYS.some(k => !(k in n))) return false;
+    if (ms(n.updatedAt) !== now) return false;
+    if (n.total !== get(o, 'total', 0) + 1 || n.total > get(c, 'total', 500)) return false;
+    const win = (start, count, secs, limit) => {
+      const oStart = o[start] === undefined ? Date.UTC(2000, 0, 1) : ms(o[start]), oCount = get(o, count, 0);
+      return n[count] <= limit && (now < oStart + secs * 1000 ? (ms(n[start]) === oStart && n[count] === oCount + 1) : (ms(n[start]) === now && n[count] === 1));
+    };
+    if (!win('minuteStart', 'minuteCount', 60, get(c, 'perMinute', 10))) return false;
+    if (!win('hourStart', 'hourCount', 3600, get(c, 'perHour', 60))) return false;
+    if (!win('dayStart', 'dayCount', 86400, get(c, 'perDay', 150))) return false;
+    if (typeof n.lastVolunteerId !== 'string') return false;
+    const vp = 'volunteers/' + n.lastVolunteerId;
+    return (vp in after) && !(vp in before);
+  }
+  function volunteerRuleOk(op, before, after, now) {
+    const d = op.data, id = op.path.split('/')[1];
+    if (op.path in before) return false;                                   // create only
+    const keys = ['nom', 'prenom', 'network', 'agreementAccepted', 'createdAt'];
+    if (Object.keys(d).some(k => !keys.includes(k)) || keys.some(k => !(k in d))) return false;
+    if (typeof d.nom !== 'string' || !d.nom.length || d.nom.length > 100 || typeof d.prenom !== 'string' || !d.prenom.length || d.prenom.length > 100) return false;
+    if (d.network !== 'bike' || d.agreementAccepted !== true || ms(d.createdAt) !== now) return false;
+    const st = after['volunteerLimits/state'];
+    return !!st && st.lastVolunteerId === id;
+  }
+  function allowed(ops, asAdmin) {
+    const now = server.now, before = docs, after = Object.assign({}, docs);
+    ops.forEach(op => { after[op.path] = op.data; });
+    return ops.every(op => {
+      if (asAdmin && op.path.startsWith('volunteerLimits/')) return true;
+      if (op.path === 'volunteerLimits/state') return stateRuleOk(op, before, after, now);
+      if (op.path.startsWith('volunteers/')) return volunteerRuleOk(op, before, after, now);
+      return false;                                                         // config: admin only; anything else: no rule
+    });
+  }
+  async function commit(rawOps, asAdmin) {
+    if (beforeCommit) { const f = beforeCommit; beforeCommit = null; await f(); }
+    commits++;
+    if (typeof alwaysDeny === 'function') alwaysDeny();
+    else if (alwaysDeny) throw Object.assign(new Error('denied'), { code: 'permission-denied' });
+    const ops = rawOps.map(op => ({ path: op.path, data: Object.fromEntries(Object.entries(op.data).map(([k, v]) => [k, v === TS ? ts(server.now) : v])) }));
+    if (!allowed(ops, asAdmin)) throw Object.assign(new Error('Missing or insufficient permissions.'), { code: 'permission-denied' });
+    ops.forEach(op => { docs[op.path] = op.data; });
+  }
+  function makeDb(asAdmin) {
+    const refOf = (name, id) => ({ id, __path: name + '/' + id,
+      get: async () => { if (readFails) throw Object.assign(new Error('offline'), { code: 'unavailable' }); const d = docs[name + '/' + id]; return { exists: d !== undefined, data: () => d }; },
+      set: async data => commit([{ path: name + '/' + id, data }], asAdmin) });
+    return {
+      collection: name => ({ doc: id0 => refOf(name, id0 || 'auto' + (++auto)) }),
+      batch: () => { const ops = []; return { set: (ref, data) => ops.push({ path: ref.__path, data }), commit: () => commit(ops, asAdmin) }; }
+    };
+  }
+  const fb = { firestore: { FieldValue: { serverTimestamp: () => TS } } };
+  const db = makeDb(false), adminDb = makeDb(true);
+  const person = { nom: 'Tremblay', prenom: 'Marie' };
+  const state = () => docs['volunteerLimits/state'];
+  const nVolunteers = () => Object.keys(docs).filter(k => k.startsWith('volunteers/')).length;
+
+  // ---------- defaults ----------
+  reset();
+  const cfg0 = await VL.config(db);
+  ok('no config document: 10 per minute, 60 per hour, 150 per day, 500 in total, open', J(cfg0) === J({ perMinute: 10, perHour: 60, perDay: 150, total: 500, enabled: true }), cfg0);
+  reset({ config: { perMinute: 'x', perHour: 0, perDay: 7.5, total: 40, enabled: false } });
+  const cfg1 = await VL.config(db);
+  ok('a damaged config falls back field by field (bad numbers -> default), the others are kept', cfg1.perMinute === 10 && cfg1.perHour === 60 && cfg1.perDay === 150 && cfg1.total === 40 && cfg1.enabled === false, cfg1);
+
+  // ---------- a normal registration ----------
+  reset();
+  const r1 = await VL.register(db, fb, person);
+  ok('first registration (no counters yet) is accepted', r1.ok === true, r1);
+  const vid = Object.keys(docs).find(k => k.startsWith('volunteers/')).split('/')[1];
+  ok('the volunteer is saved as before (name, bike, agreement, server date)', J(Object.keys(docs['volunteers/' + vid]).sort()) === J(['agreementAccepted', 'createdAt', 'network', 'nom', 'prenom']) && docs['volunteers/' + vid].network === 'bike' && ms(docs['volunteers/' + vid].createdAt) === T0, docs['volunteers/' + vid]);
+  ok('counters: 1 everywhere, windows start at the server time, the volunteer is named', state().total === 1 && state().minuteCount === 1 && state().hourCount === 1 && state().dayCount === 1 && ms(state().minuteStart) === T0 && state().lastVolunteerId === vid, state());
+
+  // ---------- per minute ----------
+  for (let i = 2; i <= 10; i++) { server.now += 1000; const r = await VL.register(db, fb, person); if (!r.ok) ok('registration ' + i + ' accepted', false, r); }
+  ok('10 registrations in a minute are accepted', state().total === 10 && state().minuteCount === 10 && nVolunteers() === 10, state());
+  const before11 = commits;
+  server.now += 1000;
+  const r11 = await VL.register(db, fb, person);
+  ok('the 11th within the minute is refused with the "minute" reason and a clear message', r11.ok === false && r11.reason === 'minute' && /Trop d'inscriptions en peu de temps.*une minute/.test(r11.message), r11);
+  ok('...and nothing was written (no wasted attempt)', commits === before11 && nVolunteers() === 10, [commits, before11]);
+  server.now = T0 + 61 * 1000;
+  const r12 = await VL.register(db, fb, person);
+  ok('a minute later the minute window starts again (count 1) while hour and day keep counting', r12.ok === true && state().minuteCount === 1 && state().hourCount === 11 && state().dayCount === 11 && state().total === 11 && ms(state().minuteStart) === server.now && ms(state().hourStart) === T0, state());
+
+  // ---------- per hour, per day, in total ----------
+  reset({ config: { perMinute: 100, perHour: 5, perDay: 8, total: 12, enabled: true } });
+  for (let i = 0; i < 5; i++) { const r = await VL.register(db, fb, person); server.now += 2 * MIN; if (!r.ok) ok('hour scenario: registration ' + (i + 1), false, r); }
+  const rh = await VL.register(db, fb, person);
+  const hhmm = new Date(T0 + HOUR).toLocaleTimeString('fr-CA', { hour: '2-digit', minute: '2-digit' });
+  ok('over the hour limit: "hour" reason, message gives the time to come back', rh.ok === false && rh.reason === 'hour' && rh.message.includes('cette heure') && rh.message.includes(hhmm), [rh.reason, rh.message, hhmm]);
+  server.now = T0 + HOUR + MIN;
+  for (let i = 0; i < 3; i++) { const r = await VL.register(db, fb, person); server.now += 2 * MIN; if (!r.ok) ok('day scenario: registration ' + (i + 6), false, r); }
+  const rd = await VL.register(db, fb, person);
+  ok('over the day limit (8): "day" reason, message says today', rd.ok === false && rd.reason === 'day' && /aujourd'hui/.test(rd.message), [rd.reason, rd.message]);
+  server.now = T0 + DAY + 3 * HOUR;
+  for (let i = 0; i < 4; i++) { const r = await VL.register(db, fb, person); server.now += 2 * MIN; if (!r.ok) ok('total scenario: registration ' + (i + 9), false, r); }
+  const rt = await VL.register(db, fb, person);
+  ok('the total (12) is reached: "total" reason, message tells to contact the patrol', rt.ok === false && rt.reason === 'total' && /maximal/.test(rt.message) && /patrouille/.test(rt.message), [rt.reason, rt.message]);
+  ok('exactly 12 volunteers were saved, not one more', nVolunteers() === 12 && state().total === 12, [nVolunteers(), state().total]);
+
+  // ---------- switch, reset, check ----------
+  reset({ config: { perMinute: 10, perHour: 60, perDay: 150, total: 500, enabled: false } });
+  const rOff = await VL.register(db, fb, person);
+  ok('switched off by an admin: refused with a clear message, nothing written', rOff.ok === false && rOff.reason === 'disabled' && /fermées/.test(rOff.message) && nVolunteers() === 0 && commits === 0, rOff);
+  const chk = await VL.check(db);
+  ok('check() (page load) reports the closed state with its message', chk.blocked === 'disabled' && chk.message === rOff.message, chk);
+  readFails = true;
+  const chkFail = await VL.check(db);
+  ok('check() never blocks the form because a read failed', chkFail.blocked === null, chkFail);
+  readFails = false;
+
+  reset({ config: { perMinute: 10, perHour: 60, perDay: 150, total: 2, enabled: true } });
+  await VL.register(db, fb, person); await VL.register(db, fb, person);
+  const rFull = await VL.register(db, fb, person);
+  ok('total of 2 reached', rFull.reason === 'total', rFull);
+  await VL.reset(adminDb, fb);
+  ok('admin reset: all counters back to zero, the limits kept, the volunteers untouched', state().total === 0 && state().minuteCount === 0 && state().hourCount === 0 && state().dayCount === 0 && nVolunteers() === 2 && docs['volunteerLimits/config'].total === 2, state());
+  const rAfter = await VL.register(db, fb, person);
+  ok('after the reset registrations work again and count from 1', rAfter.ok === true && state().total === 1 && state().minuteCount === 1, [rAfter, state()]);
+
+  // ---------- another visitor registers between our read and our write ----------
+  reset();
+  await VL.register(db, fb, person);
+  beforeCommit = async () => { server.now += 500; const r = await VL.register(makeDb(false), fb, { nom: 'Autre', prenom: 'Visiteur' }); if (!r.ok) throw new Error('setup failed'); };
+  const c0 = commits;
+  const rRace = await VL.register(db, fb, person);
+  ok('two visitors at the same moment: the first write is refused, the retry (fresh counters) succeeds', rRace.ok === true && state().total === 3 && state().minuteCount === 3 && nVolunteers() === 3, [rRace, state()]);
+
+  // ---------- a visitor's clock is wrong ----------
+  reset();
+  await VL.register(db, fb, person);               // minute window started at T0
+  server.now = T0 + 30 * 1000; skew = 90 * 1000;   // server: window still running; the visitor's clock thinks it has ended
+  const rAhead = await VL.register(db, fb, person);
+  ok('visitor\'s clock 90 s ahead: still registered (retries with the clock shifted back)', rAhead.ok === true && state().total === 2 && state().minuteCount === 2, [rAhead, state()]);
+  reset();
+  await VL.register(db, fb, person);
+  server.now = T0 + 100 * 1000; skew = -90 * 1000; // server: window ended; the visitor's clock thinks it is still running
+  const rBehind = await VL.register(db, fb, person);
+  ok('visitor\'s clock 90 s behind: still registered (retries with the clock shifted forward)', rBehind.ok === true && state().total === 2 && state().minuteCount === 1 && ms(state().minuteStart) === server.now, [rBehind, state()]);
+  skew = 0;
+
+  // ---------- failures ----------
+  reset();
+  alwaysDeny = () => { throw Object.assign(new Error('offline'), { code: 'unavailable' }); };
+  const rNet = await VL.register(db, fb, person);
+  ok('no connection: "network" message, no retry storm', rNet.ok === false && rNet.reason === 'network' && /Connexion/.test(rNet.message) && commits === 1, [rNet, commits]);
+  reset(); readFails = true;
+  const rRead = await VL.register(db, fb, person);
+  ok('counters unreadable (offline): "network" message', rRead.reason === 'network', rRead);
+  reset(); alwaysDeny = true;
+  const rUnk = await VL.register(db, fb, person);
+  ok('refused although the counters say open: "unknown" message after 4 tries, no volunteer saved', rUnk.ok === false && rUnk.reason === 'unknown' && /communiquer avec la patrouille/.test(rUnk.message) && commits === 4 && nVolunteers() === 0, [rUnk.reason, commits]);
+
+  // ---------- what the RULES refuse (a script that skips the page) ----------
+  reset();
+  const first = await VL.register(db, fb, person);
+  const st = state();
+  const forged = (over, extraOps) => {
+    const id = 'forged' + (++auto);
+    const n = Object.assign({ total: st.total + 1, minuteStart: st.minuteStart, minuteCount: st.minuteCount + 1, hourStart: st.hourStart, hourCount: st.hourCount + 1, dayStart: st.dayStart, dayCount: st.dayCount + 1, lastVolunteerId: id, updatedAt: TS }, over || {});
+    const v = { nom: 'Faux', prenom: 'Robot', network: 'bike', agreementAccepted: true, createdAt: TS };
+    return [{ path: 'volunteerLimits/state', data: n }, { path: 'volunteers/' + n.lastVolunteerId, data: v }].concat(extraOps || []);
+  };
+  const tryOps = async (ops, admin) => { try { await commit(ops, admin); return true; } catch (e) { return false; } };
+  ok('rules: a well-formed +1 registration is accepted (the control case)', await tryOps(forged()), null);
+  reset(); await VL.register(db, fb, person);
+  ok('rules: the counters alone (no volunteer in the batch) are refused', !(await tryOps([forged()[0]])), null);
+  ok('rules: a volunteer alone (counters untouched) is refused', !(await tryOps([forged()[1]])), null);
+  ok('rules: a volunteer whose id is not the one named in the counters is refused', !(await tryOps([forged()[0], Object.assign({}, forged()[1], { path: 'volunteers/other' })])), null);
+  ok('rules: a jump of +2 in the total is refused', !(await tryOps(forged({ total: st.total + 2 }))), null);
+  ok('rules: a window count that does not move by exactly 1 is refused', !(await tryOps(forged({ minuteCount: st.minuteCount + 2 }))), null);
+  ok('rules: restarting a window that is still running (count back to 1) is refused', !(await tryOps(forged({ minuteStart: TS, minuteCount: 1 }))), null);
+  ok('rules: counters going backwards (total) are refused', !(await tryOps(forged({ total: st.total }))), null);
+  ok('rules: an extra field in the counters is refused', !(await tryOps(forged({ sneaky: 1 }))), null);
+  ok('rules: a volunteer with an extra field is refused', !(await tryOps([forged()[0], Object.assign({}, forged()[1], { data: { nom: 'a', prenom: 'b', network: 'bike', agreementAccepted: true, createdAt: TS, admin: true } })])), null);
+  ok('rules: a back-dated volunteer (not the server clock) is refused', !(await tryOps([forged()[0], Object.assign({}, forged()[1], { data: { nom: 'a', prenom: 'b', network: 'bike', agreementAccepted: true, createdAt: ts(T0 - DAY) } })])), null);
+  const dupId = Object.keys(docs).find(k => k.startsWith('volunteers/')).split('/')[1];
+  ok('rules: re-using the id of an existing volunteer (a free +1) is refused', !(await tryOps([forged({ lastVolunteerId: dupId })[0], { path: 'volunteers/' + dupId, data: { nom: 'a', prenom: 'b', network: 'bike', agreementAccepted: true, createdAt: TS } }])), null);
+  ok('rules: two volunteers for one counter increment are refused', !(await tryOps(forged({}, [{ path: 'volunteers/second', data: { nom: 'a', prenom: 'b', network: 'bike', agreementAccepted: true, createdAt: TS } }]))), null);
+  ok('rules: the public cannot write the limits (config)', !(await tryOps([{ path: 'volunteerLimits/config', data: { perMinute: 100000 } }])), null);
+  ok('rules: an admin can write the limits and the counters', (await tryOps([{ path: 'volunteerLimits/config', data: { perMinute: 5 } }], true)) && (await tryOps([{ path: 'volunteerLimits/state', data: { total: 0 } }], true)), null);
+  reset({ config: { perMinute: 1, perHour: 60, perDay: 150, total: 500, enabled: true } });
+  await VL.register(db, fb, person);
+  const stFull = state();
+  ok('rules: one registration over the minute limit, forged directly, is refused', !(await tryOps([{ path: 'volunteerLimits/state', data: { total: 2, minuteStart: stFull.minuteStart, minuteCount: 2, hourStart: stFull.hourStart, hourCount: 2, dayStart: stFull.dayStart, dayCount: 2, lastVolunteerId: 'z', updatedAt: TS } }, { path: 'volunteers/z', data: { nom: 'a', prenom: 'b', network: 'bike', agreementAccepted: true, createdAt: TS } }])), null);
+  reset({ config: { perMinute: 10, perHour: 60, perDay: 150, total: 500, enabled: false } });
+  ok('rules: with the switch off even a well-formed registration is refused', !(await tryOps(forged({ total: 1, minuteStart: TS, minuteCount: 1, hourStart: TS, hourCount: 1, dayStart: TS, dayCount: 1 }))), null);
+
+  // ---------- admin: validation and saving ----------
+  reset();
+  const bad = [{ perMinute: 0 }, { perHour: 1.5 }, { perDay: 'abc' }, { total: 100001 }, { perMinute: -3 }];
+  bad.forEach(b => { const p = VL.parseConfig(Object.assign({ perMinute: 10, perHour: 60, perDay: 150, total: 500 }, b)); ok('limit ' + J(b) + ' is rejected with a message naming it', p.ok === false && Object.keys(p.errors).length === 1 && /1 à 100000/.test(Object.values(p.errors)[0]), p); });
+  const saved = await VL.saveConfig(adminDb, fb, { perMinute: '5', perHour: '30', perDay: '100', total: '300', enabled: false });
+  ok('valid limits (typed as text in the form) are saved as numbers with the switch', saved.ok && J(Object.assign({}, docs['volunteerLimits/config'], { updatedAt: 0 })) === J({ perMinute: 5, perHour: 30, perDay: 100, total: 300, enabled: false, updatedAt: 0 }), docs['volunteerLimits/config']);
+  const notSaved = await VL.saveConfig(adminDb, fb, { perMinute: 0, perHour: 30, perDay: 100, total: 300 });
+  ok('invalid limits are not saved', notSaved.ok === false && docs['volunteerLimits/config'].perMinute === 5, docs['volunteerLimits/config']);
+
+  // ---------- the view the admin reads ----------
+  reset({ config: { perMinute: 3, perHour: 60, perDay: 150, total: 500, enabled: true } });
+  for (let i = 0; i < 3; i++) await VL.register(db, fb, person);
+  const v = VL.view(await VL.config(db), await VL.readState(db), server.now);
+  ok('view: used / limit per window, reset time of the running windows, blocked reason', v.minute.used === 3 && v.minute.limit === 3 && v.minute.resetAt === T0 + MIN && v.hour.used === 3 && v.total.used === 3 && v.blocked === 'minute', v);
+  const vLater = VL.view(await VL.config(db), await VL.readState(db), T0 + 2 * MIN);
+  ok('view: an ended window reads as 0 used and not blocked', vLater.minute.used === 0 && vLater.minute.resetAt === null && vLater.hour.used === 3 && vLater.blocked === null, vLater);
+  ok('every refusal reason has a message in French', ['disabled', 'total', 'day', 'hour', 'minute', 'network', 'unknown'].every(r => typeof VL.message(r, null) === 'string' && VL.message(r, null).length > 20), null);
+
+  // ---------- the pages and the rules text agree with this module ----------
+  const text = async url => (await fetch(url)).text();
+  const page = await text('/pages/maintenance-volunteer-register.html');
+  ok('registration page: loads the module and registers through it (no direct add() any more)', /volunteer-limits\.js/.test(page) && /VolunteerLimits\.register\(/.test(page) && !/collection\('volunteers'\)\.add\(/.test(page), null);
+  ok('registration page: has the closed notice and the error box', /id="closed-message"/.test(page) && /id="error-message"/.test(page), null);
+  const admin = await text('/pages/user-management.html');
+  ok('Bénévoles tab: has the limits card (4 limits, switch, save, reset) and loads the module', ['vl-per-minute', 'vl-per-hour', 'vl-per-day', 'vl-total', 'vl-enabled', 'vl-save-btn', 'vl-reset-btn'].every(id => admin.includes('id="' + id + '"')) && /volunteer-limits\.js/.test(admin), null);
+  const rules = await text('/assets/Rules%20for%20Firebase.txt');
+  const dflt = key => { const m = rules.match(new RegExp("c\\.get\\('" + key + "', (\\d+)\\)")); return m ? Number(m[1]) : null; };
+  ok('rules text: the defaults are the module\'s (10 / 60 / 150 / 500)', dflt('perMinute') === VL.DEFAULTS.perMinute && dflt('perHour') === VL.DEFAULTS.perHour && dflt('perDay') === VL.DEFAULTS.perDay && dflt('total') === VL.DEFAULTS.total, [dflt('perMinute'), dflt('perHour'), dflt('perDay'), dflt('total')]);
+  ok('rules text: the volunteer rule requires the counters (getAfter), the counters require the volunteer (existsAfter), admins write the limits', /getAfter\(\/databases\/\$\(database\)\/documents\/volunteerLimits\/state\)\.data\.lastVolunteerId == volunteerId/.test(rules) && /existsAfter\(\/databases\/\$\(database\)\/documents\/volunteers\//.test(rules) && /match \/volunteerLimits\/\{docId\}/.test(rules) && /allow write: if isAdmin\(\) && canWorkIn\('bike'\)/.test(rules), null);
+  ok('rules text: window lengths 60 / 3600 / 86400 seconds like the module', /'minuteStart', 'minuteCount', 60,/.test(rules) && /'hourStart', 'hourCount', 3600,/.test(rules) && /'dayStart', 'dayCount', 86400,/.test(rules) && J(VL.WINDOWS.map(w => w.secs)) === J([60, 3600, 86400]), null);
+  ok('rules file: CRLF line endings kept (as the file always was)', !/[^\r]\n/.test(rules), null);
+
+  document.getElementById('out').textContent = out.join('\n');
+})().catch(e => { document.getElementById('out').textContent = 'HARNESS ERROR ' + e.stack; });
+</script>
+</body></html>
