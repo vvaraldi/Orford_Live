@@ -141,7 +141,7 @@
   // Password-reset pages: the e-mail link's code behaves as ?code= says (ok | expired | invalid | offline) and the
   // new-password step as ?confirm= says (weak | used | offline). Every call is logged in window.__authCalls.
   window.__authCalls = [];
-  if (/^(forgot|reset)-password$/.test(Q.get('page') || '')) {
+  if (/^(forgot|new)-password$/.test(Q.get('page') || '')) {
     const authError = code => Object.assign(new Error(code), { code });
     const fail = (param, map) => { const v = Q.get(param); if (map[v]) throw authError(map[v]); };
     window.auth = {
