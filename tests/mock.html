@@ -119,13 +119,15 @@
   };
   // two-activity user: pick the current one like the header switcher would have
   // (a system admin works in every activity whatever ?net says, so ?choice also applies to them)
-  if (Q.get('choice')) { try { localStorage.setItem('orford-network', JSON.stringify({ id: Q.get('choice'), season: Network.ofSeason() })); } catch (e) {} }
+  // (the sign-in pages - login, forgot / reset password - load no network.js: nothing to set up there)
+  if (typeof Network === 'undefined') { /* no activity handling on this page */ }
+  else if (Q.get('choice')) { try { localStorage.setItem('orford-network', JSON.stringify({ id: Q.get('choice'), season: Network.ofSeason() })); } catch (e) {} }
   else { try { localStorage.removeItem('orford-network'); } catch (e) {} }
   // never start a test carrying over a kind choice made by a previous test in the same browser profile
   try { localStorage.removeItem('orford-kind'); } catch (e) {}
   // ?kind=downhill: start already on that kind, like a user who switched then reloaded
   if (Q.get('kind')) { try { localStorage.setItem('orford-kind', JSON.stringify({ network: NET === 'both' ? (Q.get('choice') || 'ski') : NET, kind: Q.get('kind') })); } catch (e) {} }
-  Network.reload = () => { window.__reloads++; };
+  if (typeof Network !== 'undefined') Network.reload = () => { window.__reloads++; };
   // what the real auth.js does once the user is known
   function checkAuthStatus(opts) {
     if (!Network.setUser(currentUserData)) { document.body.textContent = 'ACCESS DENIED (no activity)'; return; }
@@ -136,4 +138,23 @@
   }
   function onFirebaseReady(cb) { cb(); }
   function getAuthErrorMessage(e) { return e.message; }
+  // Password-reset pages: the e-mail link's code behaves as ?code= says (ok | expired | invalid | offline) and the
+  // new-password step as ?confirm= says (weak | used | offline). Every call is logged in window.__authCalls.
+  window.__authCalls = [];
+  if (/^(forgot|reset)-password$/.test(Q.get('page') || '')) {
+    const authError = code => Object.assign(new Error(code), { code });
+    const fail = (param, map) => { const v = Q.get(param); if (map[v]) throw authError(map[v]); };
+    window.auth = {
+      sendPasswordResetEmail: async (email, settings) => { window.__authCalls.push(['send', email, settings]); fail('send', { offline: 'auth/network-request-failed' }); },
+      verifyPasswordResetCode: async code => {
+        window.__authCalls.push(['verify', code]);
+        fail('code', { expired: 'auth/expired-action-code', invalid: 'auth/invalid-action-code', offline: 'auth/network-request-failed' });
+        return 'marie@example.test';
+      },
+      confirmPasswordReset: async (code, password) => {
+        window.__authCalls.push(['confirm', code, password]);
+        fail('confirm', { weak: 'auth/weak-password', used: 'auth/invalid-action-code', offline: 'auth/network-request-failed' });
+      }
+    };
+  }
 </script>

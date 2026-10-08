@@ -23,12 +23,15 @@ positions, editing README.md, testing as a real user, etc.).
 | 2026-10-04 (afternoon) | 2026-10-04 18:07 → 18:29 (~22min) | ~14m | ~22m |
 | 2026-10-04 (evening) | 2026-10-04 21:08 → 23:48 (~2h40m, one continuous block, up to the moment of this estimate) | ~1h30m | ~2h25m |
 | 2026-10-05 (evening) | 2026-10-05 20:26 → 22:09 (~1h43m, one continuous block; includes the last half minute after the previous estimate, 23:48 the night before) | ~52m | ~1h29m |
+| 2026-10-05 (end) | 2026-10-05 22:09 → 22:09 (the last minute of the evening block above, after its estimate) | ~1m | ~1m |
+| 2026-10-06 (evening) | 2026-10-06 19:29 → 2026-10-07 00:01 (~4h32m, one evening block running past midnight, with many long gaps while you tested, deployed and edited the quote in Word) | ~42m | ~1h12m |
+| 2026-10-07 (morning) | 2026-10-07 06:48 → 06:57 (~9m, up to the moment of this estimate) | ~9m | ~9m |
 
 **Manual addition (not from chat timestamps):** +2h00m - customer/team meetings, morning of 2026-09-28 (before the day's chat activity started; per the Method note above, offline time isn't normally included, but you asked for this one to be logged).
 
-**Running total (active chat time + the meeting addition, all estimates so far): ~16h35m - 21h25m**
+**Running total (active chat time + the meeting addition, all estimates so far): ~17h27m - 22h47m**
 
-**Note:** the 2026-10-05 (evening) row is computed up to 22:09, when this estimate was made; the
+**Note:** the 2026-10-07 (morning) row is computed up to 06:57, when this estimate was made; the
 session may have continued after that, and any further time will need a new row. 2026-09-23 (the
 Firebase backup/export session, ~5 min of chat) was missing from earlier estimates and is now
 included. Nothing was logged in the transcript on 2026-09-24 to 2026-09-27, 2026-09-30 or 2026-10-01.
@@ -89,6 +92,16 @@ orphan-file clean-up shared by all four apps (files matched by path instead of U
 guard when no file can be listed, bucket diagnostic, preview of each orphan photo). Debugging with your
 real results led to two fixes: a tab/panel id clash that left the "Gestion des données" tab empty, and the
 missing `rules_version = '2'` line in the Storage rules, which is what blocked file listing.
+
+The 2026-10-05 (end) / 2026-10-06 / 2026-10-07 rows cover: the header link limited to the logo and the
+name (REGIS), the paginated users list in Administration (25 per page, page-size selector, filters and export
+unchanged), the written quote for the bike network, the Descente and the new Entretien app (reading the
+contract and the example, building the Word document on the example's layout, three rounds of edits with you,
+fitting the pages with Word, recovering the deleted file), and the public sign-up limits for the volunteer
+page (a rules-based limiter per minute / hour / day / total, clear messages for the visitor, an admin card
+with the limits, the open/closed switch and the reset, 59 new tests and the checklist you ran on the real
+site). The limiter was given to the customer free of charge and is not in the quote. Time spent in Word or in
+the Firebase console on your side is not counted, as always.
 
 Next time an estimate is added, keep the same method (or note if it changed) so the numbers stay
 comparable across rows.

@@ -7,7 +7,6 @@
 
 3. Improve the user experience
 #	Priority	Item
-3.0	Medium manage the risk of someone forcing the system via the registering of volunteers
 3.1	Low	Accessibility audit pass
 
 
