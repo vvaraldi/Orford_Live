@@ -27,12 +27,7 @@ Regis has a github account
 
 
 
-
-
-
-
-
-
-
+Later: once Firebase allows template edits again, set the action URL to https://regis-orford.github.io/Regis/pages/new-password.html.
+You can then delete the redirect from the old repo. Until then, the redirect is what makes the emailed link work.
 
 
