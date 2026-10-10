@@ -75,6 +75,16 @@ Public JSON, no key, readable from a page (cross-site calls allowed):
 
 ## Progress
 
+- **Step 2 - Data and web values: DONE (2026-10-09)** - `js/services/weather-service.js` + `APP_CONFIG.weather`
+  (place, the two stations, publish flags, 3 h window). Record in `weather_records`: `locationId`, `recordedAt`,
+  `manual {13 fields, null = not typed}`, `web {fetchedAt, fields {value, source, observedAt, publishable}}`,
+  `comment`, author / editor fields. Web values come from the first station that has them (lake first, airport
+  after); feels-like computed (wind chill / humidex, Environment Canada formulas); a typed value wins and can be
+  undone; `effectiveValues(record, {publicOnly})` drops the airport's values. The list query uses only
+  `recordedAt` (no composite index). Checked live against Environment Canada (now, yesterday, 45 days ago).
+  Units: °C, km/h, mm, cm, %, kPa, km (confirmed by the data). Rain = the 24 h precipitation, offered only above
+  +1 °C; the cloud / sky / airport hints are approximations (labelled as hints in the form, step 3).
+
 - **Step 1 - Foundation: DONE (2026-10-09)** - permission `allowMeteo` (user form, list badge, CSV import/export and
   template); portal tile `meteo` with the season symbol (`weatherIcon` per activity in `config.js`,
   `Network.seasonIcon()`); yellow module colour (`--color-meteo`, `data-module="meteo"`); `pages/meteo-report.html`

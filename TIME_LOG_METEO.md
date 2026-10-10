@@ -9,12 +9,15 @@ in the Firebase / GitHub consoles is not counted.
 |---|---|---|---|
 | 2026-10-09 | 2026-10-09 20:50 → 21:15 (~25m: the request, my questions, your answers, the Environment Canada feasibility check and this record) | ~2m | ~2m |
 | 2026-10-09 (step 1) | 2026-10-09 21:15 → 21:35 (~20m, one block: step 1 built, tested and checked on screen) | ~6m | ~20m |
+| 2026-10-09 (step 2) | 2026-10-09 21:35 → 21:52 (~17m, one block: step 2 built, tested, and checked against the live Environment Canada service) | ~9m | ~17m |
 
-**Running total for the Météo app: ~8m - 22m**
+**Running total for the Météo app: ~17m - 39m**
 
-**Note:** the last row is computed up to 21:35, when this estimate was made; any further time needs a new row.
+**Note:** the last row is computed up to 21:52, when this estimate was made; any further time needs a new row.
 
 What the rows cover: the first questions to define the app and the Environment Canada feasibility check (see
 `METEO_APP.md`); then step 1, the foundation: the Météo permission (user form, list badge, import / export),
 the portal tile with the season's symbol, the yellow module colour, the Météo page shell with its access check
-and navigation, the Firestore rules for the weather collections, and the tests (1172 checks in the whole suite).
+and navigation, the Firestore rules for the weather collections, and the tests (1172 checks in the whole suite). Step 2: the data layer (`js/services/weather-service.js`): the
+fields and their validation, reading Environment Canada for a time, the feels-like, the record as stored (typed
+and web values together), the effective / publishable values, saving and listing in Firestore, and 40 tests.

@@ -66,6 +66,27 @@ const APP_CONFIG = {
     measurementId: "G-EBLYWBM9YB"
   },
 
+  // ===== WEATHER (Météo app, js/services/weather-service.js) =====
+  // Environment Canada's near-real-time observations (hourly, public, no key). A place ("location") has
+  // stations, best first: a value comes from the FIRST station that has it. publish: false = the station's values
+  // only help the person typing in the office (the airport data carries a NAV CANADA "all rights reserved"
+  // notice): they are stored but never put on the public page. More places can be added later.
+  //   profile  'ground' = a plain weather station, 'airport' = an airport (adds pressure, clouds, visibility)
+  weather: {
+    api: 'https://api.weather.gc.ca/collections/swob-realtime/items',
+    maxAgeHours: 3,                 // an observation older than this (before the chosen time) is not offered
+    defaultLocation: 'mountain',
+    locations: {
+      mountain: {
+        id: 'mountain', name: 'Mont Orford',
+        stations: [
+          { id: 'lac', name: 'Lac Memphrémagog', mscId: '702CFGG', profile: 'ground', publish: true },
+          { id: 'sherbrooke', name: 'Aéroport de Sherbrooke', mscId: '7028123', profile: 'airport', publish: false }
+        ]
+      }
+    }
+  },
+
   // ===== VERSION =====
   version: new Date().toISOString().split('T')[0].replace(/-/g, ''),
   

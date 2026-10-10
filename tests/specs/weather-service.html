@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html><head><meta charset="utf-8"><title>WeatherService tests</title></head>
+<body>
+<pre id="out">running...</pre>
+<script src="/js/core/config.js"></script>
+<script src="/js/services/weather-service.js"></script>
+<script>
+// The Météo data layer: Environment Canada readings (canned answers, taken from real readings of 2026-10-09),
+// the feels-like, validation, what is stored, and the Firestore calls (a fake Firestore).
+(async () => {
+  const out = []; const J = JSON.stringify;
+  const ok = (n, c, x) => out.push((c ? 'PASS ' : 'FAIL ') + n + (c ? '' : ' :: ' + J(x)));
+  const WS = WeatherService;
+  const T0 = Date.parse('2026-10-09T20:30:00Z');
+
+  // ---- real readings (trimmed) ----
+  const LAC = { 'stn_nam-value': 'LAC MEMPHREMAGOG', 'date_tm-value': '2026-10-09T20:00:00.000Z', air_temp: 8.4, rel_hum: 86, dwpt_temp: 6.2,
+    avg_wnd_spd_10m_pst10mts: 15.4, avg_wnd_dir_10m_pst10mts: 297, max_wnd_spd_10m_pst10mts: 24.4, max_wnd_spd_10m_pst1hr: 29.2 };
+  const AIRPORT = { 'stn_nam-value': 'Sherbrooke', 'date_tm-value': '2026-10-09T20:00:00.000Z', air_temp: 7.9, rel_hum: 80, dwpt_temp: 4.7,
+    mslp: 1020.1, avg_vis_pst10mts: 16.09, cld_amt_code_1: 1, cld_bas_hgt_1: 1310, cld_amt_code_2: 4,
+    avg_wnd_spd_10m_pst10mts: 16.6, avg_wnd_dir_10m_pst10mts: 261, pcpn_amt_pst1hr: 0.0, pcpn_amt_pst24hrs: 3.3 };
+
+  // ---- a fake fetch: answers per station id, records every URL ----
+  let ANSWERS, URLS;
+  const fakeFetch = async url => {
+    URLS.push(url);
+    const id = /msc_id-value=([^&]+)/.exec(url)[1];
+    const a = ANSWERS[id];
+    if (a instanceof Error) throw a;
+    return { ok: !(a && a.status), status: a && a.status, json: async () => ({ features: a && a.props ? [{ properties: a.props }] : [] }) };
+  };
+  const answers = (lac, airport) => { ANSWERS = { '702CFGG': lac, '7028123': airport }; URLS = []; };
+
+  // ---- config ----
+  const cfg = APP_CONFIG.weather;
+  ok('config: one place (Mont Orford) with the two Environment Canada stations, the lake first; only the lake is publishable',
+    cfg.defaultLocation === 'mountain' && J(cfg.locations.mountain.stations.map(s => [s.id, s.mscId, s.publish])) === J([['lac', '702CFGG', true], ['sherbrooke', '7028123', false]]), cfg);
+
+  // ---- the feels-like (Environment Canada's formulas) ----
+  ok('feels-like: -10 °C with 20 km/h wind = wind chill -18', WS.feelsLike(-10, 20, null) === -18, WS.feelsLike(-10, 20, null));
+  ok('feels-like: 30 °C with a 20 °C dew point = humidex 38', WS.feelsLike(30, 5, 20) === 38, WS.feelsLike(30, 5, 20));
+  ok('feels-like: between 0 and 20 °C it is the air temperature itself', WS.feelsLike(8.4, 15.4, 6.2) === 8.4 && WS.feelsLike(0.5, 30, 0) === 0.5, null);
+  ok('feels-like: cold but wind under 5 km/h = the air temperature; no temperature = nothing', WS.feelsLike(-5, 3, null) === -5 && WS.feelsLike(null, 20, null) === null, null);
+  ok('feels-like: 22 °C and dry (humidex not above the temperature) = the temperature', WS.feelsLike(22, 5, 0) === 22, WS.feelsLike(22, 5, 0));
+  ok('wind direction in words: 297° = ONO, 0° and 360° = N, 90° = E, 180° = S', WS.compass(297) === 'ONO' && WS.compass(0) === 'N' && WS.compass(360) === 'N' && WS.compass(90) === 'E' && WS.compass(180) === 'S' && WS.compass(null) === '', null);
+
+  // ---- reading one station ----
+  const lac = WS.mapObservation(LAC, 'ground');
+  ok('lake station: temperature, humidity, wind (10 min), direction, gusts (the hour\'s maximum), dew point; nothing invented',
+    lac.tempC === 8.4 && lac.humidityPct === 86 && lac.windKmh === 15.4 && lac.windDir === 297 && lac.gustKmh === 29.2 && lac.dewPointC === 6.2 && lac.pressureKpa === undefined && lac.cloudCover === undefined && lac.visibilityKm === undefined, lac);
+  const air = WS.mapObservation(AIRPORT, 'airport');
+  ok('airport: pressure in kPa (1020.1 hPa), visibility, clouds (a broken/overcast layer = overcast), rain only above freezing',
+    air.pressureKpa === 102 && air.visibilityKm === 16.09 && air.cloudCover === 'overcast' && air.rainMm === 3.3, air);
+  ok('airport: no precipitation, overcast: no sky suggestion; few clouds: "sun"', air.sky === undefined && WS.mapObservation(Object.assign({}, AIRPORT, { cld_amt_code_2: undefined }), 'airport').sky === 'sun', air.sky);
+  const sky = (over) => WS.mapObservation(Object.assign({}, AIRPORT, over), 'airport').sky;
+  ok('sky suggestion: rain above +1 °C, snow below, fog under 1 km of visibility, otherwise nothing special',
+    sky({ pcpn_amt_pst1hr: 0.4, air_temp: 6 }) === 'rain' && sky({ pcpn_amt_pst1hr: 0.4, air_temp: -3 }) === 'snow' && sky({ avg_vis_pst10mts: 0.4 }) === 'fog', null);
+  ok('airport: a clear sky has no cloud layer in a complete report; without the report nothing is claimed',
+    WS.mapObservation({ air_temp: 5, avg_vis_pst10mts: 16 }, 'airport').cloudCover === 'clear' && WS.mapObservation({ air_temp: 5 }, 'airport').cloudCover === undefined, null);
+  ok('airport: no rain value when it is freezing (the 24 h amount may be snow)', WS.mapObservation(Object.assign({}, AIRPORT, { air_temp: -2 }), 'airport').rainMm === undefined, null);
+  ok('text numbers from the service are read as numbers', WS.mapObservation({ air_temp: '8.4', rel_hum: '86' }, 'ground').tempC === 8.4, null);
+
+  // ---- the request ----
+  const station = cfg.locations.mountain.stations[0];
+  const url = WS.observationUrl(station, T0);
+  ok('request: one station by its id, the 3 hours before the chosen time, newest first, a single reading',
+    url.startsWith(cfg.api + '?f=json&msc_id-value=702CFGG&') && url.includes('datetime=2026-10-09T17:30:00Z/2026-10-09T20:30:00Z') && url.includes('sortby=-date_tm-value') && url.endsWith('limit=1'), url);
+
+  // ---- both stations ----
+  answers({ props: LAC }, { props: AIRPORT });
+  const web = await WS.fetchWebValues({ at: T0, fetch: fakeFetch });
+  const f = web.fields;
+  ok('both read: temperature, wind, gusts and humidity from the lake; pressure, clouds, visibility from the airport', f.tempC.source === 'lac' && f.humidityPct.source === 'lac' && f.windKmh.source === 'lac' && f.gustKmh.source === 'lac' && f.pressureKpa.source === 'sherbrooke' && f.cloudCover.value === 'overcast' && f.visibilityKm.source === 'sherbrooke', J(Object.keys(f)));
+  ok('...the airport never replaces a value the lake has (temperature stays 8.4, not 7.9)', f.tempC.value === 8.4 && f.windDir.value === 297, f.tempC);
+  ok('...publishable only for the lake: lake values yes, airport values no', f.tempC.publishable === true && f.pressureKpa.publishable === false && f.rainMm.publishable === false, null);
+  ok('...the feels-like is computed (here the temperature itself) and marked as calculated', f.feelsLikeC.value === 8.4 && f.feelsLikeC.source === 'calc' && f.feelsLikeC.publishable === true, f.feelsLikeC);
+  ok('...the observation time is kept per value and overall', f.tempC.observedAt === Date.parse('2026-10-09T20:00:00.000Z') && web.observedAt === Date.parse('2026-10-09T20:00:00.000Z') && web.missing.length === 0 && web.errors.length === 0, web);
+  ok('both stations were asked', URLS.length === 2 && URLS.some(u => u.includes('702CFGG')) && URLS.some(u => u.includes('7028123')), URLS);
+
+  // ---- failures ----
+  answers(new Error('network down'), { props: AIRPORT });
+  const partial = await WS.fetchWebValues({ at: T0, fetch: fakeFetch });
+  ok('the lake cannot be read: the airport still gives its values (not publishable), the failure is reported', partial.fields.tempC.source === 'sherbrooke' && partial.fields.tempC.publishable === false && partial.errors.length === 1 && partial.errors[0].station === 'lac', partial);
+  answers({ status: 503 }, new Error('timeout'));
+  let failed = null;
+  try { await WS.fetchWebValues({ at: T0, fetch: fakeFetch }); } catch (e) { failed = e; }
+  ok('every station fails (HTTP error): an error with a code, nothing invented', failed && failed.code === 'unreachable', failed && failed.message);
+  answers({ props: null }, { props: null });
+  const none = await WS.fetchWebValues({ at: T0, fetch: fakeFetch });
+  ok('no observation in the window (e.g. a very old date): no values, both stations listed as missing, no error', Object.keys(none.fields).length === 0 && none.observedAt === null && J(none.missing) === J(['lac', 'sherbrooke']), none);
+
+  // ---- validation ----
+  const good = WS.validateManual({ tempC: ' -12,5 ', windKmh: '20', cloudCover: 'partly', sky: 'snow', newSnowCm: '', humidityPct: 85 });
+  ok('typed values: comma accepted, text read as numbers, empty = nothing, every field present', good.ok && good.values.tempC === -12.5 && good.values.windKmh === 20 && good.values.humidityPct === 85 && good.values.newSnowCm === null && good.values.visibilityKm === null && Object.keys(good.values).length === WS.KEYS.length && good.values.cloudCover === 'partly', good);
+  const bad = WS.validateManual({ tempC: '120', windDir: '400', humidityPct: 'abc', cloudCover: 'stormy', pressureKpa: '50' });
+  ok('refused: out of range, not a number, unknown choice - each named', !bad.ok && ['tempC', 'windDir', 'humidityPct', 'cloudCover', 'pressureKpa'].every(k => !!bad.errors[k]) && /entre -60 et 50/.test(bad.errors.tempC) && /un nombre/.test(bad.errors.humidityPct), bad.errors);
+  ok('zero is a value (0 cm of snow is not "nothing")', WS.validateManual({ newSnowCm: 0, snowDepthCm: '0' }).values.newSnowCm === 0 && WS.validateManual({ snowDepthCm: '0' }).values.snowDepthCm === 0, null);
+
+  // ---- a record, as stored ----
+  const user = { uid: 'u1', name: 'Marie' };
+  const FB = { firestore: { Timestamp: { fromDate: d => ({ toDate: () => d, toMillis: () => d.getTime(), __ts: true }) }, FieldValue: { serverTimestamp: () => 'SERVER_TS' } } };
+  const built = WS.buildRecord({ at: new Date(T0), manual: { newSnowCm: '12', snowDepthCm: '55' }, web, comment: '  Belle journée  ' }, user, FB);
+  const r = built.record;
+  ok('record: place, day and time, typed values (all fields, null where nothing), comment trimmed, author kept', built.ok && r.locationId === 'mountain' && r.recordedAt.toMillis() === T0 && r.manual.newSnowCm === 12 && r.manual.tempC === null && r.comment === 'Belle journée' && r.createdBy === 'u1' && r.createdByName === 'Marie' && r.createdAt === 'SERVER_TS', r);
+  ok('record: the web values are kept as read (value, source, time, publishable) next to the typed ones', r.web.fields.tempC.value === 8.4 && r.web.fields.tempC.source === 'lac' && r.web.fields.tempC.observedAt.toMillis() === Date.parse('2026-10-09T20:00:00.000Z') && r.web.fields.pressureKpa.publishable === false && r.web.fetchedAt.__ts === true, r.web);
+  ok('record: nothing typed and no web values = refused; web values alone are enough; a bad value is refused with its message',
+    !WS.buildRecord({ at: new Date(T0), manual: {}, web: null }, user, FB).ok && WS.buildRecord({ at: new Date(T0), manual: {}, web }, user, FB).ok && WS.buildRecord({ at: new Date(T0), manual: { tempC: '999' }, web: null }, user, FB).errors.tempC, null);
+  ok('record: an invalid date is refused', WS.buildRecord({ at: 'not a date', manual: { tempC: 1 }, web: null }, user, FB).errors.recordedAt, null);
+
+  // ---- what a record says ----
+  const rec = { manual: { tempC: -3, newSnowCm: 0 }, web: r.web };
+  const eff = WS.effectiveValues(rec);
+  ok('effective values: the typed value wins (even 0), otherwise the web value', eff.tempC.value === -3 && eff.tempC.source === 'manual' && eff.newSnowCm.value === 0 && eff.humidityPct.value === 86 && eff.humidityPct.source === 'lac' && eff.pressureKpa.value === 102, eff);
+  const pub = WS.effectiveValues(rec, { publicOnly: true });
+  ok('public values: typed and lake values only; airport values (pressure, clouds, visibility) are left out', pub.tempC.source === 'manual' && pub.humidityPct.source === 'lac' && pub.pressureKpa === undefined && pub.cloudCover === undefined && pub.visibilityKm === undefined, pub);
+  ok('a typed value can be undone: with null the web value comes back', WS.effectiveValues({ manual: { tempC: null }, web: r.web }).tempC.value === 8.4, null);
+
+  // ---- Firestore (fake) ----
+  const writes = [], queries = [];
+  const rows = [
+    { id: 'r1', locationId: 'mountain', recordedAt: FB.firestore.Timestamp.fromDate(new Date(T0)), manual: {} },
+    { id: 'r2', locationId: 'elsewhere', recordedAt: FB.firestore.Timestamp.fromDate(new Date(T0)), manual: {} },
+    { id: 'r3', recordedAt: FB.firestore.Timestamp.fromDate(new Date(T0 + 3600000)), manual: {} }
+  ];
+  const db = { collection: name => {
+    const q = { clauses: [], where(f, op, v) { this.clauses.push([f, op, v]); return this; }, orderBy(f, d) { this.clauses.push(['orderBy', f, d]); return this; },
+      async get() { queries.push({ name, clauses: this.clauses }); return { docs: rows.map(x => ({ id: x.id, data: () => { const { id, ...d } = x; return d; } })) }; },
+      async add(d) { writes.push([name, 'add', d]); return { id: 'new1' }; },
+      doc(id) { return { update: async d => { writes.push([name, id, 'update', d]); } }; } };
+    return q;
+  } };
+  const saved = await WS.save(db, FB, { at: new Date(T0), manual: { tempC: 5 }, web: null }, user);
+  ok('save: one document in weather_records with the author', saved.ok && saved.id === 'new1' && writes[0][0] === 'weather_records' && writes[0][2].createdBy === 'u1' && writes[0][2].manual.tempC === 5, writes[0]);
+  const refused = await WS.save(db, FB, { at: new Date(T0), manual: {}, web: null }, user);
+  ok('save: a refused record writes nothing', !refused.ok && writes.length === 1, refused);
+  const upd = await WS.update(db, FB, 'r1', { manual: { tempC: 1 }, web: null }, { manual: { tempC: '2.5', newSnowCm: '3' }, comment: ' ok ', at: new Date(T0 + 60000) }, { uid: 'u2', name: 'Luc' });
+  const patch = writes[1][3];
+  ok('update: typed values, comment and time corrected; the editor and time recorded; the author is NOT in the change', upd.ok && patch.manual.tempC === 2.5 && patch.comment === 'ok' && patch.recordedAt.toMillis() === T0 + 60000 && patch.modifiedBy === 'u2' && patch.modifiedAt === 'SERVER_TS' && !('createdBy' in patch) && !('web' in patch), patch);
+  const noValue = await WS.update(db, FB, 'r1', { manual: { tempC: 1 }, web: null }, { manual: { tempC: '' } }, user);
+  ok('update: erasing the last value of a record without web values is refused', !noValue.ok && noValue.errors.values && writes.length === 2, noValue);
+  const keepWeb = await WS.update(db, FB, 'r1', { manual: { tempC: 1 }, web: r.web }, { manual: { tempC: '' } }, user);
+  ok('update: a record with web values may have its typed values erased (the web values show again)', keepWeb.ok, keepWeb);
+  const day = await WS.listDay(db, FB, new Date(T0));
+  const q = queries[queries.length - 1].clauses;
+  ok('list: one query on the day only (recordedAt from midnight to the next midnight, oldest first; no composite index), other places filtered out',
+    q[0][0] === 'recordedAt' && q[0][1] === '>=' && q[1][1] === '<' && q[1][2].toMillis() - q[0][2].toMillis() === 86400000 && q[2][0] === 'orderBy' && J(day.map(d => d.id)) === J(['r1', 'r3']), [q, day.map(d => d.id)]);
+
+  document.getElementById('out').textContent = out.join('\n');
+})().catch(e => { document.getElementById('out').textContent = 'HARNESS ERROR ' + e.stack; });
+</script>
+</body></html>
