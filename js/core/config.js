@@ -118,9 +118,11 @@ const APP_CONFIG = {
   //   features      what the network has: shelters, snowCondition (ski-only inspection field)
   //   infractions   the fault types and practices offered on the infraction form (id -> label)
   //   publicTitle   what the public status page calls this activity's trails
+  //   weatherIcon   the Météo app's symbol while the season runs (ski: snowflake, bike: sun)
   networks: {
     ski: {
       id: 'ski', name: 'Ski', icon: '⛷️',
+      weatherIcon: '❄️',   // symbol of the Météo app while this activity's season runs (Network.seasonIcon)
       season: { from: { month: 11, day: 1 }, to: { month: 4, day: 30 } }, // 1 November to 30 April
       map: 'ski',
       trailKinds: ['uphill', 'downhill', 'lift'],
@@ -143,6 +145,7 @@ const APP_CONFIG = {
     },
     bike: {
       id: 'bike', name: 'Vélo', icon: '🚵',
+      weatherIcon: '☀️',
       season: { from: { month: 5, day: 1 }, to: { month: 10, day: 31 } }, // 1 May to 31 October
       map: 'bike',
       trailKinds: ['bike'],
@@ -276,6 +279,13 @@ const APP_CONFIG = {
         { id: 'maintenance-report', label: 'Journal', icon: '📝', href: 'pages/maintenance-report.html' },
         { id: 'maintenance-admin', label: 'Gestion', icon: '📋', href: 'pages/maintenance-admin.html', admin: true },
         { id: 'maintenance-stats', label: 'Admin', icon: '⚙️', href: 'pages/maintenance-stats.html', admin: true }
+      ]
+    },
+    meteo: {
+      title: 'Météo',
+      items: [
+        { id: 'meteo-report', label: 'Relevés', icon: '🌡️', href: 'pages/meteo-report.html' }
+        // the Gestion / Admin entries (admin: true) come with their pages
       ]
     },
     support: {

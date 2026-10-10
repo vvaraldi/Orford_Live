@@ -130,6 +130,11 @@ const Network = (function () {
     const fmt = d => d.toLocaleDateString('fr-CA', { day: 'numeric', month: 'short', year: 'numeric' });
     return range.active ? `Saison en cours (depuis le ${fmt(range.start)})` : `Dernière saison (${fmt(range.start)} – ${fmt(range.end)})`;
   }
+  /** The Météo app's symbol for a date (default: today): the snowflake in the ski season, the sun in the bike season. */
+  function seasonIcon(date) {
+    return APP_CONFIG.networks[ofSeason(date)].weatherIcon || '🌦️';
+  }
+
   /** A path from the site root ("assets/map/Ski-Touring_Map.png") as a URL valid from the current page. */
   function url(path) {
     return siteUrl(path); // config.js: independent of where the site is hosted
@@ -138,7 +143,7 @@ const Network = (function () {
   const api = {
     ids, ofSeason, setUser, usePublic, set,
     current, config, feature,
-    of, matches, filter, url, seasonRange, seasonStart, seasonLabel,
+    of, matches, filter, url, seasonRange, seasonStart, seasonLabel, seasonIcon,
     // Replaceable in tests
     now: () => new Date(),
     reload: () => window.location.reload()

@@ -115,7 +115,8 @@
   var currentUserData = {
     uid: 'u1', name: 'Test', role: Q.get('as') === 'system' ? 'system_admin' : (Q.get('as') === 'inspector' ? 'inspector' : 'admin'),
     networks: NET === 'both' ? ['ski', 'bike'] : [NET],
-    allowInspection: true, allowInfraction: true, allowSignalisation: true
+    allowInspection: true, allowInfraction: true, allowSignalisation: true,
+    allowMeteo: Q.get('meteo') !== '0'   // ?meteo=0: a user without the Météo permission
   };
   // two-activity user: pick the current one like the header switcher would have
   // (a system admin works in every activity whatever ?net says, so ?choice also applies to them)

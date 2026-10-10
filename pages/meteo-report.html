@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Relevés météo">
+  <meta name="theme-color" content="#ca8a04">
+  <title>Météo</title>
+  <!-- The symbol follows the season (snowflake in winter, sun in summer): set by the script at the end -->
+  <link rel="icon" id="page-icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🌦️</text></svg>">
+  <link rel="stylesheet" href="../css/main.css">
+</head>
+<body data-theme="light" data-module="meteo" data-nav="meteo" data-page="meteo-report">
+  <script src="../js/core/config.js"></script>
+  <script src="../js/core/network.js"></script>
+  <script src="../js/core/layout.js"></script>
+  <!-- Loading -->
+  <div id="loading" class="page-loading"><div class="loading-spinner"></div><p class="loading-text">Chargement...</p></div>
+
+  <!-- Main Content -->
+  <main id="main-content" class="main" style="display: none;">
+    <div class="page-header">
+      <div class="page-header__content">
+        <h1 class="page-title"><span id="season-icon">🌦️</span> Météo</h1>
+        <p class="page-subtitle">Relevés météo du jour : température, vent, neige et conditions</p>
+      </div>
+    </div>
+
+    <section class="content-section">
+      <div class="section-card">
+        <div class="section-card__header"><h2 class="section-card__title">🌡️ Relevés</h2></div>
+        <div class="section-card__body">
+          <p id="under-construction">Cette application est en cours de mise en place : la saisie des relevés arrive prochainement.</p>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <!-- Footer -->
+  <footer class="footer footer--simple"><div class="footer__content"><p class="footer__copyright">© 2026 Regis for Mont Orford</p></div></footer>
+
+  <!-- Scripts -->
+  <script src="../js/core/utils.js"></script>
+  <script src="../js/core/theme.js"></script>
+  <script src="../js/core/ui.js"></script>
+  <script src="../js/core/firebase-loader.js"></script>
+  <script src="../js/core/auth.js"></script>
+
+  <script>
+    // The season's symbol: in the page title and as the browser tab icon
+    function applySeasonIcon() {
+      const icon = Network.seasonIcon();
+      document.getElementById('season-icon').textContent = icon;
+      document.getElementById('page-icon').href =
+        `data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>${icon}</text></svg>`;
+    }
+
+    function initMeteoReport() {
+      applySeasonIcon();
+      checkAuthStatus({
+        requireAuth: true,
+        requiredPermission: 'allowMeteo',
+        permissionDefault: false,
+        onAuthenticated: async () => {
+          // the entry form and the list of readings come with the next steps
+        }
+      });
+    }
+
+    onFirebaseReady(initMeteoReport);
+  </script>
+</body>
+</html>

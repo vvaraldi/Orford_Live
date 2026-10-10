@@ -26,12 +26,15 @@ positions, editing README.md, testing as a real user, etc.).
 | 2026-10-05 (end) | 2026-10-05 22:09 → 22:09 (the last minute of the evening block above, after its estimate) | ~1m | ~1m |
 | 2026-10-06 (evening) | 2026-10-06 19:29 → 2026-10-07 00:01 (~4h32m, one evening block running past midnight, with many long gaps while you tested, deployed and edited the quote in Word) | ~42m | ~1h12m |
 | 2026-10-07 (morning) | 2026-10-07 06:48 → 06:57 (~9m, up to the moment of this estimate) | ~9m | ~9m |
+| 2026-10-07 (morning, end) | 2026-10-07 06:57 → 07:00 (the last minutes of the morning exchange, after its estimate) | ~2m | ~2m |
+| 2026-10-07 (evening) | 2026-10-07 20:44 → 22:29 (~1h45m, one evening block, with long gaps while you worked in the Firebase and GitHub consoles) | ~33m | ~1h17m |
 
 **Manual addition (not from chat timestamps):** +2h00m - customer/team meetings, morning of 2026-09-28 (before the day's chat activity started; per the Method note above, offline time isn't normally included, but you asked for this one to be logged).
 
-**Running total (active chat time + the meeting addition, all estimates so far): ~17h27m - 22h47m**
+**Running total (active chat time + the meeting addition, all estimates so far): ~18h02m - 24h06m**
+(The Météo app started on 2026-10-09 is logged on its own in `TIME_LOG_METEO.md` and is not in this total.)
 
-**Note:** the 2026-10-07 (morning) row is computed up to 06:57, when this estimate was made; the
+**Note:** the 2026-10-07 (evening) row is computed up to 22:29, when this estimate was made; the
 session may have continued after that, and any further time will need a new row. 2026-09-23 (the
 Firebase backup/export session, ~5 min of chat) was missing from earlier estimates and is now
 included. Nothing was logged in the transcript on 2026-09-24 to 2026-09-27, 2026-09-30 or 2026-10-01.
@@ -102,6 +105,15 @@ page (a rules-based limiter per minute / hour / day / total, clear messages for 
 with the limits, the open/closed switch and the reset, 59 new tests and the checklist you ran on the real
 site). The limiter was given to the customer free of charge and is not in the quote. Time spent in Word or in
 the Firebase console on your side is not counted, as always.
+
+The 2026-10-07 (morning, end) / (evening) rows cover: the password-reset link investigation (the emailed link
+came from a custom action URL in the Firebase template that still pointed to the old site), the rebuilt reset
+page (`pages/new-password.html`: checks the e-mail code, new password twice, French messages, built on the current
+design instead of the old page's missing scripts), its tests (48 checks over 8 link cases, with the mocked
+Firebase taught to play the reset flow), the GitHub Pages address-case finding (`/Regis/`, not `/regis/`), the
+Firebase console refusing template edits (a Google-side block), and the stopgap redirect page published at the
+old address, which made the real reset-by-e-mail work end to end. The quote had already been sent and was not
+changed. Time spent in the Firebase and GitHub consoles and on the test e-mails is not counted, as always.
 
 Next time an estimate is added, keep the same method (or note if it changed) so the numbers stay
 comparable across rows.

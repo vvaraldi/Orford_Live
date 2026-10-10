@@ -7,7 +7,8 @@
 
 3. Improve the user experience
 #	Priority	Item
-3.1	Low	Accessibility audit pass
+3.1 create a weather app
+3.5	Low	Accessibility audit pass
 
 
 

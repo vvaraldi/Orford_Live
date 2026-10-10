@@ -105,6 +105,10 @@
   background: linear-gradient(135deg, var(--color-maintenance) 0%, var(--color-maintenance-dark) 100%);
 }
 
+.app-card--meteo .app-card__header {
+  background: linear-gradient(135deg, var(--color-meteo) 0%, var(--color-meteo-dark) 100%);
+}
+
 .app-card__icon {
   display: flex;
   align-items: center;

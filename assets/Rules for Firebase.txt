@@ -288,6 +288,34 @@ service cloud.firestore {
       allow write: if isAdmin() && canWorkIn('bike');
     }
 
+    // METEO (weather): readings entered by the people allowed to (inspectors/{uid}.allowMeteo) and by admins.
+    // Same in both seasons, so no activity check. A record is written by the person who creates it
+    // (createdBy = their uid); any user with the permission, and any admin, can correct any record;
+    // only the system admin deletes. Signed-in read (the records carry the author's name).
+    function allowsMeteo() {
+      return request.auth != null &&
+             get(/databases/$(database)/documents/inspectors/$(request.auth.uid)).data.get('allowMeteo', false) == true;
+    }
+
+    match /weather_records/{recordId} {
+      allow read: if request.auth != null;
+      allow create: if allowsMeteo() && request.resource.data.createdBy == request.auth.uid;
+      allow update: if (allowsMeteo() || isAdmin()) && request.resource.data.createdBy == resource.data.createdBy;
+      allow delete: if isSystemAdmin();
+    }
+
+    // The PUBLIC copy of the latest reading (no names), read by the public status page and by the Mont Orford
+    // website. Written by the app each time a reading is saved. The fields are checked when it is built (step 5).
+    match /weather_public/{docId} {
+      allow read: if true;
+      allow write: if docId == 'latest' && (allowsMeteo() || isAdmin());
+    }
+
+    // Admin settings of the weather (for example: show the weather when looking at a report)
+    match /weather_settings/{docId} {
+      allow read: if request.auth != null;
+      allow write: if isAdmin();
+    }
     // REQUESTS
     match /requests/{requestId} {
       allow read: if request.auth != null && 

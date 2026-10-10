@@ -42,7 +42,8 @@ New-Item -ItemType Directory -Force -Path $buildDir | Out-Null
 # "page" = built from a real page + the mock + a spec (see Build-Page). "unit" = a spec file
 # that already stands alone (t-*.html style: loads real js/core/*.js directly, no mock/page needed).
 $tests = @(
-  @{ name = 'smoke-index';              type = 'page'; page = 'index.html';                          spec = 'smoke.html';       queries = @('?page=index&net=ski', '?page=index&net=both') }
+  @{ name = 'smoke-index';              type = 'page'; page = 'index.html';                          spec = 'smoke.html';       queries = @('?page=index&net=ski', '?page=index&net=both', '?page=index&net=ski&meteo=0') }
+  @{ name = 'smoke-meteo';              type = 'page'; page = 'pages\meteo-report.html';             spec = 'smoke.html';       queries = @('?page=meteo-report&net=ski', '?page=meteo-report&net=bike') }
   @{ name = 'smoke-support';            type = 'page'; page = 'pages\support.html';                  spec = 'smoke.html';       queries = @('?page=support&net=bike') }
   @{ name = 'smoke-user-profile';       type = 'page'; page = 'pages\user-profile.html';              spec = 'smoke.html';       queries = @('?page=profile&net=ski') }
   @{ name = 'smoke-user-management';    type = 'page'; page = 'pages\user-management.html';           spec = 'smoke.html';       queries = @('?page=user-management&net=ski&as=system', '?page=user-management&net=both&as=admin', '?page=user-management&net=both&as=admin&choice=bike') }

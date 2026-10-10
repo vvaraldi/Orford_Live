@@ -23,6 +23,36 @@
   if (PAGE === 'index') {
     const cards = [...document.querySelectorAll('#app-grid .app-card')].map(c => c.className.match(/app-card--(\w+)/)[1]);
     ok('portal shows the app cards', cards.includes('inspection') && cards.includes('infraction') && cards.includes('signalisation') && cards.includes('support') && cards.includes('status'), cards);
+    // Météo: only for users with the permission; the symbol follows the season (snowflake 1 Nov - 30 Apr, sun 1 May - 31 Oct)
+    const withMeteo = Q.get('meteo') !== '0';
+    ok('portal: the Météo card is shown only with the Météo permission', cards.includes('meteo') === withMeteo, [cards, withMeteo]);
+    const iconAt = (y, m, d) => Network.seasonIcon(new Date(y, m - 1, d));
+    ok('season symbol: snowflake on 1 Nov and 30 Apr, sun on 1 May and 31 Oct (and across New Year)', iconAt(2026, 11, 1) === '❄️' && iconAt(2027, 1, 15) === '❄️' && iconAt(2027, 4, 30) === '❄️' && iconAt(2026, 5, 1) === '☀️' && iconAt(2026, 7, 15) === '☀️' && iconAt(2026, 10, 31) === '☀️', ['1 Nov', iconAt(2026, 11, 1), '30 Apr', iconAt(2027, 4, 30), '1 May', iconAt(2026, 5, 1), '31 Oct', iconAt(2026, 10, 31)]);
+    if (withMeteo) {
+      const realNow = Network.now;
+      const cardIcon = () => (document.querySelector('.app-card--meteo .app-card__icon') || {}).textContent;
+      Network.now = () => new Date(2027, 0, 15); generateAppCards(currentUserData);
+      const winter = cardIcon();
+      Network.now = () => new Date(2026, 6, 15); generateAppCards(currentUserData);
+      const summer = cardIcon();
+      Network.now = realNow; generateAppCards(currentUserData);
+      ok('portal: the Météo card shows the snowflake in winter and the sun in summer, and opens the Météo page', winter === '❄️' && summer === '☀️' && /meteo-report\.html$/.test(document.querySelector('.app-card--meteo').getAttribute('href')), [winter, summer]);
+    }
+  }
+
+  if (PAGE === 'meteo-report') {
+    ok('Météo page: own module colour and navigation', document.body.dataset.module === 'meteo' && document.body.dataset.nav === 'meteo' && /Relevés/.test((document.querySelector('header .nav__link--active') || {}).textContent || ''), [document.body.dataset.module, document.body.dataset.nav, (document.querySelector('header .nav__link--active') || {}).textContent]);
+    ok('Météo page: the season symbol in the title and as the tab icon', document.getElementById('season-icon').textContent === Network.seasonIcon() && decodeURIComponent(document.getElementById('page-icon').getAttribute('href')).includes(Network.seasonIcon()), [document.getElementById('season-icon').textContent, document.getElementById('page-icon').getAttribute('href')]);
+    ok('Météo page: shown to a user with the permission', document.getElementById('main-content').style.display !== 'none', null);
+    const accent = getComputedStyle(document.body).getPropertyValue('--theme-accent').trim();
+    ok('Météo page: yellowish accent colour', /^#ca8a04$/i.test(accent), accent);
+    // the rules for the weather collections (the real rules engine is not run here, see tests/README.md)
+    const rules = await (await fetch('/assets/Rules%20for%20Firebase.txt')).text();
+    const block = name => { const i = rules.indexOf('match /' + name + '/'); return i < 0 ? '' : rules.slice(i, rules.indexOf('\n    }', i)); };
+    ok('rules: weather_records - signed-in read, created by an allowed user for themselves, corrected by allowed users / admins without changing the author, deleted by the system admin only',
+      /allow read: if request\.auth != null/.test(block('weather_records')) && /allow create: if allowsMeteo\(\) && request\.resource\.data\.createdBy == request\.auth\.uid/.test(block('weather_records')) && /allow update: if \(allowsMeteo\(\) \|\| isAdmin\(\)\) && request\.resource\.data\.createdBy == resource\.data\.createdBy/.test(block('weather_records')) && /allow delete: if isSystemAdmin\(\)/.test(block('weather_records')), block('weather_records'));
+    ok('rules: weather_public - public read, only the "latest" document, written by allowed users / admins', /allow read: if true/.test(block('weather_public')) && /docId == 'latest' && \(allowsMeteo\(\) \|\| isAdmin\(\)\)/.test(block('weather_public')), block('weather_public'));
+    ok('rules: weather_settings - signed-in read, admin write; the permission is read from the user document (false when missing)', /allow write: if isAdmin\(\)/.test(block('weather_settings')) && /data\.get\('allowMeteo', false\) == true/.test(rules), block('weather_settings'));
   }
 
   if (PAGE === 'user-management') {
@@ -32,6 +62,7 @@
     const shown = [...document.querySelectorAll('.admin-tabs__btn')].filter(b => b.style.display !== 'none').map(b => b.dataset.tab);
     ok('Sentiers, Cartes and Données tabs: system admin only', ['trails', 'maps', 'data'].every(t => shown.includes(t) === sys), shown);
     ok('the Import tab is gone', !document.querySelector('[data-tab="import"]') && !document.getElementById('import-tab'));
+    ok('Météo permission: a checkbox in the user form (off for a new user), a badge in the list, a column in the exports', !!document.getElementById('access-meteo') && document.getElementById('access-meteo').checked === false && /🌦️\s*Météo/.test(document.querySelector('label[for="access-meteo"]').textContent) && !!document.querySelector('#users-tbody .access-badge--meteo') && /Météo: u\.allowMeteo/.test(document.documentElement.innerHTML.replace(/&gt;/g, '>')) , null);
     if (sys) {
       ok('Sentiers tab starts on the activity chosen in the portal (a system admin has one too)', document.getElementById('trail-network').value === Network.current(), [document.getElementById('trail-network').value, Network.current()]);
     } else {
@@ -70,17 +101,17 @@
     ok('bulk import block: in Utilisateurs, between the user list and the user export', at('.user-table-section') < at('#import-section') && at('#import-section') < at('.data-export-section:not(#import-section)'), kids.map(k => k.id || k.className));
     // The downloadable CSV template is coherent with a user profile: every field an import can set is a column, and every row is read back correctly
     const header = CSV_TEMPLATE.split('\n')[0].split(',');
-    const profileFields = ['name', 'email', 'password', 'role', 'phone', 'allowInspection', 'allowInfraction', 'allowSignalisation', 'allowMaintenance', 'networks'];
+    const profileFields = ['name', 'email', 'password', 'role', 'phone', 'allowInspection', 'allowInfraction', 'allowSignalisation', 'allowMaintenance', 'allowMeteo', 'networks'];
     ok('CSV template: one column per profile field the import can set', J(header) === J(profileFields), header);
     parseCsv(CSV_TEMPLATE);
-    const got = parsedUsers.map(u => [u.name, u.role, u.phone, u.allowInspection, u.allowInfraction, u.allowSignalisation, u.allowMaintenance, u.networks.join('|')]);
+    const got = parsedUsers.map(u => [u.name, u.role, u.phone, u.allowInspection, u.allowInfraction, u.allowSignalisation, u.allowMaintenance, u.allowMeteo, u.networks.join('|')]);
     if (sys) {
       ok('CSV template: the 3 example rows are read back as written', J(got) === J([
-        ['Jean Dupont', 'inspector', '514-555-1234', true, false, false, false, 'ski'],
-        ['Sophie Gagnon', 'inspector', '', true, false, false, true, 'bike'],
-        ['Marie Tremblay', 'admin', '', true, true, true, false, 'ski|bike']]), got);
+        ['Jean Dupont', 'inspector', '514-555-1234', true, false, false, false, false, 'ski'],
+        ['Sophie Gagnon', 'inspector', '', true, false, false, true, false, 'bike'],
+        ['Marie Tremblay', 'admin', '', true, true, true, false, true, 'ski|bike']]), got);
     } else {
-      ok('CSV template: the 3 example rows are read, activities limited to the importing admin\'s own', got.length === 3 && got.every(g => g[7].split('|').every(id => myNetworks().includes(id)) || g[7] === ''), got);
+      ok('CSV template: the 3 example rows are read, activities limited to the importing admin\'s own', got.length === 3 && got.every(g => g[8].split('|').every(id => myNetworks().includes(id)) || g[8] === ''), got);
     }
     if (sys) {
       // Données: the Entretien logs are exported too (JSON keeps the logs; CSV has one row per work entry)

@@ -150,6 +150,21 @@
   --theme-gradient-hover: linear-gradient(135deg, var(--color-maintenance-dark) 0%, var(--color-maintenance) 100%);
 }
 
+/* ===== MÉTÉO (WEATHER) MODULE ===== */
+[data-module="meteo"] {
+  --theme-accent: var(--color-meteo);
+  --theme-accent-light: var(--color-meteo-light);
+  --theme-accent-dark: var(--color-meteo-dark);
+  --theme-accent-rgb: var(--color-meteo-rgb);
+
+  --theme-gradient: linear-gradient(135deg, var(--color-meteo) 0%, var(--color-meteo-dark) 100%);
+
+  --theme-header-from: var(--color-meteo);
+
+  --theme-header-to: var(--color-meteo-dark);
+  --theme-gradient-hover: linear-gradient(135deg, var(--color-meteo-dark) 0%, var(--color-meteo) 100%);
+}
+
 /* ===== INSPECTION RANDONNÉE MODULE ===== */
 [data-module="inspection-rando"] {
   --theme-accent: var(--color-inspection-rando);
@@ -274,6 +289,19 @@
   --theme-header-from: #10b981;
 
   --theme-header-to: #047857;
+}
+
+[data-theme="dark"][data-module="meteo"] {
+  --theme-accent: #facc15;
+  --theme-accent-light: #fde047;
+  --theme-accent-dark: #eab308;
+  --theme-accent-rgb: 250, 204, 21;
+
+  --theme-gradient: linear-gradient(135deg, #eab308 0%, #a16207 100%);
+
+  --theme-header-from: #eab308;
+
+  --theme-header-to: #a16207;
 }
 
 [data-theme="dark"][data-module="inspection-rando"] {

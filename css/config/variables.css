@@ -99,6 +99,12 @@
   --color-maintenance-dark: #047857;
   --color-maintenance-rgb: 5, 150, 105;
 
+  /* Météo (weather) - Yellow */
+  --color-meteo: #ca8a04;
+  --color-meteo-light: #fde047;
+  --color-meteo-dark: #a16207;
+  --color-meteo-rgb: 202, 138, 4;
+
   /* ===== TRAIL DIFFICULTY COLORS ===== */
   --color-difficulty-easy: #22c55e;
   --color-difficulty-medium: #3b82f6;

@@ -62,6 +62,11 @@
       border-color: #166534;
     }
 
+    .access-badge--clickable.is-active.access-badge--meteo {
+      background: rgba(202, 138, 4, 0.15);
+      border-color: #ca8a04;
+    }
+
     /* Activity (network) badges: icon + name, same on/off look as the app badges */
     .access-badge--clickable.access-badge--network {
       width: auto;
@@ -476,7 +481,7 @@
           <strong>role</strong> (<code>inspector</code> par défaut, ou <code>admin</code>),
           <strong>phone</strong>,
           <strong>allowInspection</strong> (vrai par défaut),
-          <strong>allowInfraction</strong>, <strong>allowSignalisation</strong>, <strong>allowMaintenance</strong> (faux par défaut ; valeurs <code>true</code> ou <code>false</code>),
+          <strong>allowInfraction</strong>, <strong>allowSignalisation</strong>, <strong>allowMaintenance</strong>, <strong>allowMeteo</strong> (faux par défaut ; valeurs <code>true</code> ou <code>false</code>),
           <strong>networks</strong> : activités séparées par « | », par exemple <code>ski|bike</code> (sans cette colonne, l'utilisateur reçoit l'activité par défaut : ski).
           Les utilisateurs importés sont créés actifs.
         </p>
@@ -1077,6 +1082,10 @@
               <input type="checkbox" class="form-check-input" id="access-maintenance">
               <label class="form-check-label" for="access-maintenance">🪏 Entretien</label>
             </div>
+            <div class="form-check">
+              <input type="checkbox" class="form-check-input" id="access-meteo">
+              <label class="form-check-label" for="access-meteo">🌦️ Météo</label>
+            </div>
           </div>
 
           <div class="form-group" id="password-group" style="display: none;">
@@ -1508,6 +1517,7 @@
               ${appBadge(user, manageable, 'allowInfraction', 'infraction', '🚨', 'Infraction')}
               ${appBadge(user, manageable, 'allowSignalisation', 'signalisation', '🚧', 'Signalisation')}
               ${appBadge(user, manageable, 'allowMaintenance', 'maintenance', '🪏', 'Entretien')}
+              ${appBadge(user, manageable, 'allowMeteo', 'meteo', '🌦️', 'Météo')}
             </div>
           </td>
           <td data-label="Statut">
@@ -1566,7 +1576,7 @@
       document.getElementById('users-table').scrollIntoView({ behavior: 'smooth', block: 'start' });
     }
 
-    // App permission badge (inspection / infraction / signalisation / maintenance)
+    // App permission badge (inspection / infraction / signalisation / maintenance / meteo)
     function appBadge(user, manageable, field, cls, icon, label) {
       const on = user[field] === true;
       const attrs = manageable
@@ -1634,7 +1644,7 @@
         filterAndRenderUsers(true);
         
         const user = users.find(u => u.id === userId);
-        const fieldNames = { allowInspection: 'Inspection', allowInfraction: 'Infraction', allowSignalisation: 'Signalisation', allowMaintenance: 'Entretien' };
+        const fieldNames = { allowInspection: 'Inspection', allowInfraction: 'Infraction', allowSignalisation: 'Signalisation', allowMaintenance: 'Entretien', allowMeteo: 'Météo' };
         showMessage(`${fieldNames[field]} ${newValue ? 'activé' : 'désactivé'} pour ${user?.name || 'utilisateur'}.`, 'success');
       } catch (error) {
         console.error('Error toggling access:', error);
@@ -1722,6 +1732,7 @@
       document.getElementById('access-infraction').checked = user.allowInfraction === true;
       document.getElementById('access-signalisation').checked = user.allowSignalisation === true;
       document.getElementById('access-maintenance').checked = user.allowMaintenance === true;
+      document.getElementById('access-meteo').checked = user.allowMeteo === true;
       
       document.getElementById('password-group').style.display = 'none';
       document.getElementById('user-password').required = false;
@@ -1776,7 +1787,8 @@
         allowInspection: document.getElementById('access-inspection').checked,
         allowInfraction: document.getElementById('access-infraction').checked,
         allowSignalisation: document.getElementById('access-signalisation').checked,
-        allowMaintenance: document.getElementById('access-maintenance').checked
+        allowMaintenance: document.getElementById('access-maintenance').checked,
+        allowMeteo: document.getElementById('access-meteo').checked
       };
 
       if (userData.networks.length === 0) {
@@ -1865,7 +1877,8 @@
           Inspection: u.allowInspection === true ? 'Oui' : 'Non',
           Infraction: u.allowInfraction === true ? 'Oui' : 'Non',
           Signalisation: u.allowSignalisation === true ? 'Oui' : 'Non',
-          Entretien: u.allowMaintenance === true ? 'Oui' : 'Non'
+          Entretien: u.allowMaintenance === true ? 'Oui' : 'Non',
+          Météo: u.allowMeteo === true ? 'Oui' : 'Non'
         };
       });
 
@@ -2159,6 +2172,7 @@
         user.allowInfraction = user.allowinfraction === 'true' || user.allowinfraction === '1';
         user.allowSignalisation = user.allowsignalisation === 'true' || user.allowsignalisation === '1';
         user.allowMaintenance = user.allowmaintenance === 'true' || user.allowmaintenance === '1';
+        user.allowMeteo = user.allowmeteo === 'true' || user.allowmeteo === '1';
 
         // Activities: "ski|bike". A system admin gets all of them; anyone else only gets
         // activities the importing admin holds. Empty column = default activity.
@@ -2213,6 +2227,7 @@
             <span class="access-badge--clickable access-badge--infraction ${user.allowInfraction ? 'is-active' : ''}" style="width:24px;height:24px;font-size:0.875rem;">🚨</span>
             <span class="access-badge--clickable access-badge--signalisation ${user.allowSignalisation ? 'is-active' : ''}" style="width:24px;height:24px;font-size:0.875rem;">🚧</span>
             <span class="access-badge--clickable access-badge--maintenance ${user.allowMaintenance ? 'is-active' : ''}" style="width:24px;height:24px;font-size:0.875rem;">🪏</span>
+            <span class="access-badge--clickable access-badge--meteo ${user.allowMeteo ? 'is-active' : ''}" style="width:24px;height:24px;font-size:0.875rem;">🌦️</span>
           </td>
         </tr>
       `}).join('');
@@ -2293,6 +2308,7 @@
             allowInfraction: user.allowInfraction,
             allowSignalisation: user.allowSignalisation,
             allowMaintenance: user.allowMaintenance,
+            allowMeteo: user.allowMeteo,
             createdAt: firebase.firestore.FieldValue.serverTimestamp(),
             createdBy: currentUser.uid,
             importedVia: 'bulk_import'
@@ -2361,10 +2377,10 @@
     }
 
     // One column per field of a user profile that an import can set (status is always "active")
-    const CSV_TEMPLATE = `name,email,password,role,phone,allowInspection,allowInfraction,allowSignalisation,allowMaintenance,networks
-Jean Dupont,jean.dupont@example.com,MotDePasse123,inspector,514-555-1234,true,false,false,false,ski
-Sophie Gagnon,sophie.gagnon@example.com,MotDePasse789,inspector,,true,false,false,true,bike
-Marie Tremblay,marie.tremblay@example.com,MotDePasse456,admin,,true,true,true,false,ski|bike`;
+    const CSV_TEMPLATE = `name,email,password,role,phone,allowInspection,allowInfraction,allowSignalisation,allowMaintenance,allowMeteo,networks
+Jean Dupont,jean.dupont@example.com,MotDePasse123,inspector,514-555-1234,true,false,false,false,false,ski
+Sophie Gagnon,sophie.gagnon@example.com,MotDePasse789,inspector,,true,false,false,true,false,bike
+Marie Tremblay,marie.tremblay@example.com,MotDePasse456,admin,,true,true,true,false,true,ski|bike`;
 
     function downloadCsvTemplate() {
       downloadFile('\uFEFF' + CSV_TEMPLATE, 'modele_import_utilisateurs.csv', 'text/csv;charset=utf-8');
