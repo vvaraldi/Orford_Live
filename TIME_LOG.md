@@ -28,13 +28,14 @@ positions, editing README.md, testing as a real user, etc.).
 | 2026-10-07 (morning) | 2026-10-07 06:48 → 06:57 (~9m, up to the moment of this estimate) | ~9m | ~9m |
 | 2026-10-07 (morning, end) | 2026-10-07 06:57 → 07:00 (the last minutes of the morning exchange, after its estimate) | ~2m | ~2m |
 | 2026-10-07 (evening) | 2026-10-07 20:44 → 22:29 (~1h45m, one evening block, with long gaps while you worked in the Firebase and GitHub consoles) | ~33m | ~1h17m |
+| 2026-10-09 (small items) | 2026-10-09 23:15 → 23:33 (~18m, one block, plus a ~20 min wait for the test suite; the block is ~9m / ~18m in all, of which about 40 % - the Météo export and the quick delete - is logged in `TIME_LOG_METEO.md`; this row is the rest) | ~5m | ~11m |
 
 **Manual addition (not from chat timestamps):** +2h00m - customer/team meetings, morning of 2026-09-28 (before the day's chat activity started; per the Method note above, offline time isn't normally included, but you asked for this one to be logged).
 
-**Running total (active chat time + the meeting addition, all estimates so far): ~18h02m - 24h06m**
+**Running total (active chat time + the meeting addition, all estimates so far): ~18h07m - 24h17m**
 (The Météo app started on 2026-10-09 is logged on its own in `TIME_LOG_METEO.md` and is not in this total.)
 
-**Note:** the 2026-10-07 (evening) row is computed up to 22:29, when this estimate was made; the
+**Note:** the 2026-10-09 (small items) row is computed up to 23:33, when this estimate was made; the
 session may have continued after that, and any further time will need a new row. 2026-09-23 (the
 Firebase backup/export session, ~5 min of chat) was missing from earlier estimates and is now
 included. Nothing was logged in the transcript on 2026-09-24 to 2026-09-27, 2026-09-30 or 2026-10-01.
@@ -114,6 +115,8 @@ Firebase taught to play the reset flow), the GitHub Pages address-case finding (
 Firebase console refusing template edits (a Google-side block), and the stopgap redirect page published at the
 old address, which made the real reset-by-e-mail work end to end. The quote had already been sent and was not
 changed. Time spent in the Firebase and GitHub consoles and on the test e-mails is not counted, as always.
+
+The 2026-10-09 (small items) row covers: the temporary / permanent choice on Signalisations (report form, the dashboard's Permanentes / Temporaires / Les deux selector, the detail views), the users filter by allowed application, the Bénévoles tab order, and their tests.
 
 Next time an estimate is added, keep the same method (or note if it changed) so the numbers stay
 comparable across rows.

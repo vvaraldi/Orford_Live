@@ -19,6 +19,13 @@
 
   <main id="main-content" class="main" style="display: none;">
     <div class="page-header"><div class="page-header__content"><h1 class="page-title"><span id="season-icon">🌦️</span> Administration de la météo</h1><p class="page-subtitle">Statistiques et gestion des données</p></div></div>
+    <!-- The switch for the weather shown in the reports (admins) -->
+    <section class="management-section" id="weather-settings" hidden>
+      <div class="management-section__title">⚙️ Météo dans les rapports</div>
+      <div class="management-section__desc">Quand c'est activé, la fiche d'un rapport (pages Gestion des Inspections, Infractions, Signalisations et Entretien) affiche le relevé météo le plus proche de l'heure du rapport, avec le jour et l'heure du relevé. Rien n'est copié dans le rapport. Désactiver réduit le nombre de lectures de la base de données (le changement peut prendre jusqu'à 10 minutes à atteindre les autres utilisateurs).</div>
+      <label class="form-check"><input type="checkbox" class="form-check-input" id="show-in-reports"> <span class="form-check-label">Afficher la météo dans les rapports</span></label>
+      <span id="show-in-reports-status" role="status" style="margin-left: 0.75rem; font-size: 0.875rem;"></span>
+    </section>
     <div id="admin-root"></div>
   </main>
 
@@ -29,6 +36,7 @@
   <script src="../js/core/firebase-loader.js"></script>
   <script src="../js/core/auth.js"></script>
   <script src="../js/services/weather-service.js"></script>
+  <script src="../js/services/weather-context.js"></script>
   <script src="../js/admin/data-admin.js"></script>
 
   <script>
@@ -76,6 +84,36 @@
 
       DataAdmin.init({
         deniedUrl: 'meteo-report.html',
+
+        // The switch for the weather in reports. It must never stop the statistics from loading.
+        async onReady(userData) {
+          const box = document.getElementById('show-in-reports'), status = document.getElementById('show-in-reports-status');
+          try {
+            box.checked = await WeatherContext.readSetting(db);
+            document.getElementById('weather-settings').hidden = false;
+          } catch (error) {
+            console.error('Weather settings:', error);
+            document.getElementById('weather-settings').hidden = false;
+            box.disabled = true;
+            status.textContent = 'Réglage illisible (les règles Firebase à jour sont-elles publiées ?).';
+            return;
+          }
+          box.addEventListener('change', async () => {
+            const wanted = box.checked;
+            box.disabled = true;
+            status.textContent = 'Enregistrement…';
+            try {
+              await WeatherContext.saveSettings(db, firebase, { showInReports: wanted }, { uid: currentUser.uid, name: userData.name || '' });
+              status.textContent = wanted ? 'Enregistré : la météo s\'affiche dans les rapports.' : 'Enregistré : la météo ne s\'affiche plus dans les rapports.';
+            } catch (error) {
+              console.error('Saving the weather settings:', error);
+              box.checked = !wanted;
+              status.textContent = 'Erreur : le réglage n\'a pas été enregistré.';
+            } finally {
+              box.disabled = false;
+            }
+          });
+        },
 
         async fetch({ start, end }) {
           seasonRange = { start, end };

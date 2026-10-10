@@ -175,6 +175,8 @@
   <script src="../js/services/photo-map-modal.js"></script>
   <script src="../js/services/sector-service.js"></script>
   <script src="../js/services/trail-service.js"></script>
+  <script src="../js/services/weather-service.js"></script>
+  <script src="../js/services/weather-context.js"></script>
 
   <script>
     const STATUS_LABELS = {
@@ -398,7 +400,8 @@
         </div>
         <div class="detail-section">
           <h4>📊 Statut de la signalisation</h4>
-          ${statusHtml}
+          ${statusHtml}${r.duration === "temporary" ? ' <span class="badge badge-warning" title="Due à une condition temporaire">Temporaire</span>' : ''}
+          <p style="font-size:0.8rem;color:var(--theme-text-secondary);margin-top:0.35rem;">Durée : ${r.duration === "temporary" ? "temporaire (due à une condition temporaire)" : "permanente"}</p>
         </div>
         <div class="detail-section">
           <h4>📷 Photos (${photos.length})</h4>
@@ -420,6 +423,7 @@
         </div>
       `;
       
+      WeatherContext.attach(document.getElementById('modal-body'), date);   // the weather nearest in time to the report (if the admin switch is on)
       fillLocationEditor(r);
       document.getElementById('modal-resolved').checked = r.resolved || false;
       document.getElementById('modal-archived').checked = r.archived || false;

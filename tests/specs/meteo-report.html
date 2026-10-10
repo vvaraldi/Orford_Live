@@ -130,10 +130,25 @@
     const del = window.__writes.filter(w => w[0] === 'weather_records' && w[2] === 'delete');
     ok('system admin: "Supprimer ce relevé" asks once, deletes that reading only, resets the form and refreshes the list', confirms.length === 1 && del.length === 1 && del[0][1] === 'W2' && /Nouveau relevé/.test(text('form-title')) && !rowsText().some(r => /Luc/.test(r)) && rowsText().length === 1 && $('delete-btn').style.display === 'none', [confirms, del, rowsText()]);
     ok('...a toast says so and the public "latest" document is rewritten from what remains', toast() === 'Relevé supprimé.' && !!lastPublic() && publicWrites().some(w => w[2] === 'set'), [toast(), publicWrites().length]);
+    // the quick delete of each row of the list (one reading left: W1)
+    ok('system admin: a 🗑️ button on every row of the list, beside "Modifier"', document.querySelectorAll('[data-delete]').length === rowsText().length && rowsText().length === 1 && document.querySelector('[data-delete]').dataset.delete === 'W1', [document.querySelectorAll('[data-delete]').length, rowsText()]);
+    window.__writes.length = 0; confirms.length = 0;
+    document.querySelector('[data-delete="W1"]').click(); await wait(500);
+    const quick = window.__writes.filter(w => w[0] === 'weather_records' && w[2] === 'delete');
+    ok('quick delete: asks once, deletes that reading, refreshes the list, a toast says so', confirms.length === 1 && quick.length === 1 && quick[0][1] === 'W1' && rowsText().length === 0 && toast() === 'Relevé supprimé.' && $('records-empty').style.display !== 'none', [confirms, quick, rowsText(), toast()]);
+    ok('quick delete: nothing left, so the public "latest" document is removed', window.__writes.some(w => w[0] === 'weather_public' && w[1] === 'latest' && w[2] === 'delete'), window.__writes.filter(w => w[0] === 'weather_public'));
+    confirms.length = 0; window.confirm = () => false;
+    // declining the confirmation deletes nothing
+    window.__data.weather_records.push({ id: 'W9', locationId: 'mountain', recordedAt: T(new Date(2026, 0, 15, 10, 0).getTime()), manual: { tempC: 1 }, web: null, createdByName: 'Marie' });
+    setListDay('2026-01-14'); await wait(100); setListDay('2026-01-15'); await wait(300);
+    window.__writes.length = 0;
+    document.querySelector('[data-delete="W9"]').click(); await wait(300);
+    ok('quick delete: if the confirmation is declined nothing is deleted', window.__writes.filter(w => w[2] === 'delete').length === 0 && rowsText().length === 1, window.__writes);
   } else {
     setListDay('2026-01-15'); await wait(300);
     document.querySelector('[data-edit="W1"]').click(); await wait(100);
     ok('other users cannot delete: the button stays hidden while correcting a reading', $('delete-btn').style.display === 'none' && window.__writes.filter(w => w[2] === 'delete').length === 0, $('delete-btn').style.display);
+    ok('other users: no 🗑️ button on the rows of the list either (only the system admin deletes)', rowsText().length >= 1 && document.querySelectorAll('[data-delete]').length === 0 && document.querySelectorAll('[data-edit]').length === rowsText().length, [document.querySelectorAll('[data-delete]').length, rowsText().length]);
   }
 
   document.getElementById('out').textContent = out.join('\n');

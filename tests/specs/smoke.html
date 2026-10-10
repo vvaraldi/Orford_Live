@@ -132,6 +132,30 @@
       const csvName = Object.keys(files).find(n => /_Entretien\.csv$/.test(n));
       const rows = csvName ? files[csvName].replace('﻿', '').split('\n') : [];
       ok('export CSV: one row per work entry, photo links, people joined', rows.length === 3 && /photoUrls/.test(rows[0]) && /Drainage, ajout de dalots/.test(rows[1]) && /1\.jpg \| https:\/\/example\.test\/2\.jpg/.test(rows[1]) && /Ann \| Bob/.test(rows[1]) && /Reprofilage/.test(rows[2]), rows);
+      // Météo: the readings, in the JSON as stored (readable dates) and in the CSV one row per reading
+      ok('export: a Météo option, ticked by default', !!document.getElementById('export-meteo') && document.getElementById('export-meteo').checked, null);
+      ok('export JSON: the 2 readings with their typed values, the web values as read (readable dates), the author, and the count in the summary', Array.isArray(json.weatherRecords) && json.weatherRecords.length === 2 && json.summary.weatherRecordsCount === 2 && json.weatherRecords.find(r => r.id === 'W1').manual.tempC === -12 && typeof json.weatherRecords.find(r => r.id === 'W1').web.fields.tempC.observedAt === 'string' && json.weatherRecords.find(r => r.id === 'W1').createdByName === 'Marie', json.weatherRecords);
+      const wxName = Object.keys(files).find(n => /_Meteo\.csv$/.test(n));
+      const wxRows = wxName ? files[wxName].replace('﻿', '').split('\n') : [];
+      const wxHead = wxRows.length ? wxRows[0].split(',') : [];
+      const wxCell = (row, col) => (row.split('","')[wxHead.indexOf(col)] || '').replace(/^"|"$/g, '');
+      ok('export CSV: one row per reading; for each measure its typed value and its web value (<mesure>_web), who entered it', wxRows.length === 3 && wxHead.includes('tempC') && wxHead.includes('tempC_web') && wxHead.includes('createdByName') && wxHead.includes('windKmh_web'), wxHead);
+      const w1 = wxRows.find(r => /"W1"/.test(r)), w2 = wxRows.find(r => /"W2"/.test(r));
+      ok('...W1: typed -12 and web -11.5; W2: nothing typed, web -15', wxCell(w1, 'tempC') === '-12' && wxCell(w1, 'tempC_web') === '-11.5' && wxCell(w1, 'createdByName') === 'Marie' && wxCell(w2, 'tempC') === '' && wxCell(w2, 'tempC_web') === '-15', [w1, w2]);
+    }
+    // Utilisateurs: a filter by the application a user is allowed in
+    {
+      const sel = document.getElementById('filter-app');
+      ok('users: a filter by allowed application (Inspections, Infractions, Signalisations, Entretien, Météo)', J([...sel.options].map(o => o.value)) === J(['', 'allowInspection', 'allowInfraction', 'allowSignalisation', 'allowMaintenance', 'allowMeteo']) && sel.options[0].textContent === 'Toutes les applications', [...sel.options].map(o => o.value));
+      const real = users.slice();
+      const mk = (id, name, flags) => Object.assign({ id, name, email: id + '@example.test', role: 'inspector', status: 'active', networks: ['ski'] }, flags);
+      users.push(mk('fa1', 'Ann Météo', { allowMeteo: true }), mk('fa2', 'Bob Insp', { allowInspection: true, allowMaintenance: true }), mk('fa3', 'Cy Rien', {}));
+      const pick = (app, search) => { sel.value = app; document.getElementById('search-users').value = search || ''; filterAndRenderUsers(); return filteredUsers.map(u => u.id).filter(i => /^fa/.test(i)).sort(); };
+      ok('filter Météo: only the users allowed in Météo', J(pick('allowMeteo')) === J(['fa1']), pick('allowMeteo'));
+      ok('filter Entretien / Inspections: Bob (allowed in both); Infractions: nobody', J(pick('allowMaintenance')) === J(['fa2']) && J(pick('allowInspection')) === J(['fa2']) && J(pick('allowInfraction')) === J([]), null);
+      ok('no filter: everybody; with a search it narrows further (Météo + "ann" = Ann, Inspections + "ann" = nobody)', J(pick('')) === J(['fa1', 'fa2', 'fa3']) && J(pick('allowMeteo', 'ann')) === J(['fa1']) && J(pick('allowInspection', 'ann')) === J([]), null);
+      ok('the count above the table and the page change follow the filter', (pick('allowMeteo'), /\(?1\)?/.test(document.getElementById('users-count').textContent) || filteredUsers.length === 1) && usersPage === 1, document.getElementById('users-count').textContent);
+      sel.value = ''; document.getElementById('search-users').value = ''; users.length = 0; real.forEach(u => users.push(u)); filterAndRenderUsers();
     }
     const tabs = [...document.querySelectorAll('.admin-tabs__btn')];
     ok('"Liens et astuces" is the last tab, on the far right', tabs[tabs.length - 1].dataset.tab === 'links' && /Liens et astuces/.test(tabs[tabs.length - 1].textContent), tabs.map(t => t.dataset.tab));
@@ -142,7 +166,8 @@
     ok('volunteer registration card only for bike admins', card.hidden === !bikeAdmin, card.hidden);
     // Bénévoles tab: the sign-up limits of the public registration page (counters, limits, switch, reset)
     if (bikeAdmin) {
-      const val = id => document.getElementById(id).value;
+      const sections = [...document.getElementById('volunteers-tab').children];
+      ok('Bénévoles tab: the list of volunteers comes first, the sign-up limits box after it', sections.length === 2 && sections[0].contains(document.getElementById('volunteers-table')) && sections[1].id === 'vl-section', sections.map(s => s.id || s.className));      const val = id => document.getElementById(id).value;
       const setVal = (id, v) => { document.getElementById(id).value = v; };
       ok('Bénévoles tab: limits card shows the defaults (10 / 60 / 150 / 500, open) and the counters at zero', val('vl-per-minute') === '10' && val('vl-per-hour') === '60' && val('vl-per-day') === '150' && val('vl-total') === '500' && document.getElementById('vl-enabled').checked && /0 \/ 10/.test(document.getElementById('vl-status').textContent) && /0 \/ 500/.test(document.getElementById('vl-status').textContent), document.getElementById('vl-status').textContent);
       const limitWrites = () => window.__writes.filter(w => w[0] === 'volunteerLimits');

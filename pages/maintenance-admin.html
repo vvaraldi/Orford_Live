@@ -166,6 +166,8 @@
   <script src="../js/services/map-service.js"></script>
   <script src="../js/services/photo-map-modal.js"></script>
   <script src="../js/services/sector-service.js"></script>
+  <script src="../js/services/weather-service.js"></script>
+  <script src="../js/services/weather-context.js"></script>
 
   <script>
     let logsData = [];
@@ -431,6 +433,9 @@
           ${entries.map((entry, i) => entryHtml(entry, i, log)).join('') || '<p style="color:var(--theme-text-secondary);">Aucun travail enregistré</p>'}
         </div>
       `;
+
+      const worked = log.date?.toDate?.();
+      if (worked) WeatherContext.attach(modalBody, new Date(worked.getFullYear(), worked.getMonth(), worked.getDate(), 12), { reference: 'midi' });   // a day: the weather around noon
 
       const archiveBtn = document.getElementById('archive-btn');
       if (log.archived) {

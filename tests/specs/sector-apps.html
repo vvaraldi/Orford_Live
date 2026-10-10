@@ -212,6 +212,64 @@
     const sw = document.getElementById('kind-switch');
     ok(bike ? 'bike: no Montée / Descente switch in the header' : 'ski: the Montée / Descente switch is in the header and shows the view (' + (downhill ? 'Descente' : 'Montée') + ')', bike ? sw.hidden === true : (sw.hidden === false && sw.textContent.includes(downhill ? 'Descente' : 'Montée')), sw.textContent);
   }
+  // ---- Signalisations: permanent (the default) or temporary ("due à une condition temporaire") ----
+  if (PAGE === 'signalisation-report') {
+    const radio = id => document.getElementById(id);
+    ok('duration: "Permanente" is chosen by default; "Temporaire" carries its explanation', radio('duration-permanent').checked && !radio('duration-temporary').checked && /Temporaire/.test(radio('duration-temporary').closest('label').textContent) && /due à une condition temporaire/.test(radio('duration-temporary').closest('label').textContent), null);
+    const fillAndSave = async () => {
+      sectorSelect.value = bike ? 'sentiers-velo' : 'mont-orford'; populateTrails();
+      trailSelect.value = bike ? 'bike_1' : (downhill ? 'run_2' : 'trail_2'); statusSelect.value = 'ouverte';
+      await handleSubmit({ preventDefault() {} });
+      return window.__writes.filter(x => x[0] === 'signalisations' && x[2] === 'add');
+    };
+    window.__writes.length = 0; resetForm();
+    let adds = await fillAndSave();
+    ok('a report left on the default is saved as permanent', adds.length === 1 && adds[0][3].duration === 'permanent', adds);
+    window.__writes.length = 0; resetForm();
+    radio('duration-temporary').checked = true;
+    adds = await fillAndSave();
+    ok('a report marked temporary is saved as temporary', adds.length === 1 && adds[0][3].duration === 'temporary', adds);
+    ok('after saving, the form is back on permanent', radio('duration-permanent').checked && !radio('duration-temporary').checked, null);
+    // correcting a saved report
+    const mineId = opts(reportSelector).find(v => v !== 'new');
+    const saved = userReports.find(r => r.id === mineId);
+    saved.duration = 'temporary'; reportSelector.value = mineId; handleReportChange();
+    ok('opening a temporary report shows "Temporaire"; one saved before the choice existed shows "Permanente"', radio('duration-temporary').checked && (delete saved.duration, handleReportChange(), radio('duration-permanent').checked), null);
+    radio('duration-temporary').checked = true; window.__writes.length = 0;
+    await handleModify();
+    const upd = window.__writes.filter(x => x[0] === 'signalisations' && x[2] === 'update');
+    ok('modifying saves the duration chosen (and still never the network)', upd.length === 1 && upd[0][3].duration === 'temporary' && !('network' in upd[0][3]), upd);
+  }
+  if (PAGE === 'signalisation-resume') {
+    const rowIds = () => [...document.querySelectorAll('#reports-tbody tr[data-id]')].map(r => r.dataset.id).sort();
+    const sel = document.getElementById('filter-duration');
+    const choose = v => { sel.value = v; sel.dispatchEvent(new Event('change')); };
+    ok('the dashboard has a "Durée" selector: Permanentes (the default), Temporaires, Permanentes et temporaires', J(opts(sel)) === J(['permanent', 'temporary', 'both']) && sel.value === 'permanent' && /Permanentes/.test(sel.options[0].textContent) && /Temporaires/.test(sel.options[1].textContent), [opts(sel), sel.value]);
+    const all = rowIds();
+    const target = reportsData[0];                 // one report is marked temporary in memory (the mock data stays as it is)
+    target.duration = 'temporary';
+    choose('permanent');
+    ok('Permanentes: the temporary report is not listed (reports without the field are permanent)', !rowIds().includes(target.id) && rowIds().length === all.length - 1, rowIds());
+    choose('temporary');
+    const temporaryRow = document.querySelector(`#reports-tbody tr[data-id="${target.id}"]`);
+    ok('Temporaires: only the temporary report, flagged "Temporaire" in the list, and the count follows', J(rowIds()) === J([target.id]) && /Temporaire/.test(temporaryRow.textContent) && /^1 rapport/.test(document.getElementById('reports-count').textContent), [rowIds(), document.getElementById('reports-count').textContent]);
+    choose('both');
+    ok('Permanentes et temporaires: all of them', rowIds().length === all.length && /Temporaire/.test(document.querySelector(`#reports-tbody tr[data-id="${target.id}"]`).textContent), rowIds());
+    openDetailModal(target.id);
+    ok('the report\'s detail says its duration and why', /Durée : temporaire \(due à une condition temporaire\)/.test(document.getElementById('modal-body').textContent), document.getElementById('modal-body').textContent.slice(0, 200));
+    closeModal(); delete target.duration; choose('permanent');
+  }
+  if (PAGE === 'signalisation-admin') {
+    // a report of this view (an earlier test may have moved the mock's own report to the other view)
+    const first = { id: 'SIGDUR', status: 'ouverte', sector: bike ? 'sentiers-velo' : 'mont-orford', trail: bike ? 'Piste verte' : 'Adams', trailId: bike ? 'bike_1' : 'trail_2', comments: '', photos: [], resolved: false, archived: false, network: bike ? 'bike' : 'ski', createdAt: T(Date.now()), inspectorName: 'Test' };
+    reportsData.push(first);
+    first.duration = 'temporary'; openDetail(first.id);
+    ok('Gestion: the report\'s detail shows a temporary report as such', /Temporaire/.test(document.getElementById('modal-body').textContent) && /Durée : temporaire \(due à une condition temporaire\)/.test(document.getElementById('modal-body').textContent), document.getElementById('modal-body').textContent.slice(0, 160));
+    delete first.duration; openDetail(first.id);
+    ok('Gestion: a report without the field is permanent', /Durée : permanente/.test(document.getElementById('modal-body').textContent) && !/badge-warning/.test(document.getElementById('modal-body').innerHTML), null);
+    closeModal();
+  }
+
   document.getElementById('out').textContent = out.join('\n');
 })().catch(e => { document.getElementById('out').textContent = 'HARNESS ERROR ' + e.stack; });
 </script>

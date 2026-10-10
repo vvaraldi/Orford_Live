@@ -61,6 +61,17 @@ DOM) - retry with `-Budget 20000` or so, not a sign of a real bug.
 | `specs/new-password.html` | `new-password.html` (8 URL variants in `run.ps1`: valid, weak password, link used meanwhile, expired, invalid, offline, no code, other kind of e-mail link) | The page the password-reset e-mail leads to: checks the link's code, new password + confirmation, refusals on the page, double-click, the messages for each Firebase error, nothing left of the old page's dependencies. The mock plays Firebase's `auth` (`?code=`, `?confirm=`). |
 | `specs/volunteer-limits.html` | none (loads `js/services/volunteer-limits.js`, a fake Firestore applying a JavaScript COPY of the rules) | The public sign-up limits: per minute / hour / day / total, the switch, admin reset and limits, a visitor racing another, wrong clocks, offline, the French messages, and what the rules must refuse (counters without a volunteer, jumps, restarts, reused ids...). |
 
+### Météo (weather app)
+
+| Spec | Built from | What it covers |
+|---|---|---|
+| `specs/weather-service.html` | none (loads `config.js` + the service) | The data layer: fields and validation, Environment Canada readings (canned real answers), the feels-like, what a reading stores, typed vs web values, the public document, one value per day closest to noon, missing days, Firestore calls. |
+| `specs/weather-public.html` | none | The public side: the Firestore REST address and its typed JSON, the panel (values, day and time, "ancien", escaping), the public status page wiring, the rules text. |
+| `specs/weather-context.html` | none | The weather box shown in a report: nearest reading within 12 h, the admin switch, the read-saving cache, quiet failures, the four pages wired. |
+| `specs/meteo-report.html` | `meteo-report.html` (as admin / system admin / inspector) | The entry page: web values beside blank typed values, saving, the day's list, correcting, deleting (system admin only: form button and a quick 🗑️ per row), the public copy, the toasts. |
+| `specs/meteo-stats.html` | `meteo-stats.html` | The Admin page: season statistics, days without a reading, the "weather in reports" switch, data management. |
+| `specs/weather-in-reports.html` | the four Gestion pages (`wx-reports-*`) | The weather box in an opened inspection / infraction / signalisation / Entretien log. |
+
 ## The volunteer limits: what the tests cannot prove
 
 `volunteer-limits.html` runs the page logic against a JavaScript transcription of the rules

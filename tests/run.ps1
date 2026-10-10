@@ -74,6 +74,10 @@ $tests = @(
   @{ name = 'stats-maintenance';   type = 'page'; page = 'pages\maintenance-stats.html';   spec = 'data-admin-pages.html'; queries = @('?page=maintenance-stats&net=bike', '?page=maintenance-stats&net=ski', '?page=maintenance-stats&net=bike&as=system&choice=bike') }
   @{ name = 'new-password';             type = 'page'; page = 'pages\new-password.html';             spec = 'new-password.html'; queries = @('?page=new-password&mode=resetPassword&oobCode=CODE1&code=ok', '?page=new-password&mode=resetPassword&oobCode=CODE1&code=ok&confirm=weak', '?page=new-password&mode=resetPassword&oobCode=CODE1&code=ok&confirm=used', '?page=new-password&mode=resetPassword&oobCode=CODE1&code=expired', '?page=new-password&mode=resetPassword&oobCode=CODE1&code=invalid', '?page=new-password&mode=resetPassword&oobCode=CODE1&code=offline', '?page=new-password&mode=resetPassword', '?page=new-password&mode=verifyEmail&oobCode=CODE1') }
   @{ name = 'stats-meteo';         type = 'page'; page = 'pages\meteo-stats.html';         spec = 'meteo-stats.html'; queries = @('?page=meteo-stats&net=ski', '?page=meteo-stats&net=bike', '?page=meteo-stats&net=ski&as=system&choice=ski', '?page=meteo-stats&net=bike&as=system&choice=bike') }
+  @{ name = 'wx-reports-inspection';    type = 'page'; page = 'pages\inspection-history.html';      spec = 'weather-in-reports.html'; queries = @('?page=inspection-history&net=ski') }
+  @{ name = 'wx-reports-infraction';    type = 'page'; page = 'pages\infraction-admin.html';         spec = 'weather-in-reports.html'; queries = @('?page=infraction-admin&net=ski') }
+  @{ name = 'wx-reports-signalisation'; type = 'page'; page = 'pages\signalisation-admin.html';      spec = 'weather-in-reports.html'; queries = @('?page=signalisation-admin&net=ski') }
+  @{ name = 'wx-reports-maintenance';   type = 'page'; page = 'pages\maintenance-admin.html';        spec = 'weather-in-reports.html'; queries = @('?page=maintenance-admin&net=bike') }
   @{ name = 'trailservice';             type = 'unit'; spec = 'trailservice.html' }
   @{ name = 'mapservice';               type = 'unit'; spec = 'mapservice.html' }
   @{ name = 'kind';                     type = 'unit'; spec = 'kind.html' }
@@ -83,6 +87,7 @@ $tests = @(
   @{ name = 'volunteer-limits';           type = 'unit'; spec = 'volunteer-limits.html' }
   @{ name = 'weather-service';            type = 'unit'; spec = 'weather-service.html' }
   @{ name = 'weather-public';             type = 'unit'; spec = 'weather-public.html' }
+  @{ name = 'weather-context';            type = 'unit'; spec = 'weather-context.html' }
 )
 if ($Only) { $tests = $tests | Where-Object { $Only -contains $_.name } }
 

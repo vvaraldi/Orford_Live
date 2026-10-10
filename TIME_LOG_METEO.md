@@ -13,10 +13,12 @@ in the Firebase / GitHub consoles is not counted.
 | 2026-10-09 (step 3) | 2026-10-09 21:52 → 22:11 (~19m, one block: step 3 built, tested, and checked on screen) | ~6m | ~19m |
 | 2026-10-09 (step 4) | 2026-10-09 22:11 → 22:27 (~16m, one block: step 4 built, tested, and checked on screen) | ~7m | ~16m |
 | 2026-10-09 (step 5) | 2026-10-09 22:27 → 22:42 (~16m, one block: step 5 built, tested, and checked on screen) | ~8m | ~16m |
+| 2026-10-09 (step 6) | 2026-10-09 22:42 → 23:15 (~32m, one block, of which a ~10 min wait for the growing test suite to finish: step 6 built, tested, and checked on screen) | ~9m | ~9m |
+| 2026-10-09 (small additions) | 2026-10-09 23:15 → 23:33 (the Météo export and the quick delete on the list: about 40 % of a ~18m block shared with other small items logged in `TIME_LOG.md`) | ~4m | ~7m |
 
-**Running total for the Météo app: ~38m - 1h30m**
+**Running total for the Météo app: ~51m - 1h46m**
 
-**Note:** the last row is computed up to 22:42, when this estimate was made; any further time needs a new row.
+**Note:** the last row is computed up to 23:33, when this estimate was made; any further time needs a new row.
 
 What the rows cover: the first questions to define the app and the Environment Canada feasibility check (see
 `METEO_APP.md`); then step 1, the foundation: the Météo permission (user form, list badge, import / export),
@@ -37,3 +39,6 @@ save, a correction or a deletion), its rules, the weather panel on the public st
 no reading, "ancien" after 36 h), the web address and a stand-alone file for the Mont Orford website
 (`js/services/weather-public.js`), the fix of the notices on the entry page (they did not show), and 41 tests (1417
 in the whole suite).
+Step 6: the weather in the reports: the nearest reading (12 h at most, with its day and time) at the top of the report
+view in the four Gestion pages, nothing copied, the admin switch on Météo > Admin with its settings and the cache that
+limits the reads, and 28 + 43 + 5 tests.

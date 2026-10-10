@@ -154,6 +154,8 @@
   <script src="../js/services/photo-map-modal.js"></script>
   <script src="../js/services/sector-service.js"></script>
   <script src="../js/services/trail-service.js"></script>
+  <script src="../js/services/weather-service.js"></script>
+  <script src="../js/services/weather-context.js"></script>
 
   <script>
     // Fault types and practices of the current activity (APP_CONFIG.networks[..].infractions),
@@ -392,6 +394,8 @@
         </div>
       `;
       
+      WeatherContext.attach(modalBody, date);   // the weather nearest in time to the offence (if the admin switch is on)
+
       // Update archive button
       const archiveBtn = document.getElementById('archive-btn');
       if (inf.archived) {

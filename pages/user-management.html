@@ -147,7 +147,7 @@
     }
     
     /* Bénévoles tab: sign-up limits of the public registration page */
-    #vl-section { margin-bottom: var(--space-md); }
+    #vl-section { margin-top: var(--space-md); }   /* under the list of volunteers */
     .vl-status { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 0.75rem; margin-bottom: 1rem; }
     .vl-stat { border: 1px solid var(--theme-border); border-radius: var(--radius-md); padding: 0.6rem 0.8rem; background: var(--theme-surface-alt); }
     .vl-stat__label { font-size: 0.8rem; color: var(--theme-text-secondary); }
@@ -419,6 +419,14 @@
             <select class="form-select form-select--sm" id="filter-network" style="width: auto;">
               <option value="">Toutes les activités</option>
             </select>
+            <select class="form-select form-select--sm" id="filter-app" style="width: auto;" title="Utilisateurs qui ont accès à cette application">
+              <option value="">Toutes les applications</option>
+              <option value="allowInspection">🔍 Inspections</option>
+              <option value="allowInfraction">🚨 Infractions</option>
+              <option value="allowSignalisation">🚧 Signalisations</option>
+              <option value="allowMaintenance">🪏 Entretien</option>
+              <option value="allowMeteo">🌦️ Météo</option>
+            </select>
             <div class="page-size-select">
               <label for="users-page-size">Afficher:</label>
               <select class="form-select form-select--sm" id="users-page-size" style="width: auto;">
@@ -606,47 +614,6 @@
 
     <!-- TAB: VOLUNTEERS (bike network) -->
     <div class="admin-tab-content" id="volunteers-tab">
-      <div class="data-export-section" id="vl-section">
-        <div class="data-export-section__header">
-          <span>🛡️</span>
-          <h3>Limites d'inscription</h3>
-        </div>
-        <p class="data-export-section__description">
-          La page d'inscription est publique (sans connexion) : ces limites, communes à tous les visiteurs, la protègent
-          contre les inscriptions en rafale. Quand une limite est atteinte, le visiteur lit un message clair. Les compteurs
-          d'une minute, d'une heure et d'une journée repartent d'eux-mêmes; le total se remet à zéro avec le bouton
-          « Réinitialiser les compteurs » (par exemple au début d'une saison).
-        </p>
-
-        <div id="vl-status" class="vl-status" aria-live="polite">Chargement…</div>
-
-        <div class="vl-form">
-          <div class="form-group">
-            <label class="form-label" for="vl-per-minute">Par minute</label>
-            <input type="number" class="form-input" id="vl-per-minute" min="1" max="100000" step="1">
-          </div>
-          <div class="form-group">
-            <label class="form-label" for="vl-per-hour">Par heure</label>
-            <input type="number" class="form-input" id="vl-per-hour" min="1" max="100000" step="1">
-          </div>
-          <div class="form-group">
-            <label class="form-label" for="vl-per-day">Par jour</label>
-            <input type="number" class="form-input" id="vl-per-day" min="1" max="100000" step="1">
-          </div>
-          <div class="form-group">
-            <label class="form-label" for="vl-total">Au total</label>
-            <input type="number" class="form-input" id="vl-total" min="1" max="100000" step="1">
-          </div>
-        </div>
-        <label class="vl-switch"><input type="checkbox" id="vl-enabled" checked> Inscriptions ouvertes (décocher pour fermer la page d'inscription)</label>
-
-        <div style="display:flex; gap:0.75rem; align-items:center; margin-top:0.75rem; flex-wrap:wrap;">
-          <button type="button" class="btn btn-primary btn-sm" id="vl-save-btn">💾 Enregistrer les limites</button>
-          <button type="button" class="btn btn-secondary btn-sm" id="vl-reset-btn">♻️ Réinitialiser les compteurs</button>
-          <button type="button" class="btn btn-secondary btn-sm" id="vl-refresh-btn">🔄 Actualiser</button>
-        </div>
-      </div>
-
       <div class="data-export-section">
         <div class="data-export-section__header">
           <span>🙋</span>
@@ -687,6 +654,47 @@
         <div class="loading-state" id="volunteers-loading">
           <div class="loading-spinner"></div>
           <p class="loading-text">Chargement des bénévoles...</p>
+        </div>
+      </div>
+
+      <div class="data-export-section" id="vl-section">
+        <div class="data-export-section__header">
+          <span>🛡️</span>
+          <h3>Limites d'inscription</h3>
+        </div>
+        <p class="data-export-section__description">
+          La page d'inscription est publique (sans connexion) : ces limites, communes à tous les visiteurs, la protègent
+          contre les inscriptions en rafale. Quand une limite est atteinte, le visiteur lit un message clair. Les compteurs
+          d'une minute, d'une heure et d'une journée repartent d'eux-mêmes; le total se remet à zéro avec le bouton
+          « Réinitialiser les compteurs » (par exemple au début d'une saison).
+        </p>
+
+        <div id="vl-status" class="vl-status" aria-live="polite">Chargement…</div>
+
+        <div class="vl-form">
+          <div class="form-group">
+            <label class="form-label" for="vl-per-minute">Par minute</label>
+            <input type="number" class="form-input" id="vl-per-minute" min="1" max="100000" step="1">
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="vl-per-hour">Par heure</label>
+            <input type="number" class="form-input" id="vl-per-hour" min="1" max="100000" step="1">
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="vl-per-day">Par jour</label>
+            <input type="number" class="form-input" id="vl-per-day" min="1" max="100000" step="1">
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="vl-total">Au total</label>
+            <input type="number" class="form-input" id="vl-total" min="1" max="100000" step="1">
+          </div>
+        </div>
+        <label class="vl-switch"><input type="checkbox" id="vl-enabled" checked> Inscriptions ouvertes (décocher pour fermer la page d'inscription)</label>
+
+        <div style="display:flex; gap:0.75rem; align-items:center; margin-top:0.75rem; flex-wrap:wrap;">
+          <button type="button" class="btn btn-primary btn-sm" id="vl-save-btn">💾 Enregistrer les limites</button>
+          <button type="button" class="btn btn-secondary btn-sm" id="vl-reset-btn">♻️ Réinitialiser les compteurs</button>
+          <button type="button" class="btn btn-secondary btn-sm" id="vl-refresh-btn">🔄 Actualiser</button>
         </div>
       </div>
     </div>
@@ -946,6 +954,13 @@
               <span class="export-option-desc">maintenance_logs (CSV : une ligne par travail)</span>
             </div>
           </label>
+          <label class="export-option">
+            <input type="checkbox" id="export-meteo" checked>
+            <div class="export-option-label">
+              <span class="export-option-name">🌦️ Météo</span>
+              <span class="export-option-desc">weather_records (CSV : une ligne par relevé, valeurs saisies et valeurs du web; hiver et été, sans filtre d'activité)</span>
+            </div>
+          </label>
         </div>
 
         <div class="export-form-row">
@@ -1122,6 +1137,7 @@
   <script src="../js/core/auth.js"></script>
   <script src="../js/services/sector-service.js"></script>
   <script src="../js/services/volunteer-limits.js"></script>
+  <script src="../js/services/weather-service.js"></script>
   <script src="../js/services/map-service.js"></script>
   <script src="../js/admin/map-calibration.js"></script>
   <script src="../js/services/trail-service.js"></script>
@@ -1450,6 +1466,7 @@
       const search = document.getElementById('search-users').value.toLowerCase();
       const statusFilter = document.getElementById('filter-status').value;
       const networkFilter = document.getElementById('filter-network').value;
+      const appFilter = document.getElementById('filter-app').value;   // an allow* flag, or '' = every user
 
       filteredUsers = users.filter(user => {
         const matchesSearch = !search ||
@@ -1457,7 +1474,8 @@
           user.email?.toLowerCase().includes(search);
         const matchesStatus = !statusFilter || user.status === statusFilter;
         const matchesNetwork = !networkFilter || networksOf(user).includes(networkFilter);
-        return matchesSearch && matchesStatus && matchesNetwork;
+        const matchesApp = !appFilter || user[appFilter] === true;
+        return matchesSearch && matchesStatus && matchesNetwork && matchesApp;
       });
       renderUsers();
     }
@@ -1953,6 +1971,24 @@
       });
     }
 
+    // CSV of the weather readings: one row per reading; for each measure the typed value (<mesure>) and the one read
+    // from Environment Canada (<mesure>_web); who entered it and when. JSON keeps the readings as stored.
+    function weatherCsvRows(readings) {
+      return readings.map(r => {
+        const row = {
+          id: r.id, recordedAt: r.recordedAt, locationId: r.locationId || '',
+          createdByName: r.createdByName || '', modifiedByName: r.modifiedByName || '',
+          comment: r.comment || '', createdAt: r.createdAt, modifiedAt: r.modifiedAt
+        };
+        WeatherService.KEYS.forEach(k => {
+          row[k] = r.manual && r.manual[k] !== null && r.manual[k] !== undefined ? r.manual[k] : '';
+          row[`${k}_web`] = r.web && r.web.fields && r.web.fields[k] ? r.web.fields[k].value : '';
+        });
+        row.webFetchedAt = r.web ? r.web.fetchedAt || '' : '';
+        return row;
+      });
+    }
+
     async function exportData() {
       const btn = document.getElementById('export-data-btn');
       const format = document.getElementById('export-data-format').value;
@@ -1962,10 +1998,11 @@
         shelter: document.getElementById('export-shelter-inspections').checked,
         infraction: document.getElementById('export-infractions').checked,
         signalisation: document.getElementById('export-signalisations').checked,
-        maintenance: document.getElementById('export-maintenance').checked
+        maintenance: document.getElementById('export-maintenance').checked,
+        meteo: document.getElementById('export-meteo').checked
       };
 
-      if (!opts.trail && !opts.shelter && !opts.infraction && !opts.signalisation && !opts.maintenance) {
+      if (!opts.trail && !opts.shelter && !opts.infraction && !opts.signalisation && !opts.maintenance && !opts.meteo) {
         showExportStatus('Sélectionnez au moins un type de données.', 'error');
         return;
       }
@@ -2065,6 +2102,23 @@
           } catch(e) { exportResult.maintenanceLogs = []; exportResult.summary.maintenanceLogsCount = 0; }
         }
 
+        if (opts.meteo) {
+          showExportStatus('Chargement météo...', 'info');
+          try {
+            // By time of the reading; the weather belongs to no activity (both seasons), so no activity filter
+            const snap = await db.collection('weather_records').where('recordedAt', '>=', startTimestamp).orderBy('recordedAt', 'desc').get();
+            const data = snap.docs.map(doc => {
+              const reading = formatDocumentDates(doc.data());
+              if (reading.web && reading.web.fields) {
+                reading.web = { ...reading.web, fetchedAt: formatExportDate(doc.data().web.fetchedAt), fields: Object.fromEntries(Object.entries(reading.web.fields).map(([k, f]) => [k, { ...f, observedAt: f.observedAt && f.observedAt.toDate ? formatExportDate(f.observedAt) : f.observedAt }])) };
+              }
+              return { id: doc.id, ...reading };
+            });
+            exportResult.weatherRecords = data;
+            exportResult.summary.weatherRecordsCount = data.length;
+          } catch(e) { exportResult.weatherRecords = []; exportResult.summary.weatherRecordsCount = 0; }
+        }
+
         const fromStr = startDate.toISOString().split('T')[0];
         const toStr = new Date().toISOString().split('T')[0];
         const baseName = `Orford_Live-Export-${fromStr}-to-${toStr}`;
@@ -2075,7 +2129,8 @@
             { key: 'shelterInspections', label: 'Inspections-Abris' },
             { key: 'infractions', label: 'Infractions' },
             { key: 'signalisations', label: 'Signalisations' },
-            { key: 'maintenanceLogs', label: 'Entretien', rows: maintenanceCsvRows }
+            { key: 'maintenanceLogs', label: 'Entretien', rows: maintenanceCsvRows },
+            { key: 'weatherRecords', label: 'Meteo', rows: weatherCsvRows }
           ];
           types.forEach((t, i) => {
             const records = t.rows ? t.rows(exportResult[t.key] || []) : exportResult[t.key];
@@ -2090,7 +2145,7 @@
 
         const total = (exportResult.summary.trailInspectionsCount || 0) + (exportResult.summary.shelterInspectionsCount || 0) + 
                       (exportResult.summary.infractionsCount || 0) + (exportResult.summary.signalisationsCount || 0) +
-                      (exportResult.summary.maintenanceLogsCount || 0);
+                      (exportResult.summary.maintenanceLogsCount || 0) + (exportResult.summary.weatherRecordsCount || 0);
         showExportStatus(`✓ Export réussi! ${total} enregistrements.`, 'success');
 
       } catch (error) {
@@ -2439,6 +2494,7 @@ Marie Tremblay,marie.tremblay@example.com,MotDePasse456,admin,,true,true,true,fa
           document.getElementById('search-users').addEventListener('input', debounce(() => filterAndRenderUsers(), 300));
           document.getElementById('filter-status').addEventListener('change', () => filterAndRenderUsers());
           document.getElementById('filter-network').addEventListener('change', () => filterAndRenderUsers());
+          document.getElementById('filter-app').addEventListener('change', () => filterAndRenderUsers());
           document.getElementById('users-page-size').addEventListener('change', e => {
             usersPageSize = parseInt(e.target.value, 10) || 25;
             filterAndRenderUsers();

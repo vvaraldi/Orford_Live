@@ -1,0 +1,62 @@
+<pre id="out" style="position:fixed;left:0;bottom:0;background:#fff;color:#000;font-size:11px;z-index:99999;max-height:35vh;overflow:auto">running...</pre>
+<script>
+// The weather in the four report views (Gestion of Inspections, Infractions, Signalisations, Entretien): the reading
+// nearest in time, the admin switch, and that a report always opens. The mock holds two readings on 15 Jan 2026:
+// W2 at 09:00 (web: -15 °C) and W1 at 12:00 (typed -12 °C, web wind, snow, an airport pressure).
+(async () => {
+  const out = []; const J = JSON.stringify;
+  const ok = (n, c, x) => out.push((c ? 'PASS ' : 'FAIL ') + n + (c ? '' : ' :: ' + J(x)));
+  const wait = ms => new Promise(r => setTimeout(r, ms));
+  const PAGE = Q.get('page');
+  const $ = id => document.getElementById(id);
+  await wait(1500);
+  ok('no script errors on load', window.__errs.length === 0, window.__errs);
+
+  // per page: where its reports are, how to date one, how to open its detail view
+  const PAGES = {
+    'inspection-history': { lists: () => [allInspections, filteredInspections], date: (o, d) => { o.date = d; }, open: id => viewDetails(id) },
+    'infraction-admin': { lists: () => [infractionsData], date: (o, d) => { o.offenceTimestamp = T(d.getTime()); }, open: id => openDetail(id) },
+    'signalisation-admin': { lists: () => [reportsData], date: (o, d) => { o.createdAt = T(d.getTime()); }, open: id => openDetail(id) },
+    'maintenance-admin': { lists: () => [logsData], date: (o, d) => { o.date = T(d.getTime()); }, open: id => openDetail(id), day: true }
+  };
+  const P = PAGES[PAGE];
+  const first = P.lists()[0][0];
+  ok('the page has a report to open', !!first, null);
+  async function openAt(d) {
+    P.lists().forEach(list => list.filter(o => o.id === first.id).forEach(o => P.date(o, d)));
+    await P.open(first.id);
+    await wait(400);
+    return $('modal-body');
+  }
+  const box = body => body.querySelector(':scope > .wxc');
+  const text = body => (box(body) ? box(body).textContent.replace(/\s+/g, ' ').trim() : '');
+
+  // ---- near the 12:00 reading ----
+  let body = await openAt(P.day ? new Date(2026, 0, 15) : new Date(2026, 0, 15, 12, 30));
+  ok('the weather box is the FIRST thing in the report view, and the report is still all there', !!box(body) && body.firstElementChild === box(body) && body.children.length > 2, [body.children.length, body.firstElementChild && body.firstElementChild.className]);
+  ok('it shows the day and time of the reading ' + (P.day ? '(for a day: around noon)' : 'and how far it is from the report'), /relevé du 15 janvier 2026 à 12 h 00/.test(text(body)) && (P.day ? /\(au moment de midi\)/.test(text(body)) : /\(30 min avant le rapport\)/.test(text(body))), text(body));
+  ok('the values: temperature with the feels-like, wind with its direction, snow, clouds', /Température -12 °C \(ressentie -19 °C\)/.test(text(body)) && /Vent 20 km\/h ONO/.test(text(body)) && /Neige fraîche 24 h 12 cm/.test(text(body)) && /Neige au sol 55 cm/.test(text(body)) && /Nuages Partiellement nuageux/.test(text(body)), text(body));
+  ok('an airport estimate is marked ≈ and explained', /Pression ≈ 101,2 kPa/.test(text(body)) && /≈ valeur estimée/.test(text(body)), text(body));
+  ok('nothing is stored in the report (no write at all just by looking)', window.__writes.length === 0, window.__writes);
+
+  // ---- another report, the same view: replaced, never doubled ----
+  if (!P.day) {
+    body = await openAt(new Date(2026, 0, 15, 9, 20));
+    ok('opening another report: one box only, now the 09:00 reading (-15 °C, 20 min before)', body.querySelectorAll('.wxc').length === 1 && /Température -15 °C/.test(text(body)) && /\(20 min avant le rapport\)/.test(text(body)), text(body));
+  }
+
+  // ---- no reading near ----
+  body = await openAt(new Date(2026, 0, 17, 12, 0));
+  ok('no reading within 12 hours: a quiet line says so, the report opens', !!box(body) && /Aucun relevé météo à moins de 12 h d/.test(text(body)) && body.children.length > 2, text(body));
+
+  // ---- the admin switch ----
+  window.__data.weather_settings = [{ id: 'config', showInReports: false }]; WeatherContext._reset();
+  body = await openAt(P.day ? new Date(2026, 0, 15) : new Date(2026, 0, 15, 12, 30));
+  ok('switched off by an admin: nothing is added and the report opens as before', !box(body) && body.children.length > 2, text(body));
+  window.__data.weather_settings = [{ id: 'config', showInReports: true }]; WeatherContext._reset();
+  body = await openAt(P.day ? new Date(2026, 0, 15) : new Date(2026, 0, 15, 12, 30));
+  ok('switched back on: the weather is there again', !!box(body) && /Température -12 °C/.test(text(body)), text(body));
+
+  document.getElementById('out').textContent = out.join('\n');
+})().catch(e => { document.getElementById('out').textContent = 'HARNESS ERROR ' + e.stack; });
+</script>

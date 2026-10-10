@@ -75,6 +75,25 @@ Public JSON, no key, readable from a page (cross-site calls allowed):
 
 ## Progress
 
+- **Small additions (2026-10-09, evening):** (3.4) Administration > Données: a **Météo** option in the data export
+  (JSON: the readings as stored with readable dates; CSV `_Meteo.csv`: one row per reading, for each measure the
+  typed value `<mesure>` and the web value `<mesure>_web`, who entered it; both seasons, no activity filter).
+  (3.7) a quick 🗑️ button on every row of the Relevés list (system admin only, with a confirmation, like the delete
+  inside the form; the public "latest reading" follows).
+
+- **Step 6 - Weather in reports: DONE (2026-10-09)** - when a report is opened in the Gestion pages of Inspections,
+  Infractions, Signalisations and Entretien, a box at the top of the report view shows the reading NEAREST IN TIME
+  (12 h at most), with the day and time it was recorded and how far from the report ("30 min avant le rapport";
+  Entretien, which has a day and no time, uses noon: "avant midi"). Typed values and web values with the feels-like
+  and wind direction; airport estimates marked "≈" with a note. NOTHING is copied into the report. A line says so when
+  no reading is within 12 h. `js/services/weather-context.js` (`WeatherContext.attach(container, date)`), one line in
+  each of the four pages. **The admin switch** is on Météo > Admin ("Afficher la météo dans les rapports", every
+  admin; stored in `weather_settings/config` as `showInReports`): off = nothing added and no reading is read. ON when
+  never set. Reads are limited: the switch is remembered 10 minutes in the browser (a change reaches the others within
+  10 minutes), a reading looked up for a report time is not looked up again during the visit. Any failure (rules not
+  published, offline) shows nothing and the report opens as before. Not done on purpose: the report FORMS (new
+  reports) - the weather is for looking at a report; the signalisation dashboard and the inspection dashboard popups.
+
 - **Step 5 - Public: DONE (2026-10-09)** - `weather_public/latest` = the latest reading that has something publishable
   (typed values + the lake station's; NEVER the airport's), no names, rewritten by the app after every save,
   correction or deletion (also after the Admin "delete old" tool) with `WeatherService.publishLatest`; removed when

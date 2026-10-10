@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html><head><meta charset="utf-8"><title>WeatherContext tests</title></head>
+<body>
+<pre id="out">running...</pre>
+<script src="/js/core/config.js"></script>
+<script src="/js/services/weather-service.js"></script>
+<script src="/js/services/weather-context.js"></script>
+<script>
+// The weather shown in a report: the reading nearest in time (12 h at most), the admin switch, the cache that limits
+// the reads, and the quiet failures. (The pages themselves are tested in weather-in-reports.html.)
+(async () => {
+  const out = []; const J = JSON.stringify;
+  const ok = (n, c, x) => out.push((c ? 'PASS ' : 'FAIL ') + n + (c ? '' : ' :: ' + J(x)));
+  const wait = ms => new Promise(r => setTimeout(r, ms));
+  const WC = WeatherContext;
+  const FB = { firestore: { Timestamp: { fromDate: d => ({ toDate: () => d, toMillis: () => d.getTime() }) }, FieldValue: { serverTimestamp: () => 'TS' } } };
+  const at = (d, h, m) => new Date(2026, 0, d, h, m || 0);
+  const stamp = d => FB.firestore.Timestamp.fromDate(d);
+
+  // ---- a fake Firestore that counts reads ----
+  let settingsDoc, settingsFails, readings, reads, writes, recordsDelay;
+  function reset() { settingsDoc = undefined; settingsFails = false; reads = { settings: 0, records: 0 }; writes = []; recordsDelay = 0; WC._reset(); }
+  const db = { collection: name => name === 'weather_settings'
+    ? { doc: id => ({
+        get: async () => { reads.settings++; if (settingsFails) throw new Error('permission-denied'); return { exists: settingsDoc !== undefined, data: () => settingsDoc }; },
+        set: async d => { writes.push([name, id, d]); settingsDoc = d; } }) }
+    : { where() { return this; }, orderBy() { return this; },
+        async get() { reads.records++; if (recordsDelay) await wait(recordsDelay); return { docs: readings.map(r => ({ id: r.id, data: () => { const { id, ...d } = r; return d; } })) }; } } };
+  const mkReading = (id, d, h, m, manual, web) => ({ id, locationId: 'mountain', recordedAt: stamp(at(d, h, m)), manual: manual || {}, web: web || null, createdByName: 'Marie' });
+  const airport = { fields: { pressureKpa: { value: 101.2, source: 'sherbrooke', publishable: false }, tempC: { value: -11.5, source: 'lac', publishable: true }, feelsLikeC: { value: -19, source: 'calc', publishable: true }, windKmh: { value: 20, source: 'lac', publishable: true }, windDir: { value: 297, source: 'lac', publishable: true } } };
+  readings = [mkReading('A', 15, 12, 0, { newSnowCm: 12 }, airport), mkReading('B', 15, 9, 0, { tempC: -15 }), mkReading('C', 15, 22, 0, { tempC: -8 })];
+  const O = { db, fb: FB };
+  const box = () => { const d = document.createElement('div'); d.innerHTML = '<p id="own">the report</p>'; return d; };
+
+  // ---- the switch ----
+  reset();
+  ok('no settings document = the weather is shown (default), and the answer is remembered for 10 minutes (one read only)', await WC.showInReports(db) === true && await WC.showInReports(db) === true && reads.settings === 1 && WC.DEFAULT_SHOW === true, reads);
+  reset(); settingsDoc = { showInReports: false };
+  ok('an admin switched it off: not shown (one read, then remembered)', await WC.showInReports(db) === false && await WC.showInReports(db) === false && reads.settings === 1, reads);
+  reset(); settingsDoc = { showInReports: false };
+  ok('readSetting is never remembered (the admin page shows the truth)', await WC.readSetting(db) === false && (settingsDoc = { showInReports: true }, await WC.readSetting(db) === true) && reads.settings === 2, reads);
+  reset(); settingsFails = true;
+  ok('settings unreadable (rules not published...): not shown, no error thrown', await WC.showInReports(db) === false, null);
+  reset();
+  await WC.saveSettings(db, FB, { showInReports: false }, { uid: 'u1', name: 'Marie' });
+  ok('saving the switch: written to weather_settings/config with who and when, and remembered at once', writes.length === 1 && writes[0][1] === 'config' && writes[0][2].showInReports === false && writes[0][2].updatedBy === 'u1' && writes[0][2].updatedAt === 'TS' && await WC.showInReports(db) === false && reads.settings === 0, [writes, reads]);
+
+  // ---- the nearest reading ----
+  reset();
+  const near = await WC.nearest(db, FB, at(15, 12, 30));
+  ok('nearest: the reading closest in time (12:00 is 30 min before 12:30; 09:00 and 22:00 are farther)', near.record.id === 'A' && near.delta === -30 * 60000, near && near.record.id);
+  ok('nearest: an exact tie goes to the earlier reading found first; after the report counts too (22:00 for 21:45 = 15 min after)', (await WC.nearest(db, FB, at(15, 21, 45))).record.id === 'C' && (await WC.nearest(db, FB, at(15, 21, 45))).delta === 15 * 60000, null);
+  ok('nearest: nothing within 12 hours (3 days later) = null', await WC.nearest(db, FB, at(18, 12)) === null, null);
+  const before = reads.records;
+  await WC.nearest(db, FB, at(15, 12, 30));
+  ok('nearest: the same report time is not looked up again during the visit', reads.records === before, [reads.records, before]);
+
+  // ---- the box ----
+  const html = WC.boxHtml(near, {});
+  const holder = document.createElement('div'); holder.innerHTML = html;
+  ok('box: day and time of the reading, how far from the report', /relevé du 15 janvier 2026 à \d{2} h \d{2}/.test(holder.textContent) && /\(30 min avant le rapport\)/.test(holder.textContent), holder.textContent);
+  ok('box: the values (typed first, the web ones after), feels-like, wind with direction, snow', /Température -11,5 °C \(ressentie -19 °C\)/.test(holder.textContent) && /Vent 20 km\/h ONO/.test(holder.textContent) && /Neige fraîche 24 h 12 cm/.test(holder.textContent), holder.textContent);
+  ok('box: an airport estimate is marked ≈ and explained; the lake values are not marked', /Pression ≈ 101,2 kPa/.test(holder.textContent) && /≈ valeur estimée à partir de l'aéroport de Sherbrooke/.test(holder.textContent) && !/≈ -11,5/.test(holder.textContent), holder.textContent);
+  ok('box: nothing about who entered it', !/Marie|createdBy/.test(html), null);
+  ok('box: "after" the report, and "midi" for a day with no time (Entretien)', /\(15 min après le rapport\)/.test(WC.boxHtml({ record: readings[2], delta: 15 * 60000 }).replace(/<[^>]+>/g, '')) && /\(1 h 05 avant midi\)/.test(WC.boxHtml({ record: readings[1], delta: -65 * 60000 }, { reference: 'midi' }).replace(/<[^>]+>/g, '')) && /\(au moment du rapport\)/.test(WC.boxHtml({ record: readings[0], delta: 60000 }).replace(/<[^>]+>/g, '')), null);
+  ok('box: no reading near = a quiet line saying so', /Aucun relevé météo à moins de 12 h du rapport/.test(WC.boxHtml(null).replace(/<[^>]+>/g, '')), null);
+
+  // ---- attaching it to a report view ----
+  reset();
+  let c = box();
+  await WC.attach(c, at(15, 12, 30), O);
+  ok('attach: the box is added at the TOP of the report view, the report itself is untouched', c.firstElementChild.classList.contains('wxc') && c.querySelector('#own').textContent === 'the report' && c.children.length === 2, c.innerHTML.slice(0, 120));
+  await WC.attach(c, at(15, 9, 10), O);
+  ok('attach again (another report in the same view): the box is replaced, never doubled', c.querySelectorAll('.wxc').length === 1 && /-15 °C/.test(c.querySelector('.wxc').textContent), c.innerHTML.slice(0, 160));
+  ok('attach: one read of the settings and one of the readings per report time, however many reports are opened', reads.settings === 1 && reads.records === 2, reads);
+
+  reset(); settingsDoc = { showInReports: false };
+  c = box(); await WC.attach(c, at(15, 12, 30), O);
+  ok('switched off: nothing is added and the readings are not even read', !c.querySelector('.wxc') && reads.records === 0, reads);
+  reset(); settingsFails = true;
+  c = box(); await WC.attach(c, at(15, 12, 30), O);
+  ok('settings unreadable: the report opens normally, nothing added', !c.querySelector('.wxc') && c.querySelector('#own'), null);
+  reset(); const realCollection = db.collection;
+  db.collection = n => n === 'weather_records' ? { where() { return this; }, orderBy() { return this; }, async get() { throw new Error('offline'); } } : realCollection(n);
+  c = box(); await WC.attach(c, at(15, 12, 30), O);
+  db.collection = realCollection;
+  ok('readings unreadable: the report opens normally, nothing added, no error thrown', !c.querySelector('.wxc') && c.querySelector('#own'), null);
+  reset(); recordsDelay = 80;
+  c = box();
+  const slow = WC.attach(c, at(15, 12, 30), O);           // a slow look-up for the first report...
+  recordsDelay = 0;
+  const fast = WC.attach(c, at(15, 9, 10), O);            // ...then the user opens another report at once
+  await Promise.all([slow, fast]);
+  ok('a slow answer for a previous report never draws over the current one', c.querySelectorAll('.wxc').length === 1 && /-15 °C/.test(c.querySelector('.wxc').textContent), c.innerHTML.slice(0, 160));
+  await WC.attach(null, at(15, 12), O); await WC.attach(box(), null, O);
+  ok('no container or no date: nothing happens', true, null);
+
+  // ---- the four report pages and the admin switch are wired ----
+  const text = async u => (await fetch(u)).text();
+  const pages = {
+    'inspection-history': /WeatherContext\.attach\(modalBody, insp\.date\)/,
+    'infraction-admin': /WeatherContext\.attach\(modalBody, date\)/,
+    'signalisation-admin': /WeatherContext\.attach\(document\.getElementById\('modal-body'\), date\)/,
+    'maintenance-admin': /WeatherContext\.attach\(modalBody, new Date\(worked\.getFullYear\(\), worked\.getMonth\(\), worked\.getDate\(\), 12\), \{ reference: 'midi' \}\)/
+  };
+  for (const [name, call] of Object.entries(pages)) {
+    const src = await text('/pages/' + name + '.html');
+    ok(name + ': loads the weather service and context, and shows the nearest weather when a report is opened', /weather-service\.js/.test(src) && /weather-context\.js/.test(src) && call.test(src), null);
+  }
+  const stats = await text('/pages/meteo-stats.html');
+  ok('Admin page: the switch "Afficher la météo dans les rapports" is there and saves through WeatherContext', /id="show-in-reports"/.test(stats) && /WeatherContext\.saveSettings\(/.test(stats) && /WeatherContext\.readSetting\(/.test(stats), null);
+
+  document.getElementById('out').textContent = out.join('\n');
+})().catch(e => { document.getElementById('out').textContent = 'HARNESS ERROR ' + e.stack; });
+</script>
+</body></html>

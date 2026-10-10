@@ -101,6 +101,15 @@
             </select>
           </div>
 
+          <!-- Durée: permanente (par défaut) ou temporaire -->
+          <div class="form-group">
+            <label class="form-label">Durée de la signalisation</label>
+            <div style="display:flex; gap:0.5rem 2rem; flex-wrap:wrap;">
+              <label class="form-check"><input type="radio" name="sign-duration" id="duration-permanent" value="permanent" checked> Permanente</label>
+              <label class="form-check"><input type="radio" name="sign-duration" id="duration-temporary" value="temporary"> Temporaire <span class="form-hint">— due à une condition temporaire</span></label>
+            </div>
+          </div>
+
           <!-- Photo -->
           <div class="form-group">
             <label class="form-label">Photos <span class="form-hint">(ou statut obligatoire)</span></label>
@@ -208,6 +217,12 @@
           loadUserReports();
         }
       });
+    }
+
+    // Permanent (default) or temporary ("due à une condition temporaire"); a report without the field is permanent
+    const readDuration = () => (document.getElementById('duration-temporary').checked ? 'temporary' : 'permanent');
+    function setDuration(value) {
+      document.getElementById(value === 'temporary' ? 'duration-temporary' : 'duration-permanent').checked = true;
     }
 
     function bindElements() {
@@ -335,6 +350,7 @@
       }
       
       statusSelect.value = report.status || '';
+      setDuration(report.duration);
       // The record may carry an older sector id (alias): it resolves to the current sector
       fillSectorsForView(report.sector); // keeps the report's own sector available
       SectorService.selectSector(sectorSelect, sectors, report.sector);
@@ -372,6 +388,7 @@
       reportSelector.value = 'new';
       setDefaultValues();
       statusSelect.value = '';
+      setDuration('permanent');
       fillSectorsForView();
       trailSelect.innerHTML = '<option value="">-- Sélectionner d\'abord un secteur --</option>';
       commentsInput.value = '';
@@ -451,6 +468,7 @@
           inspectorName: inspectorNameInput.value,
           status: statusSelect.value || null,
           statusDisplayName: statusSelect.value ? STATUS_LABELS[statusSelect.value] : null,
+          duration: readDuration(),
           photos: photos,
           // Keep coordinates field for first photo (for map markers retrocompat)
           coordinates: photos.length > 0 && photos[0].coordinates ? photos[0].coordinates : null,
@@ -503,6 +521,7 @@
         const updateData = {
           status: statusSelect.value || null,
           statusDisplayName: statusSelect.value ? STATUS_LABELS[statusSelect.value] : null,
+          duration: readDuration(),
           photos: photos,
           coordinates: photos.length > 0 && photos[0].coordinates ? photos[0].coordinates : null,
           sector: sectorSelect.value,

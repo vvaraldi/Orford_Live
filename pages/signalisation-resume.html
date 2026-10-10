@@ -99,6 +99,15 @@
             <option value="">Toutes les pistes</option>
           </select>
         </div>
+        <!-- Permanent (default), temporary ("due à une condition temporaire") or both -->
+        <div class="form-group" style="margin-bottom:0; min-width:180px;">
+          <label class="form-label" for="filter-duration">Durée</label>
+          <select class="form-select" id="filter-duration" title="Une signalisation temporaire est due à une condition temporaire">
+            <option value="permanent" selected>Permanentes</option>
+            <option value="temporary">Temporaires</option>
+            <option value="both">Permanentes et temporaires</option>
+          </select>
+        </div>
       </div>
     </section>
 
@@ -204,6 +213,7 @@
     // narrows to something non-empty. Apply to both the map markers and the table.
     let filterSector = '';
     let filterTrail = '';
+    let filterDuration = 'permanent';   // 'permanent' (default), 'temporary' or 'both'
 
     // If the sectors cannot be loaded the page still shows the name stored on each report
     const sectorNameOf = r => SectorService.nameOf(sectors, r.sector, r.sectorDisplayName);
@@ -225,8 +235,13 @@
       return null;
     }
 
+    // A report without the field is permanent (all reports made before the choice existed)
+    const isTemporary = r => r.duration === 'temporary';
+    const matchesDuration = r => filterDuration === 'both' || (filterDuration === 'temporary') === isTemporary(r);
+    const temporaryBadge = r => (isTemporary(r) ? ' <span class="badge badge-warning" title="Due à une condition temporaire">Temporaire</span>' : '');
+
     function visibleReports() {
-      let list = reportsData;
+      let list = reportsData.filter(matchesDuration);
       if (filterSector) list = list.filter(r => r.sector === filterSector);
       if (filterTrail) list = list.filter(r => reportTrailKey(r) === filterTrail);
       return list;
@@ -312,6 +327,11 @@
           });
           document.getElementById('filter-trail').addEventListener('change', (e) => {
             filterTrail = e.target.value;
+            renderMapMarkers();
+            renderReportsTable();
+          });
+          document.getElementById('filter-duration').addEventListener('change', (e) => {
+            filterDuration = e.target.value;
             renderMapMarkers();
             renderReportsTable();
           });
@@ -437,7 +457,7 @@
           statusHtml = `<span class="badge ${badgeClass}">${STATUS_LABELS[r.status] || r.status}</span>`;
         }
         
-        return `<tr data-id="${r.id}"><td>${dateStr}</td><td>${escapeHtml(sectorName)}</td><td>${escapeHtml(r.trail || '-')}</td><td>${statusHtml}</td><td>${escapeHtml(r.inspectorName || '-')}</td></tr>`;
+        return `<tr data-id="${r.id}"><td>${dateStr}</td><td>${escapeHtml(sectorName)}</td><td>${escapeHtml(r.trail || '-')}</td><td>${statusHtml}${temporaryBadge(r)}</td><td>${escapeHtml(r.inspectorName || '-')}</td></tr>`;
       }).join('');
       
       // Bind row clicks
@@ -489,7 +509,8 @@
         </div>
         <div class="detail-section">
           <h4>📊 Statut de la signalisation</h4>
-          ${statusHtml}
+          ${statusHtml}${temporaryBadge(r)}
+          <p style="font-size:0.8rem;color:var(--theme-text-secondary);margin-top:0.35rem;">Durée : ${isTemporary(r) ? "temporaire (due à une condition temporaire)" : "permanente"}</p>
         </div>
         <div class="detail-section">
           <h4>📷 Photos (${photos.length})</h4>

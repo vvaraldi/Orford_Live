@@ -246,6 +246,8 @@
   <script src="../js/core/auth.js"></script>
   <script src="../js/services/photo-service.js"></script>
   <script src="../js/services/trail-service.js"></script>
+  <script src="../js/services/weather-service.js"></script>
+  <script src="../js/services/weather-context.js"></script>
   <script src="../js/services/map-service.js"></script>
   <script src="../js/services/photo-map-modal.js"></script>
 
@@ -745,6 +747,7 @@
 
       modalTitle.textContent = `Inspection - ${insp.location || 'Lieu inconnu'}`;
       modalBody.innerHTML = html;
+      WeatherContext.attach(modalBody, insp.date);   // the weather nearest in time to this inspection (if the admin switch is on)
       detailModal.classList.add('show');
       document.body.style.overflow = 'hidden';
     }

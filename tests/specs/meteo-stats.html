@@ -36,6 +36,22 @@
   }
   ok('days without a reading: the 20 days before today, yesterday included (none of them has one here)', c['Jours sans relevé (20 derniers jours)'].v === '20' && /hier compris, sans aujourd'hui/.test(c['Jours sans relevé (20 derniers jours)'].sub), c['Jours sans relevé (20 derniers jours)']);
 
+  // ---- the switch for the weather in the reports (every admin) ----
+  const sw = $('show-in-reports'), swStatus = $('show-in-reports-status');
+  const settingWrites = () => window.__writes.filter(w => w[0] === 'weather_settings');
+  ok('the switch "Afficher la météo dans les rapports" is shown to admins, ON by default (no setting saved yet)', $('weather-settings').hidden === false && sw.checked === true && sw.disabled === false, [$('weather-settings').hidden, sw.checked]);
+  sw.checked = false; sw.dispatchEvent(new Event('change')); await wait(300);
+  const w1 = settingWrites()[0];
+  ok('switching it off saves weather_settings/config (showInReports false, who and when) and says so', !!w1 && w1[1] === 'config' && w1[2] === 'set' && w1[3].showInReports === false && w1[3].updatedBy === 'u1' && w1[3].updatedAt === 'TS' && /ne s'affiche plus/.test(swStatus.textContent) && sw.disabled === false, [w1, swStatus.textContent]);
+  sw.checked = true; sw.dispatchEvent(new Event('change')); await wait(300);
+  ok('switching it back on saves true', settingWrites().length === 2 && settingWrites()[1][3].showInReports === true && /s'affiche dans les rapports/.test(swStatus.textContent), settingWrites());
+  const realCollection = window.db.collection;
+  window.db.collection = name => name === 'weather_settings' ? { doc: () => ({ set: async () => { throw new Error('permission-denied'); }, get: async () => ({ exists: false, data: () => ({}) }) }) } : realCollection(name);
+  sw.checked = false; sw.dispatchEvent(new Event('change')); await wait(300);
+  window.db.collection = realCollection;
+  ok('when saving fails the box goes back to what it was and an error is shown', sw.checked === true && /Erreur/.test(swStatus.textContent) && sw.disabled === false, [sw.checked, swStatus.textContent]);
+  window.__writes.length = 0;
+
   if (!SYS) {
     ok('plain admin: no data management tab, no delete tool drawn', $('da-tab-management').style.display === 'none');
   } else {

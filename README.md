@@ -7,9 +7,8 @@
 
 3. Improve the user experience
 #	Priority	Item
-3.1 create a weather app
-3.2 For all activitire, integrate flag for signalisation report to choos if signs are "temporaire" or "permanent". In the "tableau de bord" a check box to include or not the temporary signs
 3.5	Low	Accessibility audit pass
+
 
 
 

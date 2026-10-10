@@ -325,6 +325,16 @@ const WeatherService = (() => {
     return list(db, fb, from, to, locationId);
   }
 
+  /** A value as shown: "12 cm", "297° (ONO)", "Couvert" (decimal comma). */
+  function format(key, value) {
+    const f = fieldOf(key);
+    if (!f) return String(value);
+    if (f.type === 'choice') return f.choices[value] || String(value);
+    const text = String(value).replace('.', ',');
+    if (key === 'windDir') return `${text}° (${compass(value)})`;
+    return f.unit ? `${text} ${f.unit}` : text;
+  }
+
   /** Deletes a reading (the rules reserve this to the system admin). */
   function remove(db, id) {
     return db.collection(COLLECTION).doc(id).delete();
@@ -423,7 +433,7 @@ const WeatherService = (() => {
 
   return {
     COLLECTION, FIELDS, KEYS, CLOUD_COVER, SKY, fieldOf, location,
-    compass, feelsLike, mapObservation, observationUrl, fetchWebValues,
+    compass, format, feelsLike, mapObservation, observationUrl, fetchWebValues,
     validateManual, buildRecord, effectiveValues, save, update, remove, list, listDay,
     publicDocument, publishLatest, dayKey, dailyValues, missingDays
   };
