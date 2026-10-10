@@ -1,0 +1,107 @@
+<pre id="out" style="position:fixed;left:0;bottom:0;background:#fff;color:#000;font-size:11px;z-index:99999;max-height:40vh;overflow:auto">running...</pre>
+<script>
+// The Météo entry page: the form (Environment Canada values beside blank typed values), the day's list, editing.
+// Environment Canada is played by a canned window.fetch; the readings of 15 Jan 2026 (W1, W2) come from the mock.
+(async () => {
+  const out = []; const J = JSON.stringify;
+  const ok = (n, c, x) => out.push((c ? 'PASS ' : 'FAIL ') + n + (c ? '' : ' :: ' + J(x)));
+  const wait = ms => new Promise(r => setTimeout(r, ms));
+  const $ = id => document.getElementById(id);
+  const text = id => $(id).textContent.replace(/\s+/g, ' ').trim();
+  const type = (key, v) => { const i = $('in-' + key); i.value = v; i.dispatchEvent(new Event('input')); i.dispatchEvent(new Event('change')); };
+  const setAt = v => { $('recorded-at').value = v; $('recorded-at').dispatchEvent(new Event('change')); };
+  const setListDay = v => { $('list-date').value = v; $('list-date').dispatchEvent(new Event('change')); };
+  const submit = () => $('weather-form').dispatchEvent(new Event('submit', { cancelable: true }));
+  const writes = () => window.__writes.filter(w => w[0] === 'weather_records');
+  const rowsText = () => [...document.querySelectorAll('#records-tbody tr')].map(tr => tr.textContent.replace(/\s+/g, ' ').trim());
+  await wait(500);
+  ok('no script errors on load', window.__errs.length === 0, window.__errs);
+
+  // ---- the form on opening ----
+  ok('13 measures, each with its label and unit, a web cell and a typed input', document.querySelectorAll('.wx-row').length === 13 && /Neige fraîche \(24 h\)\s*\(cm\)/.test(text('fields-grid')) && /Température ressentie/.test(text('fields-grid')) && /Rafales/.test(text('fields-grid')), text('fields-grid').slice(0, 200));
+  ok('choices: clouds (clear / partly / overcast) and conditions (sun / snow / rain / fog), each with a blank option', $('in-cloudCover').options.length === 4 && $('in-sky').options.length === 5 && $('in-cloudCover').value === '' && $('in-sky').value === '', null);
+  ok('typed values start BLANK, the web cells show "—", the comment is empty', WeatherService.KEYS.every(k => $('in-' + k).value === '') && WeatherService.KEYS.every(k => $('web-' + k).textContent === '—') && $('comment').value === '', null);
+  const at0 = new Date($('recorded-at').value);
+  ok('date and time start at now (to the minute); the place is Mont Orford', Math.abs(at0.getTime() - Date.now()) < 3 * 60000 && $('place-name').value === 'Mont Orford', [$('recorded-at').value, $('place-name').value]);
+  ok('the list starts on today, empty', /Relevés du/.test(text('list-title')) && $('records-empty').style.display !== 'none' && rowsText().length === 0, text('list-title'));
+
+  // ---- the day's list (15 Jan 2026: W2 at 09:00, W1 at 12:00) ----
+  setListDay('2026-01-15'); await wait(300);
+  const rows = rowsText();
+  ok('the day lists its two readings, oldest first, with who entered them', rows.length === 2 && /^09 h 00/.test(rows[0]) && /^12 h 00/.test(rows[1]) && /Luc/.test(rows[0]) && /Marie/.test(rows[1]), rows);
+  ok('W1: typed values marked ✎ (temperature, snow), web values marked 🌐 (wind with direction and gusts); sky from the typed clouds; comment shown',
+    /-12 °C✎/.test(rows[1]) && /20 km\/h🌐 ONO, rafales 35 km\/h🌐/.test(rows[1]) && /frais 12 cm✎ · base 55 cm✎/.test(rows[1]) && /Partiellement nuageux✎/.test(rows[1]) && /Belle neige/.test(rows[1]), rows[1]);
+  ok('W1: the feels-like is shown beside the temperature when it differs (web value)', /\(ressenti -19 °C🌐\)/.test(rows[1]), rows[1]);
+  ok('W2: web values only (🌐), no snow, no sky', /-15 °C🌐/.test(rows[0]) && !/✎/.test(rows[0]), rows[0]);
+
+  // ---- correcting a reading ----
+  document.querySelector('[data-edit="W1"]').click(); await wait(100);
+  ok('edit: the form is filled with the typed values, the time and the comment', /Modifier le relevé de 12 h 00/.test(text('form-title')) && $('in-tempC').value === '-12' && $('in-newSnowCm').value === '12' && $('in-cloudCover').value === 'partly' && $('in-windKmh').value === '' && $('comment').value === 'Belle neige' && $('save-btn').textContent === 'Enregistrer la modification', [text('form-title'), $('in-tempC').value]);
+  ok('edit: the web values are the ones saved with the reading (with their source), not read again', /-11,5 °C/.test(text('web-tempC')) && /Lac Memphrémagog/.test(text('web-tempC')) && /aéroport de Sherbrooke \(estimation\)/.test(text('web-pressureKpa')) && $('fetch-web-btn').disabled && $('cancel-btn').style.display !== 'none', [text('web-tempC'), text('web-pressureKpa')]);
+  ok('edit: "↺" (back to the web value) only where something was typed AND the web has a value', document.querySelector('[data-restore="tempC"]').classList.contains('is-visible') && !document.querySelector('[data-restore="newSnowCm"]').classList.contains('is-visible') && !document.querySelector('[data-restore="windKmh"]').classList.contains('is-visible'), null);
+  document.querySelector('[data-restore="tempC"]').click();
+  ok('"↺" empties my value so the web value applies again', $('in-tempC').value === '' && !document.querySelector('[data-restore="tempC"]').classList.contains('is-visible'), null);
+  type('tempC', '-14'); $('comment').value = 'Neige poudreuse';
+  submit(); await wait(300);
+  const upd = writes().find(w => w[2] === 'update');
+  ok('save an edit: ONE update of that reading with the new values, the editor recorded; the author and the web values are not touched',
+    !!upd && upd[1] === 'W1' && upd[3].manual.tempC === -14 && upd[3].manual.newSnowCm === 12 && upd[3].comment === 'Neige poudreuse' && upd[3].modifiedBy === 'u1' && upd[3].modifiedAt === 'TS' && !('createdBy' in upd[3]) && !('web' in upd[3]), upd);
+  ok('after saving the form is a new, blank reading again', /Nouveau relevé/.test(text('form-title')) && $('in-tempC').value === '' && $('save-btn').textContent === 'Enregistrer' && $('fetch-web-btn').disabled === false, text('form-title'));
+  document.querySelector('[data-edit="W2"]').click(); await wait(50);
+  $('cancel-btn').click();
+  ok('"Annuler la modification" goes back to a blank new reading, nothing written', /Nouveau relevé/.test(text('form-title')) && writes().filter(w => w[2] === 'update').length === 1, null);
+
+  // ---- a new reading: Environment Canada on request ----
+  setAt('2026-01-15T14:00');
+  const at = new Date($('recorded-at').value);
+  const obs = new Date(at.getTime() - 30 * 60000).toISOString();
+  const LAC = { 'date_tm-value': obs, air_temp: -8.4, rel_hum: 70, dwpt_temp: -13, avg_wnd_spd_10m_pst10mts: 20, avg_wnd_dir_10m_pst10mts: 297, max_wnd_spd_10m_pst1hr: 35 };
+  const AIR = { 'date_tm-value': obs, air_temp: -7.9, mslp: 1012.1, avg_vis_pst10mts: 16.09, cld_amt_code_1: 4 };
+  const asked = [];
+  window.fetch = async url => { asked.push(url); const props = /702CFGG/.test(url) ? LAC : AIR; return { ok: true, json: async () => ({ features: [{ properties: props }] }) }; };
+  $('fetch-web-btn').click(); await wait(300);
+  ok('"Charger" asks both stations for the chosen time (not now)', asked.length === 2 && asked.every(u => u.includes('datetime=' + new Date(at.getTime() - 3 * 3600000).toISOString().replace(/\.\d{3}Z$/, 'Z') + '/' + at.toISOString().replace(/\.\d{3}Z$/, 'Z'))), asked);
+  ok('the web values appear beside the blank typed ones, with station and time of observation', /-8,4 °C/.test(text('web-tempC')) && /Lac Memphrémagog/.test(text('web-tempC')) && /20 km\/h/.test(text('web-windKmh')) && /297° \(ONO\)/.test(text('web-windDir')) && /101,2 kPa/.test(text('web-pressureKpa')) && /aéroport de Sherbrooke \(estimation\)/.test(text('web-pressureKpa')) && /Couvert/.test(text('web-cloudCover')), [text('web-tempC'), text('web-pressureKpa')]);
+  ok('the feels-like is there (wind chill, computed)', /calculée/.test(text('web-feelsLikeC')) && /°C/.test(text('web-feelsLikeC')), text('web-feelsLikeC'));
+  ok('the status says when it was observed, 30 min before the reading', /Observations de \d{2} h \d{2} \(30 min avant le relevé\)/.test(text('web-status')), text('web-status'));
+  ok('...and the typed values are STILL blank', WeatherService.KEYS.every(k => $('in-' + k).value === ''), null);
+  type('tempC', '-9');
+  ok('typing a value shows "↺" beside it (the web has one); a measure without web value shows none', document.querySelector('[data-restore="tempC"]').classList.contains('is-visible') && !document.querySelector('[data-restore="snowDepthCm"]').classList.contains('is-visible'), null);
+  setAt('2026-01-15T17:30');
+  ok('changing the hour after loading warns to reload (nothing is erased)', /L'heure a changé/.test(text('web-status')) && $('in-tempC').value === '-9', text('web-status'));
+  setAt('2026-01-15T14:00');
+
+  // ---- refusals, then saving ----
+  type('humidityPct', '250'); type('windDir', '400');
+  submit(); await wait(100);
+  ok('invalid values are refused with a message for each, the fields marked, nothing written', /entre 0 et 100/.test(text('form-errors')) && /entre 0 et 360/.test(text('form-errors')) && $('in-humidityPct').classList.contains('is-invalid') && writes().filter(w => w[2] === 'add').length === 0, text('form-errors'));
+  type('humidityPct', ''); type('windDir', '');
+  ok('typing again clears the errors', text('form-errors') === '' && !$('in-humidityPct').classList.contains('is-invalid'), null);
+  type('newSnowCm', '3'); $('comment').value = '  Test  ';
+  submit(); await wait(400);
+  const add = writes().find(w => w[2] === 'add');
+  ok('a new reading: ONE record with the typed values, the web values as read, the time and the author', !!add && add[3].createdBy === 'u1' && add[3].createdByName === 'Test' && add[3].manual.tempC === -9 && add[3].manual.newSnowCm === 3 && add[3].manual.windKmh === null && add[3].web.fields.tempC.source === 'lac' && add[3].web.fields.tempC.value === -8.4 && add[3].web.fields.pressureKpa.publishable === false && add[3].comment === 'Test' && add[3].recordedAt instanceof Date && add[3].recordedAt.getHours() === 14, add);
+  ok('after saving: blank new reading, and the list shows that reading\'s day', /Nouveau relevé/.test(text('form-title')) && WeatherService.KEYS.every(k => $('in-' + k).value === '') && WeatherService.KEYS.every(k => $('web-' + k).textContent === '—') && $('list-date').value === '2026-01-15', [$('list-date').value]);
+
+  // ---- nothing typed, nothing loaded ----
+  submit(); await wait(100);
+  ok('nothing typed and nothing loaded: refused ("au moins une valeur"), nothing written', /au moins une valeur/.test(text('form-errors')) && writes().filter(w => w[2] === 'add').length === 1, text('form-errors'));
+
+  // ---- Environment Canada unreachable ----
+  window.fetch = async () => { throw new Error('offline'); };
+  $('fetch-web-btn').click(); await wait(300);
+  ok('Environment Canada unreachable: says so, the form stays usable by hand', /inaccessible/.test(text('web-status')) && $('fetch-web-btn').disabled === false && WeatherService.KEYS.every(k => $('web-' + k).textContent === '—'), text('web-status'));
+  type('tempC', '2'); submit(); await wait(300);
+  ok('...and a reading typed by hand alone is saved (no web part)', writes().filter(w => w[2] === 'add').length === 2 && writes().filter(w => w[2] === 'add')[1][3].web === null && writes().filter(w => w[2] === 'add')[1][3].manual.tempC === 2, writes().filter(w => w[2] === 'add')[1]);
+  window.fetch = async url => ({ ok: true, json: async () => ({ features: [] }) });
+  $('fetch-web-btn').click(); await wait(300);
+  ok('no observation for that hour: says so, no values, no error', /Aucune observation disponible/.test(text('web-status')) && /aucune observation pour cette heure/.test(text('web-notes')), [text('web-status'), text('web-notes')]);
+
+  // ---- moving between days ----
+  setListDay('2026-01-15'); await wait(200);
+  $('day-prev').click(); await wait(200);
+  ok('◀ shows the day before (empty), ▶ comes back, "Aujourd\'hui" goes to today', $('list-date').value === '2026-01-14' && rowsText().length === 0 && ($('day-next').click(), await wait(200), $('list-date').value === '2026-01-15' && rowsText().length === 2) && ($('day-today').click(), await wait(200), $('list-date').value === (() => { const d = new Date(); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); })()), [$('list-date').value]);
+
+  document.getElementById('out').textContent = out.join('\n');
+})().catch(e => { document.getElementById('out').textContent = 'HARNESS ERROR ' + e.stack; });
+</script>

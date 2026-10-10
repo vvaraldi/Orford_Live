@@ -120,7 +120,8 @@
   const rows = [
     { id: 'r1', locationId: 'mountain', recordedAt: FB.firestore.Timestamp.fromDate(new Date(T0)), manual: {} },
     { id: 'r2', locationId: 'elsewhere', recordedAt: FB.firestore.Timestamp.fromDate(new Date(T0)), manual: {} },
-    { id: 'r3', recordedAt: FB.firestore.Timestamp.fromDate(new Date(T0 + 3600000)), manual: {} }
+    { id: 'r3', recordedAt: FB.firestore.Timestamp.fromDate(new Date(T0 + 3600000)), manual: {} },
+    { id: 'r4', locationId: 'mountain', recordedAt: FB.firestore.Timestamp.fromDate(new Date(T0 + 3 * 86400000)), manual: {} }   // another day: left out
   ];
   const db = { collection: name => {
     const q = { clauses: [], where(f, op, v) { this.clauses.push([f, op, v]); return this; }, orderBy(f, d) { this.clauses.push(['orderBy', f, d]); return this; },

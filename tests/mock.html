@@ -53,6 +53,22 @@
           { sector: 'sentiers-velo', trailId: 'bike_2', trailName: 'Descente', jobText: 'Reprofilage', photos: [] }
         ] }
     ],
+    // Météo: two readings on a fixed day (15 January 2026, local time): W1 typed + web values, W2 web values only
+    weather_records: [
+      { id: 'W1', locationId: 'mountain', recordedAt: T(new Date(2026, 0, 15, 12, 0).getTime()), comment: 'Belle neige', createdBy: 'u1', createdByName: 'Marie',
+        manual: { tempC: -12, newSnowCm: 12, snowDepthCm: 55, cloudCover: 'partly' },
+        web: { fetchedAt: T(new Date(2026, 0, 15, 12, 5).getTime()), fields: {
+          tempC: { value: -11.5, source: 'lac', observedAt: T(new Date(2026, 0, 15, 12, 0).getTime()), publishable: true },
+          windKmh: { value: 20, source: 'lac', observedAt: T(new Date(2026, 0, 15, 12, 0).getTime()), publishable: true },
+          windDir: { value: 297, source: 'lac', observedAt: T(new Date(2026, 0, 15, 12, 0).getTime()), publishable: true },
+          gustKmh: { value: 35, source: 'lac', observedAt: T(new Date(2026, 0, 15, 12, 0).getTime()), publishable: true },
+          feelsLikeC: { value: -19, source: 'calc', observedAt: T(new Date(2026, 0, 15, 12, 0).getTime()), publishable: true },
+          pressureKpa: { value: 101.2, source: 'sherbrooke', observedAt: T(new Date(2026, 0, 15, 12, 0).getTime()), publishable: false } } } },
+      { id: 'W2', locationId: 'mountain', recordedAt: T(new Date(2026, 0, 15, 9, 0).getTime()), comment: '', createdBy: 'u2', createdByName: 'Luc',
+        manual: {},
+        web: { fetchedAt: T(new Date(2026, 0, 15, 9, 5).getTime()), fields: {
+          tempC: { value: -15, source: 'lac', observedAt: T(new Date(2026, 0, 15, 9, 0).getTime()), publishable: true } } } }
+    ],
     signalisations: [
       { id: 'SIG1', inspectorId: 'u1', inspectorName: 'Test', status: 'ouverte', sector: 'giroux-nord', sectorDisplayName: 'Mont Giroux Nord', trail: 'Magog', comments: 'c', resolved: false, archived: false, network: 'ski', createdAt: ago(3), photos: [] },   // old format: name only, no trail record named "Magog" any more
       { id: 'SIG2', inspectorId: 'u1', inspectorName: 'Test', status: 'fermee', sector: 'mont-orford', sectorDisplayName: 'Mont-Orford', trail: 'Maxi', trailId: 'run_2', comments: '', resolved: false, archived: false, network: 'ski', createdAt: ago(4), coordinates: { latitude: 45.31, longitude: -72.23 },

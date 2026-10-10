@@ -75,6 +75,15 @@ Public JSON, no key, readable from a page (cross-site calls allowed):
 
 ## Progress
 
+- **Step 3 - Entry page: DONE (2026-10-09)** - `pages/meteo-report.html`: date and time (default now), place,
+  a button "Charger les données d'Environnement Canada" (by hand; reads the stations for the CHOSEN time), 13
+  measures each with the web value + its station and observation time beside a BLANK typed input, a "↺" to take back
+  a typed value, a comment, save. Errors named per field; nothing typed and nothing loaded is refused; if
+  Environment Canada is down the form still works by hand. A list of the day's readings (◀ ▶ / date / today) shows
+  the effective value of each with ✎ typed / 🌐 web, who entered it, and "Modifier" (the web values are kept as
+  read, the author never changes, the editor is recorded). Times are shown the Quebec way ("12 h 00").
+  Not in this step: delete (system admin, with the Gestion page in step 4).
+
 - **Step 2 - Data and web values: DONE (2026-10-09)** - `js/services/weather-service.js` + `APP_CONFIG.weather`
   (place, the two stations, publish flags, 3 h window). Record in `weather_records`: `locationId`, `recordedAt`,
   `manual {13 fields, null = not typed}`, `web {fetchedAt, fields {value, source, observedAt, publishable}}`,

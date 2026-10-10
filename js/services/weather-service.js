@@ -311,7 +311,11 @@ const WeatherService = (() => {
       .where('recordedAt', '<', fb.firestore.Timestamp.fromDate(to))
       .orderBy('recordedAt', 'asc').get();
     const place = locationId || config().defaultLocation;
-    return snap.docs.map(d => ({ id: d.id, ...d.data() })).filter(r => (r.locationId || config().defaultLocation) === place);
+    const fromMs = from.getTime(), toMs = to.getTime();
+    return snap.docs.map(d => ({ id: d.id, ...d.data() })).filter(r => {
+      const t = ms(r.recordedAt);
+      return t !== null && t >= fromMs && t < toMs && (r.locationId || config().defaultLocation) === place;
+    }).sort((a, b) => ms(a.recordedAt) - ms(b.recordedAt));
   }
 
   /** The records of one day (local time). */
