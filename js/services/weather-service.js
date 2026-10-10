@@ -325,10 +325,55 @@ const WeatherService = (() => {
     return list(db, fb, from, to, locationId);
   }
 
+  /** Deletes a reading (the rules reserve this to the system admin). */
+  function remove(db, id) {
+    return db.collection(COLLECTION).doc(id).delete();
+  }
+
+  // ---- For the statistics ----
+
+  /** 2026-01-15 for a date, in local time */
+  const dayKey = d => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+
+  /**
+   * One value per day for a measure: among the day's readings that HAVE a value for it (typed, else web), the one
+   * taken closest to noon. Returns [{ day: '2026-01-15', value, at (ms), source }] oldest day first.
+   */
+  function dailyValues(records, key) {
+    const best = new Map();
+    records.forEach(r => {
+      const v = effectiveValues(r)[key];
+      const t = ms(r.recordedAt);
+      if (!v || t === null) return;
+      const at = new Date(t);
+      const noon = new Date(at.getFullYear(), at.getMonth(), at.getDate(), 12).getTime();
+      const distance = Math.abs(t - noon);
+      const day = dayKey(at);
+      if (!best.has(day) || distance < best.get(day).distance) best.set(day, { day, value: v.value, at: t, source: v.source, distance });
+    });
+    return [...best.values()].sort((a, b) => (a.day < b.day ? -1 : 1)).map(({ distance, ...rest }) => rest);
+  }
+
+  /**
+   * The days WITHOUT any reading among the `count` days ending on `lastDay` (a Date; that day included).
+   * Returns their keys, oldest first. The statistics use the 20 days ending yesterday: today is not over yet.
+   */
+  function missingDays(records, lastDay, count) {
+    const have = new Set();
+    records.forEach(r => { const t = ms(r.recordedAt); if (t !== null) have.add(dayKey(new Date(t))); });
+    const missing = [];
+    for (let i = count - 1; i >= 0; i--) {
+      const key = dayKey(new Date(lastDay.getFullYear(), lastDay.getMonth(), lastDay.getDate() - i));
+      if (!have.has(key)) missing.push(key);
+    }
+    return missing;
+  }
+
   return {
     COLLECTION, FIELDS, KEYS, CLOUD_COVER, SKY, fieldOf, location,
     compass, feelsLike, mapObservation, observationUrl, fetchWebValues,
-    validateManual, buildRecord, effectiveValues, save, update, list, listDay
+    validateManual, buildRecord, effectiveValues, save, update, remove, list, listDay,
+    dayKey, dailyValues, missingDays
   };
 })();
 window.WeatherService = WeatherService;

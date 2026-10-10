@@ -146,6 +146,25 @@
   ok('list: one query on the day only (recordedAt from midnight to the next midnight, oldest first; no composite index), other places filtered out',
     q[0][0] === 'recordedAt' && q[0][1] === '>=' && q[1][1] === '<' && q[1][2].toMillis() - q[0][2].toMillis() === 86400000 && q[2][0] === 'orderBy' && J(day.map(d => d.id)) === J(['r1', 'r3']), [q, day.map(d => d.id)]);
 
+  // ---- for the statistics: one value per day (closest to noon), missing days, delete ----
+  const stampAt = (d, h, m) => FB.firestore.Timestamp.fromDate(new Date(2026, 0, d, h, m || 0));
+  const mk = (d, h, m, manual, web) => ({ recordedAt: stampAt(d, h, m), manual: manual || {}, web: web || null });
+  const webT = v => ({ fields: { tempC: { value: v, source: 'lac', publishable: true } } });
+  const day15 = [mk(15, 8, 0, { tempC: -20 }), mk(15, 11, 30, { tempC: -12 }), mk(15, 16, 0, { tempC: -9 })];
+  const dv = WS.dailyValues(day15, 'tempC');
+  ok('one value per day: among the day\'s readings the one closest to noon (11:30 beats 08:00 and 16:00)', dv.length === 1 && dv[0].day === '2026-01-15' && dv[0].value === -12, dv);
+  ok('closest to noon counts both sides of noon: 12:20 beats 11:30 only when nearer', WS.dailyValues([mk(15, 11, 30, { tempC: 1 }), mk(15, 12, 20, { tempC: 2 })], 'tempC')[0].value === 2 && WS.dailyValues([mk(15, 11, 50, { tempC: 1 }), mk(15, 12, 20, { tempC: 2 })], 'tempC')[0].value === 1, null);
+  const mixed = WS.dailyValues([mk(16, 9, 0, { newSnowCm: 5 }), mk(16, 12, 0, { tempC: -3 }), mk(14, 10, 0, { tempC: -5 }), mk(14, 12, 0, {}, webT(-4))], 'tempC');
+  ok('per measure: a reading without that measure is skipped (the noon one has no snow, so the 09:00 snow counts); days oldest first; a web value counts when nothing was typed',
+    J(WS.dailyValues([mk(16, 9, 0, { newSnowCm: 5 }), mk(16, 12, 0, { tempC: -3 })], 'newSnowCm').map(x => [x.day, x.value])) === J([['2026-01-16', 5]]) && J(mixed.map(x => [x.day, x.value, x.source])) === J([['2026-01-14', -4, 'lac'], ['2026-01-16', -3, 'manual']]), mixed);
+  ok('a value of 0 is a value (no snow that day)', WS.dailyValues([mk(15, 12, 0, { newSnowCm: 0 })], 'newSnowCm')[0].value === 0, null);
+  ok('nothing for the measure = no point', WS.dailyValues([mk(15, 12, 0, { tempC: 1 })], 'snowDepthCm').length === 0 && WS.dailyValues([], 'tempC').length === 0, null);
+  const lastDay = new Date(2026, 0, 20);
+  const missing = WS.missingDays([mk(20, 8), mk(18, 9), mk(10, 9), mk(1, 9)], lastDay, 20);   // 20 days: 1 Jan .. 20 Jan, the last day included
+  ok('missing days: the 20 days ending on the given day, those without any reading, oldest first', missing.length === 16 && missing[0] === '2026-01-02' && !missing.includes('2026-01-20') && !missing.includes('2026-01-18') && !missing.includes('2026-01-10') && !missing.includes('2026-01-01') && missing.includes('2026-01-19'), missing);
+  ok('missing days: all of them when there is no reading; none when every day has one', WS.missingDays([], lastDay, 20).length === 20 && WS.missingDays(Array.from({ length: 20 }, (_, i) => mk(1 + i, 9)), lastDay, 20).length === 0, null);
+  const deleted = []; await WS.remove({ collection: n => ({ doc: id => ({ delete: async () => { deleted.push([n, id]); } }) }) }, 'abc');
+  ok('delete: removes that reading from weather_records', J(deleted) === J([['weather_records', 'abc']]), deleted);
   document.getElementById('out').textContent = out.join('\n');
 })().catch(e => { document.getElementById('out').textContent = 'HARNESS ERROR ' + e.stack; });
 </script>

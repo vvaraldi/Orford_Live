@@ -1,0 +1,62 @@
+<pre id="out" style="position:fixed;left:0;bottom:0;background:#fff;color:#000;font-size:11px;z-index:99999;max-height:40vh;overflow:auto">running...</pre>
+<script>
+// The Météo Admin page: the season's statistics (one value per day, the reading closest to noon; days without a
+// reading in the last 20 days) and, for the system admin, the data management tab (no photos, so no orphan tool).
+// The mock holds two readings on 15 Jan 2026 (W1 at 12:00 typed + web, W2 at 09:00 web only), in the ski season 2025-2026.
+(async () => {
+  const out = []; const J = JSON.stringify;
+  const ok = (n, c, x) => out.push((c ? 'PASS ' : 'FAIL ') + n + (c ? '' : ' :: ' + J(x)));
+  const wait = ms => new Promise(r => setTimeout(r, ms));
+  const SYS = Q.get('as') === 'system';
+  const ski = NET === 'ski';
+  const $ = id => document.getElementById(id);
+  const click = el => el.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
+  await wait(1800);
+  ok('no script errors on load', window.__errs.length === 0, window.__errs);
+
+  const cards = () => Object.fromEntries([...document.querySelectorAll('#da-cards .stat-card')].map(c => [c.querySelector('.stat-card__label').textContent, { v: c.querySelector('.stat-card__value').textContent, sub: (c.querySelector('.stat-card__sub') || {}).textContent }]));
+  const chart = id => Chart.getChart($('da-chart-' + id));
+  const tabs = () => [...document.querySelectorAll('.tab-btn')].map(b => b.textContent.trim());
+  const c = cards();
+
+  ok('two tabs like the other apps: Statistiques, and Gestion des données for the system admin only', tabs().length === 2 && /Statistiques/.test(tabs()[0]) && ($('da-tab-management').style.display !== 'none') === SYS, [tabs(), $('da-tab-management').style.display]);
+  ok('the page carries the season symbol and the Météo module', document.body.dataset.module === 'meteo' && $('season-icon').textContent === Network.seasonIcon(), $('season-icon').textContent);
+  ok('the season navigator shows the season of the chosen activity', $('da-season-label').textContent === Network.seasonLabel(Network.seasonRange()), $('da-season-label').textContent);
+  ok('the statistics are drawn: 8 cards, 3 charts, the ranking', Object.keys(c).length === 8 && document.querySelectorAll('#da-charts .chart-section').length === 3 && document.querySelectorAll('#da-rankings .data-table').length === 1, Object.keys(c));
+
+  if (ski) {
+    // winter 2025-2026 holds the two readings of 15 January
+    ok('winter: 2 readings on 1 day, out of the 181 days of the season', c['Relevés'].v === '2' && c['Jours avec relevé'].v === '1' && /sur 181 jours/.test(c['Jours avec relevé'].sub), c);
+    ok('temperature: one value per day = the reading closest to noon (W1 at 12:00, typed -12, not the 09:00 web -15)', c['Température moyenne'].v === '-12 °C' && c['Jour le plus froid'].v === '-12 °C' && c['Jour le plus chaud'].v === '-12 °C' && /15 janv/.test(c['Jour le plus froid'].sub), c);
+    ok('snow: cumulated fresh snow (12 cm, 1 day of snow) and the maximum depth at the base (55 cm)', c['Neige fraîche cumulée'].v === '12 cm' && /1 jour\(s\) de neige/.test(c['Neige fraîche cumulée'].sub) && c['Neige au sol maximale'].v === '55 cm', c);
+    ok('temperature chart: one point per day, a line with a °C axis; snow charts: a bar and a line', J(chart('temp').data.labels.length) === '1' && chart('temp').data.datasets[0].data[0] === -12 && chart('temp').config.type === 'line' && chart('snowfall').config.type === 'bar' && chart('snowfall').data.datasets[0].data[0] === 12 && chart('snowdepth').data.datasets[0].data[0] === 55, [chart('temp').data, chart('snowfall').config.type]);
+    ok('ranking: who entered the readings', J([...document.querySelectorAll('#da-ranking-0 tbody tr')].map(tr => [...tr.children].slice(1).map(td => td.textContent)).sort()) === J([['Luc', '1'], ['Marie', '1']]), null);
+  } else {
+    ok('summer 2026 (no reading yet): zero everywhere, "—" for the measures, the charts say there is no data', c['Relevés'].v === '0' && c['Jours avec relevé'].v === '0' && c['Température moyenne'].v === '—' && c['Neige fraîche cumulée'].v === '—' && document.querySelectorAll('#da-charts .chart-empty').length === 3, c);
+  }
+  ok('days without a reading: the 20 days before today, yesterday included (none of them has one here)', c['Jours sans relevé (20 derniers jours)'].v === '20' && /hier compris, sans aujourd'hui/.test(c['Jours sans relevé (20 derniers jours)'].sub), c['Jours sans relevé (20 derniers jours)']);
+
+  if (!SYS) {
+    ok('plain admin: no data management tab, no delete tool drawn', $('da-tab-management').style.display === 'none');
+  } else {
+    const visible = el => !!el && el.offsetParent !== null;
+    click($('da-tab-management')); await wait(300);
+    ok('Gestion des données opens: the delete tool is there, no orphan tool (no photos in this app)', visible($('da-pane-management')) && visible($('da-delete-before')) && !document.querySelector('#da-orphans [data-role=scan]') && !document.querySelector('#da-orphans *'), $('da-orphans').innerHTML.slice(0, 80));
+    const stat = label => { const el = [...document.querySelectorAll('#da-overview .db-stat')].find(e => e.querySelector('.db-stat__label').textContent === label); return el && el.querySelector('.db-stat__value').textContent; };
+    ok('overview: all the readings of both seasons, first and last day, how many carry web values', stat('Relevés') === '2' && /15 janv/.test(stat('Premier relevé')) && /15 janv/.test(stat('Dernier relevé')) && stat('Avec valeurs du web') === '2' && /hiver et été/.test($('da-overview-desc').textContent), [...document.querySelectorAll('#da-overview .db-stat')].map(e => e.textContent));
+    ok('the delete tool speaks of the weather in both seasons, with no mention of photos or of one activity', /relevés météo, hiver et été/.test($('da-delete-desc').textContent) && !/activité/.test($('da-delete-desc').textContent) && $('da-delete-photos').hidden === true, $('da-delete-desc').textContent);
+
+    const clickBackup = HTMLAnchorElement.prototype.click; HTMLAnchorElement.prototype.click = function () { window.__backups = (window.__backups || []).concat(this.download || ''); };
+    URL.createObjectURL = () => 'blob:test'; URL.revokeObjectURL = () => {};
+    const confirms = []; window.confirm = m => { confirms.push(m); return true; };
+    $('da-delete-before').value = '2026-02-01'; $('da-delete-before').dispatchEvent(new Event('change')); await wait(400);
+    ok('delete old: the preview counts the 2 readings before the date', $('da-delete-count').textContent === '2' && $('da-delete-btn').disabled === false, [$('da-delete-count').textContent]);
+    window.__writes.length = 0;
+    click($('da-delete-btn')); await wait(800);
+    const deletes = window.__writes.filter(x => x[2] === 'delete');
+    ok('delete old: confirmed once (the message says both seasons), a backup file is offered, then each reading is deleted', confirms.length === 1 && /\(hiver et été\)/.test(confirms[0]) && !/activité/.test(confirms[0]) && (window.__backups || []).some(n => /^backup-meteo-/.test(n)) && J(deletes.map(d => [d[0], d[1]]).sort()) === J([['weather_records', 'W1'], ['weather_records', 'W2']]), [confirms, window.__backups, deletes]);
+    HTMLAnchorElement.prototype.click = clickBackup;
+  }
+  document.getElementById('out').textContent = out.join('\n');
+})().catch(e => { document.getElementById('out').textContent = 'HARNESS ERROR ' + e.stack; });
+</script>

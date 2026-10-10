@@ -75,6 +75,17 @@ Public JSON, no key, readable from a page (cross-site calls allowed):
 
 ## Progress
 
+- **Step 4 - Admin: DONE (2026-10-09)** - `pages/meteo-stats.html` (nav entry "Admin", admins only) on the shared engine
+  (`js/admin/data-admin.js`: new optional `series` chart kind, `orphanApp` optional, `deleteOld.scope/description`;
+  the other three Admin pages are unchanged). Statistiques by season of the activity chosen in the header: 8 cards
+  (readings, days with a reading out of the days so far, mean / coldest / warmest day, cumulated fresh snow, max snow
+  at the base, days without a reading in the last 20 - ending YESTERDAY, today is not over), 3 charts (temperature
+  line, fresh-snow bars, snow-at-base line; ONE value per day = the reading closest to noon that has that measure),
+  and a ranking of who entered readings. Gestion des données (system admin): overview, delete old readings (both
+  seasons) with an automatic JSON backup; no orphan tool (no photos). A single reading is deleted from the entry
+  page by the system admin only. No separate "Gestion" page: readings are already listed and corrected on the entry
+  page (can be added if wanted).
+
 - **Step 3 - Entry page: DONE (2026-10-09)** - `pages/meteo-report.html`: date and time (default now), place,
   a button "Charger les données d'Environnement Canada" (by hand; reads the stations for the CHOSEN time), 13
   measures each with the web value + its station and observation time beside a BLANK typed input, a "↺" to take back

@@ -305,8 +305,9 @@ const APP_CONFIG = {
     meteo: {
       title: 'Météo',
       items: [
-        { id: 'meteo-report', label: 'Relevés', icon: '🌡️', href: 'pages/meteo-report.html' }
-        // the Gestion / Admin entries (admin: true) come with their pages
+        { id: 'meteo-report', label: 'Relevés', icon: '🌡️', href: 'pages/meteo-report.html' },
+        { id: 'meteo-stats', label: 'Admin', icon: '⚙️', href: 'pages/meteo-stats.html', admin: true }
+        // no separate "Gestion": readings are listed, corrected (and deleted by the system admin) on the Relevés page
       ]
     },
     support: {

@@ -11,12 +11,15 @@
  *     fetch({ start, end })   -> Promise<records[]>: the activity's records of the season, normalised
  *     onReady(userData)       -> optional, awaited before the first fetch (load sectors...)
  *     cards:    [{ label, value(recs), sub(recs)?, highlight? }]
- *     charts:   [{ id, title, kind: 'weekly' | 'bar' | 'doughnut', label?, data(recs) -> [[name, n], ...],
+ *     charts:   [{ id, title, kind: 'weekly' | 'bar' | 'doughnut' | 'series', label?, data(recs) -> [[name, n], ...],
  *                  limit?, half?, tall?, color? }]       (consecutive `half` charts share a row)
+ *               kind 'series' = values in the order given (a value per day), negatives allowed, no sorting:
+ *               { type?: 'line' (default) | 'bar', unit?, beginAtZero? }
  *     rankings: [{ title, columns: ['Name', 'Count', ...], rows(recs) -> [[name, n, ...], ...] }]
  *     management: { overview() -> [{ label, value }],
- *                   deleteOld: { noun, find(beforeDate) -> [{ collection, id, data }], remove(item), backupName },
- *                   orphanApp: 'infraction' | 'signalisation' | 'maintenance' }
+ *                   deleteOld: { noun, find(beforeDate) -> [{ collection, id, data }], remove(item), backupName,
+ *                                scope? (words for "which activity", default: the current activity) },
+ *                   orphanApp?: 'infraction' | 'signalisation' | 'maintenance' (none: an app without photos) }
  *   })
  * A record needs `date` (a Date) for the weekly chart.
  *
@@ -131,7 +134,7 @@ const DataAdmin = (function () {
             </div>
           </div>
           <div id="da-delete-preview" style="margin-top: 1rem; display: none;">
-            <p style="color: var(--color-danger); font-weight: 500;"><span id="da-delete-count">0</span> enregistrement(s) seront supprimé(s) avec leurs photos.</p>
+            <p style="color: var(--color-danger); font-weight: 500;"><span id="da-delete-count">0</span> enregistrement(s) seront supprimé(s)<span id="da-delete-photos"> avec leurs photos</span>.</p>
           </div>
         </div>
         <div id="da-orphans"></div>
@@ -197,6 +200,7 @@ const DataAdmin = (function () {
       const keys = Object.keys(weeks).sort();
       return keys.map(k => [new Date(k).toLocaleDateString('fr-CA', { month: 'short', day: 'numeric' }), weeks[k]]);
     }
+    if (def.kind === 'series') return def.data(records);
     const pairs = def.data(records).filter(p => p[1] > 0).sort((a, b) => b[1] - a[1]);
     return def.limit ? pairs.slice(0, def.limit) : pairs;
   }
@@ -236,6 +240,13 @@ const DataAdmin = (function () {
       if (def.kind === 'weekly') {
         charts[def.id] = new Chart(ctx, { type: 'line', data: { labels, datasets: [{ label: def.label || 'Total', data: values, borderColor: def.color || '#3b82f6', backgroundColor: 'rgba(59, 130, 246, 0.1)', fill: true, tension: 0.3 }] },
           options: Object.assign({ plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true, ticks: { stepSize: 1 } } } }, base) });
+      } else if (def.kind === 'series') {
+        const bar = def.type === 'bar';
+        charts[def.id] = new Chart(ctx, { type: bar ? 'bar' : 'line',
+          data: { labels, datasets: [Object.assign({ label: def.label || 'Valeur', data: values, borderColor: def.color || '#3b82f6', backgroundColor: bar ? (def.color || '#3b82f6') : 'rgba(59, 130, 246, 0.1)' },
+            bar ? {} : { fill: false, tension: 0.2, pointRadius: 2, spanGaps: true })] },
+          options: Object.assign({ plugins: { legend: { display: false }, tooltip: { callbacks: { label: c => `${def.label || 'Valeur'} : ${c.parsed.y}${def.unit ? ' ' + def.unit : ''}` } } },
+            scales: { y: { beginAtZero: def.beginAtZero !== false && bar ? true : !!def.beginAtZero, title: { display: !!def.unit, text: def.unit || '' } }, x: { ticks: { maxTicksLimit: 14, autoSkip: true } } } }, base) });
       } else if (def.kind === 'doughnut') {
         charts[def.id] = new Chart(ctx, { type: 'doughnut', data: { labels, datasets: [{ data: values, backgroundColor: PALETTE }] },
           options: Object.assign({ plugins: { legend: { position: 'bottom' } } }, base) });
@@ -293,7 +304,7 @@ const DataAdmin = (function () {
     const before = beforeDate();
     const spec = cfg.management.deleteOld;
     if (!before) return;
-    if (!window.confirm(`Êtes-vous sûr de vouloir supprimer ${spec.noun} de l'activité « ${Network.config().name} » avant le ${before.toLocaleDateString('fr-CA')}?\n\nUn fichier de sauvegarde sera téléchargé automatiquement.\n\nCette action est IRRÉVERSIBLE.`)) return;
+    if (!window.confirm(`Êtes-vous sûr de vouloir supprimer ${spec.noun} ${spec.scope || `de l'activité « ${Network.config().name} »`} avant le ${before.toLocaleDateString('fr-CA')}?\n\nUn fichier de sauvegarde sera téléchargé automatiquement.\n\nCette action est IRRÉVERSIBLE.`)) return;
     try {
       message('Création de la sauvegarde...', 'success');
       const items = await spec.find(before);
@@ -336,14 +347,19 @@ const DataAdmin = (function () {
       requiredRoles: ['admin', 'system_admin'],
       onAuthenticated: async (userData) => {
         // (needs the activity, known only now)
-        $('da-delete-desc').textContent = `Supprime ${cfg.management.deleteOld.noun} et leurs photos avant la date spécifiée, pour l'activité « ${Network.config().name} » uniquement. Un fichier de sauvegarde sera téléchargé automatiquement avant la suppression.`;
+        const deleteSpec = cfg.management.deleteOld;
+        if (!cfg.management.orphanApp) $('da-delete-photos').hidden = true;   // no photos in this app
+        $('da-delete-desc').textContent = deleteSpec.description
+          || `Supprime ${deleteSpec.noun} et leurs photos avant la date spécifiée, pour l'activité « ${Network.config().name} » uniquement. Un fichier de sauvegarde sera téléchargé automatiquement avant la suppression.`;
         if (cfg.notice) { const text = cfg.notice(); if (text) $('da-notice').innerHTML = `<div class="alert alert-warning show">${escapeHtml(text)}</div>`; }
         // Data management first, and on its own: a problem drawing the statistics (a chart script that
         // did not load, say) must never hide the clean-up tools. Deleting is reserved to the system admin
         // (the Firestore and Storage rules say the same).
         if (userData.role === 'system_admin') {
           $('da-tab-management').style.display = '';
-          if (typeof StorageCleanup === 'undefined') {
+          if (!cfg.management.orphanApp) {
+            // an app without photos (Météo): no orphan clean-up
+          } else if (typeof StorageCleanup === 'undefined') {
             $('da-orphans').innerHTML = '<div class="alert alert-danger show">Outil de nettoyage indisponible : le fichier js/services/storage-cleanup.js n\'est pas chargé (déploiement incomplet ou cache : rechargez la page avec Ctrl+F5).</div>';
           } else {
             StorageCleanup.mount($('da-orphans'), cfg.management.orphanApp, { onDone: loadOverview });

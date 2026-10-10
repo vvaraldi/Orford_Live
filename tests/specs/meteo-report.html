@@ -16,6 +16,9 @@
   const rowsText = () => [...document.querySelectorAll('#records-tbody tr')].map(tr => tr.textContent.replace(/\s+/g, ' ').trim());
   await wait(500);
   ok('no script errors on load', window.__errs.length === 0, window.__errs);
+  const AS = Q.get('as') || 'admin', SYS = AS === 'system';
+  const adminLink = document.querySelector('header .nav__link--admin');
+  ok('navigation: an Admin entry for the Météo Admin page, shown to admins and system admins, hidden to other users', !!adminLink && /meteo-stats\.html$/.test(adminLink.getAttribute('href')) && (getComputedStyle(adminLink).display !== 'none') === (AS !== 'inspector'), [adminLink && adminLink.getAttribute('href'), adminLink && getComputedStyle(adminLink).display]);
 
   // ---- the form on opening ----
   ok('13 measures, each with its label and unit, a web cell and a typed input', document.querySelectorAll('.wx-row').length === 13 && /Neige fraîche \(24 h\)\s*\(cm\)/.test(text('fields-grid')) && /Température ressentie/.test(text('fields-grid')) && /Rafales/.test(text('fields-grid')), text('fields-grid').slice(0, 200));
@@ -38,6 +41,7 @@
   document.querySelector('[data-edit="W1"]').click(); await wait(100);
   ok('edit: the form is filled with the typed values, the time and the comment', /Modifier le relevé de 12 h 00/.test(text('form-title')) && $('in-tempC').value === '-12' && $('in-newSnowCm').value === '12' && $('in-cloudCover').value === 'partly' && $('in-windKmh').value === '' && $('comment').value === 'Belle neige' && $('save-btn').textContent === 'Enregistrer la modification', [text('form-title'), $('in-tempC').value]);
   ok('edit: the web values are the ones saved with the reading (with their source), not read again', /-11,5 °C/.test(text('web-tempC')) && /Lac Memphrémagog/.test(text('web-tempC')) && /aéroport de Sherbrooke \(estimation\)/.test(text('web-pressureKpa')) && $('fetch-web-btn').disabled && $('cancel-btn').style.display !== 'none', [text('web-tempC'), text('web-pressureKpa')]);
+  ok('edit: the delete button is for the system admin only', ($('delete-btn').style.display !== 'none') === SYS, $('delete-btn').style.display);
   ok('edit: "↺" (back to the web value) only where something was typed AND the web has a value', document.querySelector('[data-restore="tempC"]').classList.contains('is-visible') && !document.querySelector('[data-restore="newSnowCm"]').classList.contains('is-visible') && !document.querySelector('[data-restore="windKmh"]').classList.contains('is-visible'), null);
   document.querySelector('[data-restore="tempC"]').click();
   ok('"↺" empties my value so the web value applies again', $('in-tempC').value === '' && !document.querySelector('[data-restore="tempC"]').classList.contains('is-visible'), null);
@@ -101,6 +105,21 @@
   setListDay('2026-01-15'); await wait(200);
   $('day-prev').click(); await wait(200);
   ok('◀ shows the day before (empty), ▶ comes back, "Aujourd\'hui" goes to today', $('list-date').value === '2026-01-14' && rowsText().length === 0 && ($('day-next').click(), await wait(200), $('list-date').value === '2026-01-15' && rowsText().length === 2) && ($('day-today').click(), await wait(200), $('list-date').value === (() => { const d = new Date(); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); })()), [$('list-date').value]);
+
+  // ---- deleting a reading: system admin only, after a confirmation ----
+  if (SYS) {
+    setListDay('2026-01-15'); await wait(300);
+    document.querySelector('[data-edit="W2"]').click(); await wait(100);
+    const confirms = []; window.confirm = m => { confirms.push(m); return true; };
+    window.__writes.length = 0;
+    $('delete-btn').click(); await wait(400);
+    const del = window.__writes.filter(w => w[0] === 'weather_records' && w[2] === 'delete');
+    ok('system admin: "Supprimer ce relevé" asks once, deletes that reading only, resets the form and refreshes the list', confirms.length === 1 && del.length === 1 && del[0][1] === 'W2' && /Nouveau relevé/.test(text('form-title')) && !rowsText().some(r => /Luc/.test(r)) && rowsText().length === 1 && $('delete-btn').style.display === 'none', [confirms, del, rowsText()]);
+  } else {
+    setListDay('2026-01-15'); await wait(300);
+    document.querySelector('[data-edit="W1"]').click(); await wait(100);
+    ok('other users cannot delete: the button stays hidden while correcting a reading', $('delete-btn').style.display === 'none' && window.__writes.filter(w => w[2] === 'delete').length === 0, $('delete-btn').style.display);
+  }
 
   document.getElementById('out').textContent = out.join('\n');
 })().catch(e => { document.getElementById('out').textContent = 'HARNESS ERROR ' + e.stack; });

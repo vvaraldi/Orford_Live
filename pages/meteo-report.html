@@ -95,6 +95,7 @@
           <div class="wx-errors" id="form-errors" role="alert"></div>
         </div>
         <div class="section-card__footer">
+          <button type="button" class="btn btn-danger" id="delete-btn" style="display:none; margin-right:auto;">🗑️ Supprimer ce relevé</button>
           <button type="button" class="btn btn-secondary" id="cancel-btn" style="display:none;">Annuler la modification</button>
           <button type="button" class="btn btn-secondary" id="reset-btn">Réinitialiser</button>
           <button type="submit" class="btn btn-primary" id="save-btn">Enregistrer</button>
@@ -147,6 +148,7 @@
     let listDay = startOfDay(new Date());
     let records = [];
     let saving = false;
+    let isSystemAdmin = false;   // only the system admin deletes a reading (the rules say the same)
 
     const el = id => document.getElementById(id);
     const SOURCE_LABEL = { lac: 'Lac Memphrémagog', sherbrooke: 'aéroport de Sherbrooke (estimation)', calc: 'calculée' };
@@ -297,6 +299,7 @@
       el('form-title').textContent = '📝 Nouveau relevé';
       el('save-btn').textContent = 'Enregistrer';
       el('cancel-btn').style.display = 'none';
+      el('delete-btn').style.display = 'none';
       el('fetch-web-btn').disabled = false;
       setWebStatus('Les valeurs du web s\'affichent ici; vos valeurs restent vides tant que vous ne les saisissez pas.');
       setWebNotes([]);
@@ -351,12 +354,27 @@
       el('form-title').textContent = `✏️ Modifier le relevé de ${clock(toDate(record.recordedAt))}`;
       el('save-btn').textContent = 'Enregistrer la modification';
       el('cancel-btn').style.display = '';
+      el('delete-btn').style.display = isSystemAdmin ? '' : 'none';
       el('fetch-web-btn').disabled = true;
       setWebStatus(webResult ? `Valeurs d'Environnement Canada conservées telles que lues le ${toDate(record.web.fetchedAt).toLocaleDateString('fr-CA')} à ${clock(ms(record.web.fetchedAt))}.` : 'Ce relevé n\'a pas de valeurs du web.');
       setWebNotes([]);
       clearErrors();
       showWebValues();
       el('weather-form').scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+
+    async function deleteReading() {
+      if (!editing || !isSystemAdmin) return;
+      if (!window.confirm('Supprimer ce relevé météo ? Cette action est irréversible.')) return;
+      try {
+        await WS.remove(db, editing.id);
+        showMessage('Relevé supprimé.', 'success');
+        resetForm();
+        await loadList();
+      } catch (err) {
+        console.error('Deleting the reading:', err);
+        showMessage('Erreur lors de la suppression du relevé.', 'error');
+      }
     }
 
     // ---- the day's list ----
@@ -420,6 +438,7 @@
       el('fetch-web-btn').addEventListener('click', loadWeb);
       el('reset-btn').addEventListener('click', resetForm);
       el('cancel-btn').addEventListener('click', resetForm);
+      el('delete-btn').addEventListener('click', deleteReading);
       el('recorded-at').addEventListener('change', () => { clearErrors(); warnIfTimeMoved(); });
       el('comment').addEventListener('input', clearErrors);
       el('day-prev').addEventListener('click', () => moveDay(-1));
@@ -434,7 +453,11 @@
         requireAuth: true,
         requiredPermission: 'allowMeteo',
         permissionDefault: false,
-        onAuthenticated: async () => {
+        onAuthenticated: async (userData) => {
+          isSystemAdmin = userData.role === 'system_admin';
+          if (userData.role === 'admin' || isSystemAdmin) {
+            document.querySelectorAll('.nav__link--admin, .mobile-nav__link--admin').forEach(link => link.style.display = '');
+          }
           resetForm();
           await loadList();
         }
