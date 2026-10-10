@@ -35,7 +35,7 @@
   let body = await openAt(P.day ? new Date(2026, 0, 15) : new Date(2026, 0, 15, 12, 30));
   ok('the weather box is the FIRST thing in the report view, and the report is still all there', !!box(body) && body.firstElementChild === box(body) && body.children.length > 2, [body.children.length, body.firstElementChild && body.firstElementChild.className]);
   ok('it shows the day and time of the reading ' + (P.day ? '(for a day: around noon)' : 'and how far it is from the report'), /relevé du 15 janvier 2026 à 12 h 00/.test(text(body)) && (P.day ? /\(au moment de midi\)/.test(text(body)) : /\(30 min avant le rapport\)/.test(text(body))), text(body));
-  ok('the values: temperature with the feels-like, wind with its direction, snow, clouds', /Température -12 °C \(ressentie -19 °C\)/.test(text(body)) && /Vent 20 km\/h ONO/.test(text(body)) && /Neige fraîche 24 h 12 cm/.test(text(body)) && /Neige au sol 55 cm/.test(text(body)) && /Nuages Partiellement nuageux/.test(text(body)), text(body));
+  ok('the values: temperature with the feels-like, wind with its direction, snow, clouds', /Température -12 °C \(ressentie -20 °C\)/.test(text(body)) && /Vent 20 km\/h ONO/.test(text(body)) && /Neige fraîche 24 h 12 cm/.test(text(body)) && /Neige au sol 55 cm/.test(text(body)) && /Nuages Partiellement nuageux/.test(text(body)), text(body));
   ok('an airport estimate is marked ≈ and explained', /Pression ≈ 101,2 kPa/.test(text(body)) && /≈ valeur estimée/.test(text(body)), text(body));
   ok('nothing is stored in the report (no write at all just by looking)', window.__writes.length === 0, window.__writes);
 

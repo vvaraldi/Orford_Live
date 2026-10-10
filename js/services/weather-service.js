@@ -268,6 +268,15 @@ const WeatherService = (() => {
       const w = record.web && record.web.fields && record.web.fields[k];
       if (w && w.value !== null && w.value !== undefined && (!publicOnly || w.publishable === true)) out[k] = { value: w.value, source: w.source };
     });
+    // The web feels-like was computed from the WEB temperature. When a different temperature was typed (and no feels-like
+    // typed) it would describe another temperature: it is worked out again from the typed one (wind chill, with the wind
+    // we have), or left out from 20 °C up, where the humidex needs a dew point that is not kept.
+    const typedTemp = record.manual && record.manual.tempC;
+    const typedFeels = record.manual && record.manual.feelsLikeC;
+    if (out.feelsLikeC && out.feelsLikeC.source === 'calc' && typedTemp !== null && typedTemp !== undefined && (typedFeels === null || typedFeels === undefined)) {
+      const feel = typedTemp >= 20 ? null : feelsLike(typedTemp, out.windKmh ? out.windKmh.value : null, null);
+      if (feel === null) delete out.feelsLikeC; else out.feelsLikeC = { value: feel, source: 'calc' };
+    }
     return out;
   }
 

@@ -75,6 +75,18 @@ Public JSON, no key, readable from a page (cross-site calls allowed):
 
 ## Progress
 
+- **Step 7 - Checks and final review: DONE (2026-10-09)** - the checklist for the REAL site is in `tests/README.md`
+  ("Météo: what the tests cannot prove", 10 steps). Checked from here on the real service after the rules were
+  published: the public address answers **404 "not found"** (rules accept the public read; no reading yet), and its
+  cross-site header answers for any origin (a page on montorford.com can read it). Final review: no leftover debug
+  code, every id used by the pages exists in their markup, the rules file's brackets balance, the 13 measures and the
+  public document's keys match between the app and the rules. One real fix: the web feels-like was computed from the
+  WEB temperature; with a different TYPED temperature it described another temperature. It is now worked out again
+  from the typed one (wind chill, with the wind kept), and left out from 20 °C up (a humidex needs a dew point that is
+  not kept); a typed feels-like always wins. Open for later (not done on purpose): old reports (before the app)
+  show a quiet "Aucun relevé météo" line and cost one read each when opened; an option would be to skip reports older
+  than the first reading (a date in the config); the rules cannot be run here, so the checklist is the proof.
+
 - **Small additions (2026-10-09, evening):** (3.4) Administration > Données: a **Météo** option in the data export
   (JSON: the readings as stored with readable dates; CSV `_Meteo.csv`: one row per reading, for each measure the
   typed value `<mesure>` and the web value `<mesure>_web`, who entered it; both seasons, no activity filter).

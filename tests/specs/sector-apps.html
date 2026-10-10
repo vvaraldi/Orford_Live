@@ -263,13 +263,20 @@
     // a report of this view (an earlier test may have moved the mock's own report to the other view)
     const first = { id: 'SIGDUR', status: 'ouverte', sector: bike ? 'sentiers-velo' : 'mont-orford', trail: bike ? 'Piste verte' : 'Adams', trailId: bike ? 'bike_1' : 'trail_2', comments: '', photos: [], resolved: false, archived: false, network: bike ? 'bike' : 'ski', createdAt: T(Date.now()), inspectorName: 'Test' };
     reportsData.push(first);
+    const durSel = () => document.getElementById('admin-duration');
+    const updatesNow = () => window.__writes.filter(x => x[0] === 'signalisations' && x[2] === 'update');
+    window.__writes.length = 0;
     first.duration = 'temporary'; openDetail(first.id);
-    ok('Gestion: the report\'s detail shows a temporary report as such', /Temporaire/.test(document.getElementById('modal-body').textContent) && /Durée : temporaire \(due à une condition temporaire\)/.test(document.getElementById('modal-body').textContent), document.getElementById('modal-body').textContent.slice(0, 160));
+    ok('Gestion: a temporary report shows "Temporaire" and its selector is on Temporaire', /Temporaire/.test(document.getElementById('modal-body').textContent) && durSel().value === 'temporary' && /due à une condition temporaire/.test(durSel().options[1].textContent), durSel().value);
     delete first.duration; openDetail(first.id);
-    ok('Gestion: a report without the field is permanent', /Durée : permanente/.test(document.getElementById('modal-body').textContent) && !/badge-warning/.test(document.getElementById('modal-body').innerHTML), null);
-    closeModal();
+    ok('Gestion: a report without the field is permanent (selector on Permanente, no badge)', durSel().value === 'permanent' && !/badge-warning/.test(document.getElementById('modal-body').innerHTML), durSel().value);
+    // the admin swaps permanent -> temporary -> permanent
+    durSel().value = 'temporary'; await saveChanges(); await wait(200);
+    ok('Gestion: swapping to Temporaire is saved with the report (and the activity is never sent)', updatesNow().length === 1 && updatesNow()[0][3].duration === 'temporary' && !('network' in updatesNow()[0][3]), updatesNow());
+    first.duration = 'temporary'; reportsData.push(first); window.__writes.length = 0; openDetail(first.id);
+    durSel().value = 'permanent'; await saveChanges(); await wait(200);
+    ok('Gestion: swapping back to Permanente is saved', updatesNow().length === 1 && updatesNow()[0][3].duration === 'permanent', updatesNow());
   }
-
   document.getElementById('out').textContent = out.join('\n');
 })().catch(e => { document.getElementById('out').textContent = 'HARNESS ERROR ' + e.stack; });
 </script>

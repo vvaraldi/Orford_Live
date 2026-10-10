@@ -72,6 +72,27 @@ DOM) - retry with `-Budget 20000` or so, not a sign of a real bug.
 | `specs/meteo-stats.html` | `meteo-stats.html` | The Admin page: season statistics, days without a reading, the "weather in reports" switch, data management. |
 | `specs/weather-in-reports.html` | the four Gestion pages (`wx-reports-*`) | The weather box in an opened inspection / infraction / signalisation / Entretien log. |
 
+## Météo: what the tests cannot prove - try these on the real site
+
+The tests play Firebase and Environment Canada with a simulated version of each. After deploying the pages and
+publishing `assets/Rules for Firebase.txt`, try this (about 10 minutes). Tell me what you see if a step differs.
+
+| # | Do | Expected |
+|---|---|---|
+| 1 | Administration > Utilisateurs: tick **Météo** on your own profile, then open the portal. | A yellow **Météo** tile (snowflake in the ski season, sun in the bike season). |
+| 2 | Open Météo > Relevés. Click **Charger les données d'Environnement Canada**. | Values appear beside empty "Votre valeur" boxes: temperature, humidity, wind and gusts from *Lac Memphrémagog*, pressure / clouds / visibility marked *aéroport de Sherbrooke (estimation)*, a feels-like marked *calculée*, with the time of the observation. Nothing is typed for you. |
+| 3 | Type a snow depth and a fresh-snow value, add a comment, **Enregistrer**. | A green notice "Relevé enregistré.", the form empties, the reading is in the day's list with ✎ (typed) and 🌐 (web) marks. |
+| 4 | Click **Modifier** on it, change the temperature, save. | "Relevé modifié."; the web values are unchanged; the feels-like follows your temperature. |
+| 5 | Open the public status page (`public-status.html`). | A **Météo** panel above the map with the day and time of the reading, no name, no airport values (pressure, clouds, visibility are not shown unless you typed them). |
+| 6 | From any other website's page (or a browser console on it): `fetch('https://firestore.googleapis.com/v1/projects/trail-inspection/databases/(default)/documents/weather_public/latest').then(r => r.json()).then(console.log)` | The reading as Firestore's typed JSON. **Checked on 2026-10-09 before any reading existed: HTTP 404 "not found" (not 403) and the cross-site header answers for any origin.** |
+| 7 | Météo > Admin (as an admin): the **Afficher la météo dans les rapports** box; open a report in Inspections / Infractions / Signalisations / Entretien > Gestion. | The box is checked by default: the report shows a yellow-edged **Météo** box with the nearest reading, its day and time ("30 min avant le rapport"). Untick it, wait up to 10 minutes (or open a private window), reopen a report: no box. |
+| 8 | Météo > Admin > Statistiques, with a few days of readings. | Cards and three charts (temperature, fresh snow, snow at the base): one value per day, the reading closest to noon; "Jours sans relevé" counts the last 20 days before today. |
+| 9 | As **system admin**: delete a reading with the 🗑️ on its row, then check the public panel. | "Relevé supprimé."; the public panel shows the previous reading (or disappears when none is left). As a plain admin or inspector there is no 🗑️. |
+| 10 | Administration > Données: export with **Météo** ticked (CSV and JSON). | A `…_Meteo.csv` with one row per reading (`tempC`, `tempC_web`, …) and a JSON with `weatherRecords`. |
+
+If steps 2 to 4 fail with a permission message, the rules are not published (or not the current file). If step 5
+shows nothing, open the browser console on the public page: a "permission" message means the `weather_public` rule.
+
 ## The volunteer limits: what the tests cannot prove
 
 `volunteer-limits.html` runs the page logic against a JavaScript transcription of the rules

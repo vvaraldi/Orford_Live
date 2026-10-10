@@ -34,7 +34,7 @@
   ok('the day lists its two readings, oldest first, with who entered them', rows.length === 2 && /^09 h 00/.test(rows[0]) && /^12 h 00/.test(rows[1]) && /Luc/.test(rows[0]) && /Marie/.test(rows[1]), rows);
   ok('W1: typed values marked ✎ (temperature, snow), web values marked 🌐 (wind with direction and gusts); sky from the typed clouds; comment shown',
     /-12 °C✎/.test(rows[1]) && /20 km\/h🌐 ONO, rafales 35 km\/h🌐/.test(rows[1]) && /frais 12 cm✎ · base 55 cm✎/.test(rows[1]) && /Partiellement nuageux✎/.test(rows[1]) && /Belle neige/.test(rows[1]), rows[1]);
-  ok('W1: the feels-like is shown beside the temperature when it differs (web value)', /\(ressenti -19 °C🌐\)/.test(rows[1]), rows[1]);
+  ok('W1: the feels-like is shown beside the temperature when it differs (web value)', /\(ressenti -20 °C🌐\)/.test(rows[1]), rows[1]);
   ok('W2: web values only (🌐), no snow, no sky', /-15 °C🌐/.test(rows[0]) && !/✎/.test(rows[0]), rows[0]);
 
   // ---- correcting a reading ----

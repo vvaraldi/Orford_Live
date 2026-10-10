@@ -115,6 +115,16 @@
   ok('public values: typed and lake values only; airport values (pressure, clouds, visibility) are left out', pub.tempC.source === 'manual' && pub.humidityPct.source === 'lac' && pub.pressureKpa === undefined && pub.cloudCover === undefined && pub.visibilityKm === undefined, pub);
   ok('a typed value can be undone: with null the web value comes back', WS.effectiveValues({ manual: { tempC: null }, web: r.web }).tempC.value === 8.4, null);
 
+  // ---- the web feels-like follows a TYPED temperature ----
+  const calcWeb = (temp, wind) => ({ fields: { tempC: { value: temp, source: 'lac', publishable: true }, windKmh: { value: wind, source: 'lac', publishable: true }, feelsLikeC: { value: WS.feelsLike(temp, wind, null), source: 'calc', publishable: true } } });
+  const feelOf = rec2 => { const e = WS.effectiveValues(rec2); return e.feelsLikeC && e.feelsLikeC.value; };
+  ok('feels-like: web values only = the web feels-like (-11.5 °C, 20 km/h = -20)', feelOf({ manual: {}, web: calcWeb(-11.5, 20) }) === -20, feelOf({ manual: {}, web: calcWeb(-11.5, 20) }));
+  ok('feels-like: a temperature typed beside web values = worked out again from the TYPED temperature (-20 °C, wind 20 = -30)', feelOf({ manual: { tempC: -20 }, web: calcWeb(-11.5, 20) }) === -30, feelOf({ manual: { tempC: -20 }, web: calcWeb(-11.5, 20) }));
+  ok('feels-like: typed temperature of 20 °C or more = left out (a humidex needs a dew point that is not kept)', feelOf({ manual: { tempC: 24 }, web: calcWeb(8, 10) }) === undefined, feelOf({ manual: { tempC: 24 }, web: calcWeb(8, 10) }));
+  ok('feels-like: a typed feels-like always wins; no typed temperature = unchanged', feelOf({ manual: { tempC: -20, feelsLikeC: -25 }, web: calcWeb(-11.5, 20) }) === -25 && feelOf({ manual: { newSnowCm: 3 }, web: calcWeb(-11.5, 20) }) === -20, null);
+  ok('feels-like: nothing is invented for a typed temperature when the web had none', feelOf({ manual: { tempC: -20 }, web: null }) === undefined, null);
+  ok('feels-like: for the public reading it uses only the wind that may be published (an airport wind is not): no public wind = the temperature itself', (() => { const e = WS.effectiveValues({ manual: { tempC: -20 }, web: { fields: { windKmh: { value: 20, source: 'sherbrooke', publishable: false }, feelsLikeC: { value: -19, source: 'calc', publishable: true } } } }, { publicOnly: true }); return e.feelsLikeC && e.feelsLikeC.value === -20; })(), null);
+
   // ---- Firestore (fake) ----
   const writes = [], queries = [];
   const rows = [
@@ -178,7 +188,7 @@
       visibilityKm: { value: 16, source: 'sherbrooke', observedAt: 0, publishable: false } } }
   };
   const pubDoc = WS.publicDocument(full, FBP);
-  ok('public document: typed values first, then the lake station\'s; the airport\'s (pressure, visibility) are NOT there', pubDoc.measures.tempC === -14 && pubDoc.measures.newSnowCm === 12 && pubDoc.measures.windKmh === 20 && pubDoc.measures.feelsLikeC === -19 && !('pressureKpa' in pubDoc.measures) && !('visibilityKm' in pubDoc.measures), pubDoc.measures);
+  ok('public document: typed values first, then the lake station\'s; the airport\'s (pressure, visibility) are NOT there', pubDoc.measures.tempC === -14 && pubDoc.measures.newSnowCm === 12 && pubDoc.measures.windKmh === 20 && pubDoc.measures.feelsLikeC === -23 && !('pressureKpa' in pubDoc.measures) && !('visibilityKm' in pubDoc.measures), pubDoc.measures);
   ok('public document: no name, no comment, no author; the time of the reading and the place; the keys the rules allow', J(Object.keys(pubDoc).sort()) === J(['attribution', 'locationId', 'locationName', 'measures', 'recordedAt', 'updatedAt', 'webFields']) && pubDoc.locationName === 'Mont Orford' && pubDoc.recordedAt === full.recordedAt && pubDoc.updatedAt === 'SERVER_TS' && !/Marie|Belle neige|createdBy/.test(J(pubDoc)), Object.keys(pubDoc));
   ok('public document: webFields lists what came from the web (not the typed values), with a credit naming the lake station only', J(pubDoc.webFields.sort()) === J(['feelsLikeC', 'windDir', 'windKmh']) && /Environnement et Changement climatique Canada \(Lac Memphrémagog\)/.test(pubDoc.attribution) && !/Sherbrooke/.test(pubDoc.attribution), [pubDoc.webFields, pubDoc.attribution]);
   const typedOnly = WS.publicDocument({ locationId: 'mountain', recordedAt: stampAt(15, 9), manual: { tempC: 1 }, web: null }, FBP);
