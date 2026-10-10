@@ -75,6 +75,9 @@
     <div class="ps-message" id="loading">Chargement de l'état des sentiers...</div>
     <div class="ps-message ps-message--error" id="error" hidden></div>
 
+    <!-- Météo: the latest published reading (weather_public/latest), live; hidden when there is none -->
+    <section id="weather-panel" aria-label="Météo" hidden></section>
+
     <div class="ps-map">
       <div class="ps-map__wrapper" id="map-wrapper">
         <img alt="Carte des sentiers du Mont Orford" id="map-image"><!-- src set for the season's activity -->
@@ -99,6 +102,7 @@
   <script src="../js/core/network.js"></script>
   <script src="../js/services/map-service.js"></script>
   <script src="../js/services/trail-service.js"></script>
+  <script src="../js/services/weather-public.js"></script>
   <script src="../js/core/utils.js"></script>
   <script src="../js/core/theme.js"></script>
 
@@ -107,6 +111,7 @@
     let trails = [];    // rawTrails filtered to currentKind: what is actually drawn
     let currentKind = null; // which inspectionKind the map shows (null = the activity has only one)
     let mapSize = null; // natural size of the map image; marker coordinates are pixels on it
+    let lastWeather = null; // the latest published weather reading (plain object), or null
 
     const el = id => document.getElementById(id);
 
@@ -289,6 +294,30 @@
         console.error('Error loading trails:', error);
         showError("Impossible de charger l'état des sentiers. Veuillez réessayer plus tard.");
       });
+
+      watchWeather();
+    }
+
+    // The weather panel follows the public document live. It is an extra: whatever goes wrong here (no reading yet,
+    // rules not published) only hides the panel, never the trail map.
+    function watchWeather() {
+      const panel = el('weather-panel');
+      WeatherPublic.injectStyles();
+      const redraw = () => {
+        const plain = lastWeather;
+        if (!plain) { panel.hidden = true; panel.innerHTML = ''; return; }
+        panel.innerHTML = WeatherPublic.panelHtml(plain, { icon: Network.seasonIcon() });
+        panel.hidden = false;
+      };
+      firebase.firestore().collection('weather_public').doc('latest').onSnapshot(snap => {
+        lastWeather = snap.exists ? WeatherPublic.fromSdk(snap.data()) : null;
+        redraw();
+      }, error => {
+        console.error('Weather:', error);
+        lastWeather = null;
+        redraw();
+      });
+      setInterval(redraw, 10 * 60 * 1000);   // the "(ancien)" mark appears by itself on a screen left open
     }
 
     function init() {

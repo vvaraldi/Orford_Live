@@ -323,13 +323,15 @@
           result = await WS.save(db, firebase, { at: readAt(), manual: collectManual(), web: webResult, comment: el('comment').value }, user);
         }
         if (!result.ok) { showErrors(result.errors); return; }
-        showMessage(editing ? 'Relevé modifié.' : 'Relevé enregistré.', 'success');
+        // the public copy of the latest reading follows (a failure there never loses the reading)
+        const done = editing ? 'Relevé modifié' : 'Relevé enregistré';
+        showToast(await publishPublic() ? `${done}.` : `${done}, mais la page publique n'a pas pu être mise à jour.`, 'success');
         listDay = startOfDay(readAt());
         resetForm();
         await loadList();
       } catch (err) {
         console.error('Saving the reading:', err);
-        showMessage('Erreur lors de l\'enregistrement du relevé.', 'error');
+        showToast('Erreur lors de l\'enregistrement du relevé.', 'error');
       } finally {
         saving = false;
         el('save-btn').disabled = false;
@@ -363,17 +365,28 @@
       el('weather-form').scrollIntoView({ behavior: 'smooth', block: 'start' });
     }
 
+    /** Rewrites the public "latest reading" from the most recent reading. Returns false when that failed. */
+    async function publishPublic() {
+      try {
+        await WS.publishLatest(db, firebase);
+        return true;
+      } catch (err) {
+        console.error('Public reading:', err);
+        return false;
+      }
+    }
+
     async function deleteReading() {
       if (!editing || !isSystemAdmin) return;
       if (!window.confirm('Supprimer ce relevé météo ? Cette action est irréversible.')) return;
       try {
         await WS.remove(db, editing.id);
-        showMessage('Relevé supprimé.', 'success');
+        showToast(await publishPublic() ? 'Relevé supprimé.' : 'Relevé supprimé, mais la page publique n\'a pas pu être mise à jour.', 'success');
         resetForm();
         await loadList();
       } catch (err) {
         console.error('Deleting the reading:', err);
-        showMessage('Erreur lors de la suppression du relevé.', 'error');
+        showToast('Erreur lors de la suppression du relevé.', 'error');
       }
     }
 
@@ -413,7 +426,7 @@
         records = await WS.listDay(db, firebase, listDay);
       } catch (err) {
         console.error('Reading the readings:', err);
-        showMessage('Erreur lors du chargement des relevés.', 'error');
+        showToast('Erreur lors du chargement des relevés.', 'error');
         records = [];
       }
       renderRecords();

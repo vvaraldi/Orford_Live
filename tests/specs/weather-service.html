@@ -165,6 +165,44 @@
   ok('missing days: all of them when there is no reading; none when every day has one', WS.missingDays([], lastDay, 20).length === 20 && WS.missingDays(Array.from({ length: 20 }, (_, i) => mk(1 + i, 9)), lastDay, 20).length === 0, null);
   const deleted = []; await WS.remove({ collection: n => ({ doc: id => ({ delete: async () => { deleted.push([n, id]); } }) }) }, 'abc');
   ok('delete: removes that reading from weather_records', J(deleted) === J([['weather_records', 'abc']]), deleted);
+  // ---- the public copy of the latest reading ----
+  const FBP = { firestore: { Timestamp: FB.firestore.Timestamp, FieldValue: { serverTimestamp: () => 'SERVER_TS' } } };
+  const lakeAt = ms0 => ({ value: 0, source: 'lac', observedAt: ms0, publishable: true });
+  const full = {
+    id: 'P1', locationId: 'mountain', recordedAt: stampAt(15, 12), createdBy: 'u1', createdByName: 'Marie', comment: 'Belle neige',
+    manual: { tempC: -14, newSnowCm: 12, snowDepthCm: 55, cloudCover: 'partly' },
+    web: { fetchedAt: stampAt(15, 12, 5), fields: {
+      tempC: Object.assign(lakeAt(0), { value: -11.5 }), windKmh: Object.assign(lakeAt(0), { value: 20 }), windDir: Object.assign(lakeAt(0), { value: 297 }),
+      feelsLikeC: { value: -19, source: 'calc', observedAt: 0, publishable: true },
+      pressureKpa: { value: 101.2, source: 'sherbrooke', observedAt: 0, publishable: false },
+      visibilityKm: { value: 16, source: 'sherbrooke', observedAt: 0, publishable: false } } }
+  };
+  const pubDoc = WS.publicDocument(full, FBP);
+  ok('public document: typed values first, then the lake station\'s; the airport\'s (pressure, visibility) are NOT there', pubDoc.measures.tempC === -14 && pubDoc.measures.newSnowCm === 12 && pubDoc.measures.windKmh === 20 && pubDoc.measures.feelsLikeC === -19 && !('pressureKpa' in pubDoc.measures) && !('visibilityKm' in pubDoc.measures), pubDoc.measures);
+  ok('public document: no name, no comment, no author; the time of the reading and the place; the keys the rules allow', J(Object.keys(pubDoc).sort()) === J(['attribution', 'locationId', 'locationName', 'measures', 'recordedAt', 'updatedAt', 'webFields']) && pubDoc.locationName === 'Mont Orford' && pubDoc.recordedAt === full.recordedAt && pubDoc.updatedAt === 'SERVER_TS' && !/Marie|Belle neige|createdBy/.test(J(pubDoc)), Object.keys(pubDoc));
+  ok('public document: webFields lists what came from the web (not the typed values), with a credit naming the lake station only', J(pubDoc.webFields.sort()) === J(['feelsLikeC', 'windDir', 'windKmh']) && /Environnement et Changement climatique Canada \(Lac Memphrémagog\)/.test(pubDoc.attribution) && !/Sherbrooke/.test(pubDoc.attribution), [pubDoc.webFields, pubDoc.attribution]);
+  const typedOnly = WS.publicDocument({ locationId: 'mountain', recordedAt: stampAt(15, 9), manual: { tempC: 1 }, web: null }, FBP);
+  ok('public document: typed values only = no web fields and no credit', J(typedOnly.webFields) === '[]' && typedOnly.attribution === null, typedOnly);
+  ok('public document: a reading with only airport values has nothing publishable = null', WS.publicDocument({ locationId: 'mountain', recordedAt: stampAt(15, 9), manual: {}, web: { fields: { pressureKpa: full.web.fields.pressureKpa } } }, FBP) === null, null);
+  ok('public document: every measure it can hold is a known field (the rules refuse anything else)', Object.keys(pubDoc.measures).every(k => WS.KEYS.includes(k)), null);
+
+  // publishLatest with a fake Firestore: the 20 most recent readings, unsorted
+  const store = { records: [], writes: [] };
+  const dbp = { collection: name => name === 'weather_records'
+    ? { orderBy() { return this; }, limit() { return this; }, async get() { return { docs: store.records.map(r => ({ id: r.id, data: () => { const { id, ...d } = r; return d; } })) }; } }
+    : { doc: id => ({ set: async d => { store.writes.push([name, id, 'set', d]); }, delete: async () => { store.writes.push([name, id, 'delete']); } }) } };
+  store.records = [
+    { id: 'old', locationId: 'mountain', recordedAt: stampAt(10, 12), manual: { tempC: 3 } },
+    { id: 'airportOnly', locationId: 'mountain', recordedAt: stampAt(16, 12), manual: {}, web: { fields: { pressureKpa: full.web.fields.pressureKpa } } },
+    { id: 'newest', locationId: 'mountain', recordedAt: stampAt(15, 12), manual: { tempC: -14 } }
+  ];
+  const published = await WS.publishLatest(dbp, FBP);
+  ok('publishLatest: the most recent reading that has something publishable (the 16th has only airport values, so the 15th), written to weather_public/latest',
+    published.measures.tempC === -14 && store.writes.length === 1 && store.writes[0][0] === 'weather_public' && store.writes[0][1] === 'latest' && store.writes[0][2] === 'set', store.writes);
+  store.records = []; store.writes.length = 0;
+  const none2 = await WS.publishLatest(dbp, FBP);
+  ok('publishLatest: no reading left (or none publishable) = the public document is removed', none2 === null && J(store.writes) === J([['weather_public', 'latest', 'delete']]), store.writes);
+
   document.getElementById('out').textContent = out.join('\n');
 })().catch(e => { document.getElementById('out').textContent = 'HARNESS ERROR ' + e.stack; });
 </script>

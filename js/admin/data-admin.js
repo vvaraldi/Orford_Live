@@ -18,7 +18,8 @@
  *     rankings: [{ title, columns: ['Name', 'Count', ...], rows(recs) -> [[name, n, ...], ...] }]
  *     management: { overview() -> [{ label, value }],
  *                   deleteOld: { noun, find(beforeDate) -> [{ collection, id, data }], remove(item), backupName,
- *                                scope? (words for "which activity", default: the current activity) },
+ *                                scope? (words for "which activity", default: the current activity),
+ *                                description? (the text above the tool), done()? (awaited once all are deleted) },
  *                   orphanApp?: 'infraction' | 'signalisation' | 'maintenance' (none: an app without photos) }
  *   })
  * A record needs `date` (a Date) for the weekly chart.
@@ -328,6 +329,7 @@ const DataAdmin = (function () {
         deleted++;
         if (deleted % 10 === 0) message(`Suppression : ${deleted}/${items.length}...`, 'success');
       }
+      if (spec.done) await spec.done();   // e.g. Météo: the public copy of the latest reading follows
       message(`${deleted} enregistrement(s) supprimé(s) avec succès. Sauvegarde téléchargée.`, 'success');
       await refresh();
       await loadOverview();

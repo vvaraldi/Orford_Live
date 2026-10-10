@@ -147,6 +147,10 @@
             },
             async remove(item) {
               await db.collection(item.collection).doc(item.id).delete();
+            },
+            // the public "latest reading" follows (it could have been one of those just deleted)
+            async done() {
+              await WS.publishLatest(db, firebase);
             }
           }
           // no orphanApp: this app has no photos

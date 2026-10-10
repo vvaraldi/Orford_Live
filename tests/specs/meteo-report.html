@@ -50,6 +50,11 @@
   const upd = writes().find(w => w[2] === 'update');
   ok('save an edit: ONE update of that reading with the new values, the editor recorded; the author and the web values are not touched',
     !!upd && upd[1] === 'W1' && upd[3].manual.tempC === -14 && upd[3].manual.newSnowCm === 12 && upd[3].comment === 'Neige poudreuse' && upd[3].modifiedBy === 'u1' && upd[3].modifiedAt === 'TS' && !('createdBy' in upd[3]) && !('web' in upd[3]), upd);
+  const publicWrites = () => window.__writes.filter(w => w[0] === 'weather_public');
+  const lastPublic = () => publicWrites().filter(w => w[2] === 'set').pop();
+  const toast = () => (document.querySelector('.utils-toast') || {}).textContent || '';
+  ok('after saving a correction: a toast says so, and the public "latest" document is rewritten (the new -14, the lake\'s wind; no airport values, no names)',
+    toast() === 'Relevé modifié.' && !!lastPublic() && lastPublic()[1] === 'latest' && lastPublic()[3].measures.tempC === -14 && lastPublic()[3].measures.windKmh === 20 && !('pressureKpa' in lastPublic()[3].measures) && !/Marie|Luc|Neige poudreuse|createdBy/.test(J(lastPublic()[3])), [toast(), lastPublic()]);
   ok('after saving the form is a new, blank reading again', /Nouveau relevé/.test(text('form-title')) && $('in-tempC').value === '' && $('save-btn').textContent === 'Enregistrer' && $('fetch-web-btn').disabled === false, text('form-title'));
   document.querySelector('[data-edit="W2"]').click(); await wait(50);
   $('cancel-btn').click();
@@ -85,6 +90,7 @@
   submit(); await wait(400);
   const add = writes().find(w => w[2] === 'add');
   ok('a new reading: ONE record with the typed values, the web values as read, the time and the author', !!add && add[3].createdBy === 'u1' && add[3].createdByName === 'Test' && add[3].manual.tempC === -9 && add[3].manual.newSnowCm === 3 && add[3].manual.windKmh === null && add[3].web.fields.tempC.source === 'lac' && add[3].web.fields.tempC.value === -8.4 && add[3].web.fields.pressureKpa.publishable === false && add[3].comment === 'Test' && add[3].recordedAt instanceof Date && add[3].recordedAt.getHours() === 14, add);
+  ok('after saving a new reading: the toast, and the public document rewritten again', toast() === 'Relevé enregistré.' && publicWrites().filter(w => w[2] === 'set').length === 2, [toast(), publicWrites().length]);
   ok('after saving: blank new reading, and the list shows that reading\'s day', /Nouveau relevé/.test(text('form-title')) && WeatherService.KEYS.every(k => $('in-' + k).value === '') && WeatherService.KEYS.every(k => $('web-' + k).textContent === '—') && $('list-date').value === '2026-01-15', [$('list-date').value]);
 
   // ---- nothing typed, nothing loaded ----
@@ -106,6 +112,14 @@
   $('day-prev').click(); await wait(200);
   ok('◀ shows the day before (empty), ▶ comes back, "Aujourd\'hui" goes to today', $('list-date').value === '2026-01-14' && rowsText().length === 0 && ($('day-next').click(), await wait(200), $('list-date').value === '2026-01-15' && rowsText().length === 2) && ($('day-today').click(), await wait(200), $('list-date').value === (() => { const d = new Date(); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); })()), [$('list-date').value]);
 
+  // ---- the public copy cannot be updated (rules not published yet, no connection...): the reading is kept, the user is told ----
+  const realCollection = window.db.collection;
+  window.db.collection = name => name === 'weather_public' ? { doc: () => ({ set: async () => { throw new Error('permission-denied'); }, delete: async () => { throw new Error('permission-denied'); } }) } : realCollection(name);
+  const addsBefore = writes().filter(w => w[2] === 'add').length;
+  type('tempC', '3'); submit(); await wait(500);
+  ok('public copy not updatable: the reading is saved all the same, and the toast says the public page was not updated', writes().filter(w => w[2] === 'add').length === addsBefore + 1 && /Relevé enregistré, mais la page publique n'a pas pu être mise à jour/.test(toast()), [toast(), writes().filter(w => w[2] === 'add').length, addsBefore]);
+  window.db.collection = realCollection;
+
   // ---- deleting a reading: system admin only, after a confirmation ----
   if (SYS) {
     setListDay('2026-01-15'); await wait(300);
@@ -115,6 +129,7 @@
     $('delete-btn').click(); await wait(400);
     const del = window.__writes.filter(w => w[0] === 'weather_records' && w[2] === 'delete');
     ok('system admin: "Supprimer ce relevé" asks once, deletes that reading only, resets the form and refreshes the list', confirms.length === 1 && del.length === 1 && del[0][1] === 'W2' && /Nouveau relevé/.test(text('form-title')) && !rowsText().some(r => /Luc/.test(r)) && rowsText().length === 1 && $('delete-btn').style.display === 'none', [confirms, del, rowsText()]);
+    ok('...a toast says so and the public "latest" document is rewritten from what remains', toast() === 'Relevé supprimé.' && !!lastPublic() && publicWrites().some(w => w[2] === 'set'), [toast(), publicWrites().length]);
   } else {
     setListDay('2026-01-15'); await wait(300);
     document.querySelector('[data-edit="W1"]').click(); await wait(100);

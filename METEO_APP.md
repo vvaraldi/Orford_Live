@@ -75,6 +75,27 @@ Public JSON, no key, readable from a page (cross-site calls allowed):
 
 ## Progress
 
+- **Step 5 - Public: DONE (2026-10-09)** - `weather_public/latest` = the latest reading that has something publishable
+  (typed values + the lake station's; NEVER the airport's), no names, rewritten by the app after every save,
+  correction or deletion (also after the Admin "delete old" tool) with `WeatherService.publishLatest`; removed when
+  nothing is left. Fields fixed by the rules (`locationId, locationName, recordedAt, measures, webFields,
+  attribution, updatedAt`; `measures` limited to the 13 known keys). If the public copy cannot be written the reading
+  is still saved and the toast says so. The public status page shows a live weather panel above the map (hidden when
+  there is no reading or on any error, never touching the trail map; "(ancien)" and dimmed after 36 h; always the day
+  and time of the reading; credit to Environment Canada when its values are used). Also fixed: the entry page's
+  notices used a function that shows nothing there; they are now toasts like the other report pages.
+  **For the Mont Orford website** (`js/services/weather-public.js`, stand-alone, can simply be copied):
+  - address (no key, no login, once the rules are published):
+    `https://firestore.googleapis.com/v1/projects/trail-inspection/databases/(default)/documents/weather_public/latest`
+    (Firestore's typed JSON; 404 = no reading published). `WeatherPublic.fromRest()` turns it into
+    `{ locationName, recordedAt (ISO), measures: { tempC, feelsLikeC, windKmh, windDir, gustKmh, rainMm, newSnowCm,
+    snowDepthCm, cloudCover, sky, visibilityKm, humidityPct, pressureKpa }, webFields, attribution }`.
+  - ready-made panel: `<div id="w"></div> <script src="weather-public.js"></script> <script>
+    WeatherPublic.injectStyles(); WeatherPublic.fetchLatest('trail-inspection').then(p => { if (p) w.innerHTML =
+    WeatherPublic.panelHtml(p, { icon: '❄️' }); });</script>`
+  - to verify on the real site once the rules are published: the address answers from another website (CORS).
+  - the "show weather in reports" toggle is NOT for this panel: the public screen always shows the latest reading.
+
 - **Step 4 - Admin: DONE (2026-10-09)** - `pages/meteo-stats.html` (nav entry "Admin", admins only) on the shared engine
   (`js/admin/data-admin.js`: new optional `series` chart kind, `orphanApp` optional, `deleteOld.scope/description`;
   the other three Admin pages are unchanged). Statistiques by season of the activity chosen in the header: 8 cards

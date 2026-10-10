@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html><head><meta charset="utf-8"><title>WeatherPublic tests</title></head>
+<body>
+<pre id="out">running...</pre>
+<script src="/js/core/config.js"></script>
+<script src="/js/services/weather-public.js"></script>
+<script>
+// The public side of the Météo app: reading the public document (Firestore REST address or SDK), drawing the
+// panel (lobby screen / other website), and the wiring of the public status page and of the rules.
+(async () => {
+  const out = []; const J = JSON.stringify;
+  const ok = (n, c, x) => out.push((c ? 'PASS ' : 'FAIL ') + n + (c ? '' : ' :: ' + J(x)));
+  const WP = WeatherPublic;
+  const REC = '2026-01-15T17:00:00Z';   // 12:00 in Quebec in winter
+
+  // ---- the web address ----
+  ok('web address: the REST address of weather_public/latest in this project (no key, no login)', WP.restUrl() === 'https://firestore.googleapis.com/v1/projects/trail-inspection/databases/(default)/documents/weather_public/latest' && WP.restUrl('other') === 'https://firestore.googleapis.com/v1/projects/other/databases/(default)/documents/weather_public/latest', WP.restUrl());
+
+  // ---- Firestore REST's typed JSON, as the address returns it ----
+  const restDoc = {
+    name: 'projects/trail-inspection/databases/(default)/documents/weather_public/latest',
+    fields: {
+      locationId: { stringValue: 'mountain' }, locationName: { stringValue: 'Mont Orford' },
+      recordedAt: { timestampValue: REC },
+      measures: { mapValue: { fields: { tempC: { doubleValue: -12 }, feelsLikeC: { integerValue: '-19' }, windKmh: { integerValue: '20' }, windDir: { integerValue: '297' }, gustKmh: { doubleValue: 35 }, newSnowCm: { integerValue: '12' }, snowDepthCm: { integerValue: '55' }, cloudCover: { stringValue: 'partly' }, humidityPct: { integerValue: '70' } } } },
+      webFields: { arrayValue: { values: [{ stringValue: 'windKmh' }, { stringValue: 'windDir' }] } },
+      attribution: { stringValue: 'Données : Environnement et Changement climatique Canada (Lac Memphrémagog)' },
+      updatedAt: { timestampValue: '2026-01-15T17:05:00Z' }
+    },
+    createTime: '2026-01-10T10:00:00Z', updateTime: '2026-01-15T17:05:00Z'
+  };
+  const plain = WP.fromRest(restDoc);
+  ok('REST answer -> a plain object: place, ISO time, numbers as numbers (integers come as text in REST), the list, the credit',
+    plain.locationName === 'Mont Orford' && plain.recordedAt === REC && plain.measures.tempC === -12 && plain.measures.windKmh === 20 && plain.measures.windDir === 297 && plain.measures.cloudCover === 'partly' && J(plain.webFields) === J(['windKmh', 'windDir']) && /Environnement et Changement climatique Canada/.test(plain.attribution), plain);
+  ok('REST types: null, boolean, nested maps and arrays are read; no document / no time = nothing', WP.fromRestValue({ nullValue: null }) === null && WP.fromRestValue({ booleanValue: true }) === true && J(WP.fromRestValue({ arrayValue: { values: [{ integerValue: '1' }, { stringValue: 'a' }] } })) === J([1, 'a']) && WP.fromRest(null) === null && WP.fromRest({}) === null && WP.fromRest({ fields: { measures: { mapValue: {} } } }) === null, null);
+  const sdk = WP.fromSdk({ locationName: 'Mont Orford', recordedAt: { toDate: () => new Date(REC) }, measures: { tempC: -12 }, webFields: [], attribution: null, updatedAt: {} });
+  ok('SDK data (a Timestamp) -> the same plain object', Date.parse(sdk.recordedAt) === Date.parse(REC) && sdk.measures.tempC === -12 && sdk.attribution === null && J(sdk.webFields) === '[]' && WP.fromSdk(null) === null, sdk);
+
+  // ---- fetching it ----
+  const calls = [];
+  const fakeFetch = status => async url => { calls.push(url); return { status, ok: status === 200, json: async () => restDoc }; };
+  const fetched = await WP.fetchLatest(undefined, fakeFetch(200));
+  ok('fetchLatest: asks the REST address and returns the plain object', calls[0] === WP.restUrl() && fetched.measures.tempC === -12, calls);
+  ok('fetchLatest: no reading published (404) = null; another HTTP error = an error', (await WP.fetchLatest(undefined, fakeFetch(404))) === null && await WP.fetchLatest(undefined, fakeFetch(500)).then(() => false, e => /500/.test(e.message)), null);
+
+  // ---- the panel ----
+  const now = Date.parse(REC) + 3600 * 1000;       // one hour after the reading
+  const html = WP.panelHtml(plain, { icon: '❄️', now });
+  const box = document.createElement('div'); box.innerHTML = html; document.body.appendChild(box);
+  const tiles = [...box.querySelectorAll('.wxp-tile')].map(t => ({ label: t.querySelector('.wxp-tile__label').textContent, value: t.querySelector('.wxp-tile__value').textContent, sub: (t.querySelector('.wxp-tile__sub') || {}).textContent || '' }));
+  const tile = label => tiles.find(t => t.label === label) || {};
+  ok('panel: title with the season symbol and the place; the day and time of the reading', /❄️ Météo · Mont Orford/.test(box.textContent) && /Relevé du 15 janvier 2026 à \d{2} h \d{2}/.test(box.textContent) && !box.querySelector('.wxp--old'), box.textContent.slice(0, 120));
+  ok('panel: temperature with the feels-like', tile('Température').value === '-12 °C' && tile('Température').sub === 'Ressentie -19 °C', tiles);
+  ok('panel: wind with its direction in words, and the gusts', tile('Vent').value === '20 km/h ONO' && tile('Vent').sub === 'Rafales 35 km/h', tiles);
+  ok('panel: fresh snow (24 h) with the depth on the ground', tile('Neige fraîche (24 h)').value === '12 cm' && tile('Neige fraîche (24 h)').sub === 'Au sol : 55 cm', tiles);
+  ok('panel: the sky (here only the clouds), and the smaller items (humidity); a missing measure shows nothing', tile('Ciel').value === 'Partiellement nuageux' && /Humidité 70 %/.test(box.querySelector('.wxp__extras').textContent) && !/Pression|Visibilité|Pluie/.test(box.textContent), box.querySelector('.wxp__extras').textContent);
+  ok('panel: credits Environment Canada when web values are used', /Données : Environnement et Changement climatique Canada \(Lac Memphrémagog\)/.test(box.querySelector('.wxp__attr').textContent), null);
+  ok('panel: nothing about a person (no author, no comment)', !/createdBy|Marie|Luc|commentaire/i.test(html), null);
+  box.remove();
+
+  const onlyDepth = WP.panelHtml({ locationName: '', recordedAt: REC, measures: { snowDepthCm: 40, sky: 'snow', cloudCover: 'overcast', tempC: 1.5 }, webFields: [], attribution: null }, { now });
+  ok('panel: depth alone is "Neige au sol"; sky "Neige" with the clouds below; decimals with a comma; no credit when nothing came from the web',
+    /Neige au sol<\/div><div class="wxp-tile__value">40 cm/.test(onlyDepth) && /Ciel<\/div><div class="wxp-tile__value">Neige<\/div><div class="wxp-tile__sub">Couvert/.test(onlyDepth) && /1,5 °C/.test(onlyDepth) && !/wxp__attr/.test(onlyDepth), onlyDepth);
+  const old = WP.panelHtml(plain, { now: Date.parse(REC) + 40 * 3600 * 1000 });
+  ok('panel: a reading older than 36 h is marked old (still shown, with its day and time)', /wxp wxp--old/.test(old) && /\(ancien\)/.test(old) && WP.isOld(plain, Date.parse(REC) + 35 * 3600 * 1000) === false && WP.isOld(plain, Date.parse(REC) + 37 * 3600 * 1000) === true, null);
+  const nasty = WP.panelHtml({ locationName: '<img src=x onerror=alert(1)>', recordedAt: REC, measures: { tempC: 1 }, webFields: [], attribution: '<b>x</b>' }, { now });
+  ok('panel: text from the data is escaped (nothing can inject markup)', !/<img|<b>/.test(nasty) && /&lt;img/.test(nasty), nasty);
+  ok('panel: no values at all says so instead of an empty box', /Aucune valeur à afficher/.test(WP.panelHtml({ locationName: '', recordedAt: REC, measures: {}, webFields: [], attribution: null }, { now })), null);
+  WP.injectStyles(); WP.injectStyles();
+  ok('styles: added once, and they work with or without the site\'s theme variables', document.querySelectorAll('#wxp-styles').length === 1 && /var\(--theme-surface, #fff\)/.test(document.getElementById('wxp-styles').textContent), null);
+
+  // ---- the public status page and the rules ----
+  const page = await (await fetch('/pages/public-status.html')).text();
+  ok('public page: loads the module, has the (hidden) panel, listens live to weather_public/latest', /weather-public\.js/.test(page) && /id="weather-panel"[^>]*hidden/.test(page) && /collection\('weather_public'\)\.doc\('latest'\)\.onSnapshot/.test(page), null);
+  ok('public page: a weather problem only hides the panel (the error branch redraws with nothing), and the trails load first', /lastWeather = null;\s*redraw\(\);/.test(page) && page.indexOf("collection('trails')") < page.indexOf('watchWeather();'), null);
+  const rules = await (await fetch('/assets/Rules%20for%20Firebase.txt')).text();
+  const i = rules.indexOf('match /weather_public/'), block = rules.slice(i, rules.indexOf('// Admin settings of the weather', i));
+  ok('rules: public read; only "latest"; the fixed list of fields and of measures (no names); written by allowed users / admins; deletable by them', /allow read: if true/.test(block) && /docId == 'latest' && \(allowsMeteo\(\) \|\| isAdmin\(\)\)/.test(block) && /hasOnly\(\['locationId', 'locationName', 'recordedAt', 'measures', 'webFields', 'attribution', 'updatedAt'\]\)/.test(block) && /measures\.keys\(\)\.hasOnly\(\['tempC', 'feelsLikeC', 'windKmh', 'windDir', 'gustKmh', 'rainMm', 'newSnowCm', 'snowDepthCm', 'cloudCover', 'sky', 'visibilityKm', 'humidityPct', 'pressureKpa'\]\)/.test(block) && /updatedAt == request\.time/.test(block) && /allow delete: if docId == 'latest'/.test(block) && !/createdBy/.test(block), block);
+
+  document.getElementById('out').textContent = out.join('\n');
+})().catch(e => { document.getElementById('out').textContent = 'HARNESS ERROR ' + e.stack; });
+</script>
+</body></html>

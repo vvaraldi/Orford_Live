@@ -53,8 +53,10 @@
     ok('delete old: the preview counts the 2 readings before the date', $('da-delete-count').textContent === '2' && $('da-delete-btn').disabled === false, [$('da-delete-count').textContent]);
     window.__writes.length = 0;
     click($('da-delete-btn')); await wait(800);
-    const deletes = window.__writes.filter(x => x[2] === 'delete');
+    const deletes = window.__writes.filter(x => x[2] === 'delete' && x[0] === 'weather_records');
+    const publicDeleted = window.__writes.some(x => x[0] === 'weather_public' && x[1] === 'latest' && x[2] === 'delete');
     ok('delete old: confirmed once (the message says both seasons), a backup file is offered, then each reading is deleted', confirms.length === 1 && /\(hiver et été\)/.test(confirms[0]) && !/activité/.test(confirms[0]) && (window.__backups || []).some(n => /^backup-meteo-/.test(n)) && J(deletes.map(d => [d[0], d[1]]).sort()) === J([['weather_records', 'W1'], ['weather_records', 'W2']]), [confirms, window.__backups, deletes]);
+    ok('delete old: nothing is left, so the public "latest reading" is removed too (it must not show a deleted reading)', publicDeleted, window.__writes.filter(x => x[0] === 'weather_public'));
     HTMLAnchorElement.prototype.click = clickBackup;
   }
   document.getElementById('out').textContent = out.join('\n');

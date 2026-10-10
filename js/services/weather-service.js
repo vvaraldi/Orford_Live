@@ -330,6 +330,58 @@ const WeatherService = (() => {
     return db.collection(COLLECTION).doc(id).delete();
   }
 
+  // ---- The public copy of the latest reading (weather_public/latest, read by anyone: see js/services/weather-public.js) ----
+
+  const PUBLIC_COLLECTION = 'weather_public';
+
+  /**
+   * The public document of a reading: no names, only the values that may be published (typed values and those of the
+   * publishable station - never the airport's). measures = { key: value }; webFields = the keys that came from
+   * Environment Canada (so the page can credit it). Returns null when the reading has nothing publishable.
+   */
+  function publicDocument(record, fb) {
+    const eff = effectiveValues(record, { publicOnly: true });
+    const keys = Object.keys(eff);
+    if (!keys.length) return null;
+    const measures = {}, webFields = [];
+    const stations = new Set();
+    const loc = location(record.locationId);
+    keys.forEach(k => {
+      measures[k] = eff[k].value;
+      if (eff[k].source !== 'manual') {
+        webFields.push(k);
+        const st = loc.stations.find(s => s.id === eff[k].source);
+        if (st) stations.add(st.name);
+      }
+    });
+    return {
+      locationId: record.locationId || config().defaultLocation,
+      locationName: loc.name,
+      recordedAt: record.recordedAt,
+      measures,
+      webFields,
+      attribution: webFields.length ? `Données : Environnement et Changement climatique Canada${stations.size ? ' (' + [...stations].join(', ') + ')' : ''}` : null,
+      updatedAt: fb.firestore.FieldValue.serverTimestamp()
+    };
+  }
+
+  /**
+   * Rewrites weather_public/latest from the most recent reading that has something publishable (looking at the 20 most
+   * recent), or removes it when there is none. Call it after a reading is saved, corrected or deleted.
+   * Returns the public document written, or null.
+   */
+  async function publishLatest(db, fb) {
+    const snap = await db.collection(COLLECTION).orderBy('recordedAt', 'desc').limit(20).get();
+    const recent = snap.docs.map(d => ({ id: d.id, ...d.data() })).sort((a, b) => ms(b.recordedAt) - ms(a.recordedAt));
+    const ref = db.collection(PUBLIC_COLLECTION).doc('latest');
+    for (const record of recent) {
+      const doc = publicDocument(record, fb);
+      if (doc) { await ref.set(doc); return doc; }
+    }
+    await ref.delete();
+    return null;
+  }
+
   // ---- For the statistics ----
 
   /** 2026-01-15 for a date, in local time */
@@ -373,7 +425,7 @@ const WeatherService = (() => {
     COLLECTION, FIELDS, KEYS, CLOUD_COVER, SKY, fieldOf, location,
     compass, feelsLike, mapObservation, observationUrl, fetchWebValues,
     validateManual, buildRecord, effectiveValues, save, update, remove, list, listDay,
-    dayKey, dailyValues, missingDays
+    publicDocument, publishLatest, dayKey, dailyValues, missingDays
   };
 })();
 window.WeatherService = WeatherService;

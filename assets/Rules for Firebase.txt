@@ -305,12 +305,19 @@ service cloud.firestore {
     }
 
     // The PUBLIC copy of the latest reading (no names), read by the public status page and by the Mont Orford
-    // website. Written by the app each time a reading is saved. The fields are checked when it is built (step 5).
+    // website. Written by the app each time a reading is saved, corrected or deleted (js/services/weather-service.js
+    // publishLatest). Fixed shape: only these fields, and `measures` holds only the known measures - nothing else
+    // (a name, a comment) can be put there. Only the 'latest' document exists.
     match /weather_public/{docId} {
       allow read: if true;
-      allow write: if docId == 'latest' && (allowsMeteo() || isAdmin());
+      allow create, update: if docId == 'latest' && (allowsMeteo() || isAdmin()) &&
+          request.resource.data.keys().hasOnly(['locationId', 'locationName', 'recordedAt', 'measures', 'webFields', 'attribution', 'updatedAt']) &&
+          request.resource.data.keys().hasAll(['locationId', 'recordedAt', 'measures', 'updatedAt']) &&
+          request.resource.data.measures is map &&
+          request.resource.data.measures.keys().hasOnly(['tempC', 'feelsLikeC', 'windKmh', 'windDir', 'gustKmh', 'rainMm', 'newSnowCm', 'snowDepthCm', 'cloudCover', 'sky', 'visibilityKm', 'humidityPct', 'pressureKpa']) &&
+          request.resource.data.updatedAt == request.time;
+      allow delete: if docId == 'latest' && (allowsMeteo() || isAdmin());
     }
-
     // Admin settings of the weather (for example: show the weather when looking at a report)
     match /weather_settings/{docId} {
       allow read: if request.auth != null;
