@@ -244,8 +244,8 @@
     const rowIds = () => [...document.querySelectorAll('#reports-tbody tr[data-id]')].map(r => r.dataset.id).sort();
     const sel = document.getElementById('filter-duration');
     const choose = v => { sel.value = v; sel.dispatchEvent(new Event('change')); };
-    ok('the dashboard has a "Durée" selector: Permanentes (the default), Temporaires, Permanentes et temporaires', J(opts(sel)) === J(['permanent', 'temporary', 'both']) && sel.value === 'permanent' && /Permanentes/.test(sel.options[0].textContent) && /Temporaires/.test(sel.options[1].textContent), [opts(sel), sel.value]);
-    const all = rowIds();
+    ok('the dashboard has a "Durée" selector: Permanentes et temporaires (the default), Permanentes, Temporaires', J(opts(sel)) === J(['both', 'permanent', 'temporary']) && sel.value === 'both' && /Permanentes et/.test(sel.options[0].textContent) && /Temporaires/.test(sel.options[2].textContent), [opts(sel), sel.value]);
+    const all = rowIds();   // the default shows everything
     const target = reportsData[0];                 // one report is marked temporary in memory (the mock data stays as it is)
     target.duration = 'temporary';
     choose('permanent');
@@ -257,7 +257,7 @@
     ok('Permanentes et temporaires: all of them', rowIds().length === all.length && /Temporaire/.test(document.querySelector(`#reports-tbody tr[data-id="${target.id}"]`).textContent), rowIds());
     openDetailModal(target.id);
     ok('the report\'s detail says its duration and why', /Durée : temporaire \(due à une condition temporaire\)/.test(document.getElementById('modal-body').textContent), document.getElementById('modal-body').textContent.slice(0, 200));
-    closeModal(); delete target.duration; choose('permanent');
+    closeModal(); delete target.duration; choose('both');
   }
   if (PAGE === 'signalisation-admin') {
     // a report of this view (an earlier test may have moved the mock's own report to the other view)

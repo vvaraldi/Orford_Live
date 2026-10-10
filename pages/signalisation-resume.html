@@ -99,13 +99,13 @@
             <option value="">Toutes les pistes</option>
           </select>
         </div>
-        <!-- Permanent (default), temporary ("due à une condition temporaire") or both -->
+        <!-- Both (default), permanent only or temporary only ("due à une condition temporaire") -->
         <div class="form-group" style="margin-bottom:0; min-width:180px;">
           <label class="form-label" for="filter-duration">Durée</label>
           <select class="form-select" id="filter-duration" title="Une signalisation temporaire est due à une condition temporaire">
-            <option value="permanent" selected>Permanentes</option>
+            <option value="both" selected>Permanentes et temporaires</option>
+            <option value="permanent">Permanentes</option>
             <option value="temporary">Temporaires</option>
-            <option value="both">Permanentes et temporaires</option>
           </select>
         </div>
       </div>
@@ -213,7 +213,7 @@
     // narrows to something non-empty. Apply to both the map markers and the table.
     let filterSector = '';
     let filterTrail = '';
-    let filterDuration = 'permanent';   // 'permanent' (default), 'temporary' or 'both'
+    let filterDuration = 'both';   // 'both' (default), 'permanent' or 'temporary'
 
     // If the sectors cannot be loaded the page still shows the name stored on each report
     const sectorNameOf = r => SectorService.nameOf(sectors, r.sector, r.sectorDisplayName);

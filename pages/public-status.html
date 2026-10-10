@@ -75,9 +75,6 @@
     <div class="ps-message" id="loading">Chargement de l'état des sentiers...</div>
     <div class="ps-message ps-message--error" id="error" hidden></div>
 
-    <!-- Météo: the latest published reading (weather_public/latest), live; hidden when there is none -->
-    <section id="weather-panel" aria-label="Météo" hidden></section>
-
     <div class="ps-map">
       <div class="ps-map__wrapper" id="map-wrapper">
         <img alt="Carte des sentiers du Mont Orford" id="map-image"><!-- src set for the season's activity -->
@@ -88,6 +85,9 @@
       <span><i class="ps-dot ps-dot--closed"></i>Fermé</span>
       <span><i class="ps-dot ps-dot--unknown"></i>Inconnu</span>
     </div>
+
+    <!-- Météo: the latest published reading (weather_public/latest), live; hidden when there is none -->
+    <section id="weather-panel" aria-label="Météo" hidden></section>
   </main>
 
   <p class="ps-footer" id="footer"></p>
