@@ -17,10 +17,11 @@ in the Firebase / GitHub consoles is not counted.
 | 2026-10-09 (small additions) | 2026-10-09 23:15 → 23:33 (the Météo export and the quick delete on the list: about 40 % of a ~18m block shared with other small items logged in `TIME_LOG.md`) | ~4m | ~7m |
 | 2026-10-09 (step 7) | 2026-10-09 23:33 → 23:57 (the real-site checklist saved, the check of the public address on the real service, the final review and its fix, the last full test run; ~10m / ~19m of a ~13m / ~24m block shared with the permanent / temporary swap logged in `TIME_LOG.md`) | ~10m | ~19m |
 | 2026-10-10 (real-site checks, end) | 2026-10-09 23:57 → 2026-10-10 00:16 (the cross-site check of the public address on the real service, the weather panel moved below the map on the public status page; ~2m of a ~4m block shared with TIME_LOG.md; a ~16 min gap before it is not counted. Your own real-site tests of the checklist are not counted, as always) | ~3m | ~3m |
+| 2026-10-10 (weather in the dashboards) | 2026-10-10 13:50 → 13:55 (the closest weather reading in the detail view of the two Tableau de bord pages, Inspections and Signalisations, from the map or the list; 22 tests; the overnight gap before it is not counted) | ~5m | ~5m |
 
-**Running total for the Météo app: ~1h04m - 2h08m**
+**Running total for the Météo app: ~1h09m - 2h13m**
 
-**Note:** the last row is computed up to 00:16 on 2026-10-10, when this estimate was made; any further time needs a new row.
+**Note:** the last row is computed up to 13:55 on 2026-10-10, when this estimate was made; any further time needs a new row.
 
 Step 7: the 10-step checklist for the real site (`tests/README.md`), the check of the public REST address on the real service (404 not-found, cross-site header OK), the final review (no leftovers, ids, rules brackets, field lists) and its one fix (the web feels-like follows a typed temperature), and 6 more tests (1577 in the whole suite). The last row: the cross-site check of the public address on the real service (200, readable from another site, correct panel text) and the weather panel moved below the map on the public status page.
 

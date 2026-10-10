@@ -17,6 +17,9 @@
     'inspection-history': { lists: () => [allInspections, filteredInspections], date: (o, d) => { o.date = d; }, open: id => viewDetails(id) },
     'infraction-admin': { lists: () => [infractionsData], date: (o, d) => { o.offenceTimestamp = T(d.getTime()); }, open: id => openDetail(id) },
     'signalisation-admin': { lists: () => [reportsData], date: (o, d) => { o.createdAt = T(d.getTime()); }, open: id => openDetail(id) },
+    // the two dashboards (Tableau de bord): the modal opened from the map or the list
+    'inspection-dashboard': { lists: () => [Object.values(trailInspections)], date: (o, d) => { o.date = d; }, open: id => openTrailModal(Object.keys(trailInspections).find(k => trailInspections[k].id === id)) },
+    'signalisation-resume': { lists: () => [reportsData], date: (o, d) => { o.createdAt = T(d.getTime()); }, open: id => openDetailModal(id) },
     'maintenance-admin': { lists: () => [logsData], date: (o, d) => { o.date = T(d.getTime()); }, open: id => openDetail(id), day: true }
   };
   const P = PAGES[PAGE];

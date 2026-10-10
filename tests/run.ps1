@@ -78,6 +78,8 @@ $tests = @(
   @{ name = 'wx-reports-infraction';    type = 'page'; page = 'pages\infraction-admin.html';         spec = 'weather-in-reports.html'; queries = @('?page=infraction-admin&net=ski') }
   @{ name = 'wx-reports-signalisation'; type = 'page'; page = 'pages\signalisation-admin.html';      spec = 'weather-in-reports.html'; queries = @('?page=signalisation-admin&net=ski') }
   @{ name = 'wx-reports-maintenance';   type = 'page'; page = 'pages\maintenance-admin.html';        spec = 'weather-in-reports.html'; queries = @('?page=maintenance-admin&net=bike') }
+  @{ name = 'wx-reports-dashboard-insp'; type = 'page'; page = 'pages\inspection-dashboard.html';   spec = 'weather-in-reports.html'; queries = @('?page=inspection-dashboard&net=ski') }
+  @{ name = 'wx-reports-dashboard-sig';  type = 'page'; page = 'pages\signalisation-resume.html';     spec = 'weather-in-reports.html'; queries = @('?page=signalisation-resume&net=ski') }
   @{ name = 'trailservice';             type = 'unit'; spec = 'trailservice.html' }
   @{ name = 'mapservice';               type = 'unit'; spec = 'mapservice.html' }
   @{ name = 'kind';                     type = 'unit'; spec = 'kind.html' }

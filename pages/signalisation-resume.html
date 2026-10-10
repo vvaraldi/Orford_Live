@@ -185,6 +185,8 @@
   <script src="../js/services/photo-map-modal.js"></script>
   <script src="../js/services/sector-service.js"></script>
   <script src="../js/services/trail-service.js"></script>
+  <script src="../js/services/weather-service.js"></script>
+  <script src="../js/services/weather-context.js"></script>
 
   <script>
     const STATUS_LABELS = {
@@ -527,6 +529,8 @@
         </div>
       `;
       
+      WeatherContext.attach(document.getElementById('modal-body'), date);   // the weather nearest in time to the report (if the admin switch is on)
+
       document.getElementById('detail-modal').classList.add('show');
       document.body.style.overflow = 'hidden';
     }

@@ -215,6 +215,8 @@
   <script src="../js/core/auth.js"></script>
   <script src="../js/services/photo-service.js"></script>
   <script src="../js/services/trail-service.js"></script>
+  <script src="../js/services/weather-service.js"></script>
+  <script src="../js/services/weather-context.js"></script>
   <script src="../js/services/map-service.js"></script>
   <script src="../js/services/photo-map-modal.js"></script>
 
@@ -570,6 +572,7 @@
         }
         html += renderPhotosSection(insp, TrailService.geoMapIdOf(trail), 'trail_inspections', () => openTrailModal(trailId));
         body.innerHTML = html;
+        WeatherContext.attach(body, date);   // the weather nearest in time to this inspection (if the admin switch is on)
       }
       document.getElementById('inspection-modal').classList.add('show');
       document.body.style.overflow = 'hidden';
@@ -604,6 +607,7 @@
         }
         html += renderPhotosSection(insp, null, 'shelter_inspections', () => openShelterModal(shelterId)); // shelters are not kind-specific: network default
         body.innerHTML = html;
+        WeatherContext.attach(body, date);   // the weather nearest in time to this inspection (if the admin switch is on)
       }
       document.getElementById('inspection-modal').classList.add('show');
       document.body.style.overflow = 'hidden';
