@@ -339,10 +339,39 @@ service cloud.firestore {
       }
     }
     
-    // NOTIFICATIONS
-    match /notifications/{notificationId} {
-      allow create: if request.auth != null;
+    // SUPPORT E-MAILS
+    // The Firebase extension "Trigger Email from Firestore" reads the collection "mail" and sends each message.
+    // A signed-in user may only queue ONE short plain-text message, addressed to the creator of the request or to
+    // the admin chosen in support_settings/config - never to another address. Nobody can read, change or delete it.
+    function mailRecipientOk(requestId, address) {
+      return address == get(/databases/$(database)/documents/inspectors/$(get(/databases/$(database)/documents/requests/$(requestId)).data.createdBy)).data.email
+          || address == get(/databases/$(database)/documents/inspectors/$(get(/databases/$(database)/documents/support_settings/config).data.adminUid)).data.email;
+    }
+    match /mail/{mailId} {
+      allow create: if request.auth != null &&
+          request.resource.data.keys().hasOnly(['to', 'message', 'requestId', 'kind', 'createdBy', 'createdAt']) &&
+          request.resource.data.keys().hasAll(['to', 'message', 'requestId', 'kind', 'createdBy', 'createdAt']) &&
+          request.resource.data.to is list && request.resource.data.to.size() == 1 &&
+          request.resource.data.to[0] is string &&
+          request.resource.data.message is map &&
+          request.resource.data.message.keys().hasOnly(['subject', 'text']) &&
+          request.resource.data.message.keys().hasAll(['subject', 'text']) &&
+          request.resource.data.message.subject is string &&
+          request.resource.data.message.subject.size() > 0 && request.resource.data.message.subject.size() <= 200 &&
+          request.resource.data.message.text is string &&
+          request.resource.data.message.text.size() > 0 && request.resource.data.message.text.size() <= 3000 &&
+          request.resource.data.kind in ['created_admin', 'created_creator', 'status', 'comment'] &&
+          request.resource.data.requestId is string &&
+          request.resource.data.createdBy == request.auth.uid &&
+          request.resource.data.createdAt == request.time &&
+          mailRecipientOk(request.resource.data.requestId, request.resource.data.to[0]);
       allow read, update, delete: if false;
+    }
+
+    // Settings of those e-mails (on / off, the admin who receives the new requests): the system admin writes them
+    match /support_settings/{docId} {
+      allow read: if request.auth != null;
+      allow write: if isSystemAdmin();
     }
     
   }

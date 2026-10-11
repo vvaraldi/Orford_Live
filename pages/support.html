@@ -130,6 +130,24 @@
       </div>
     </div>
 
+    <!-- E-mail settings (system admin only): who is told of a new request, and the on / off switch -->
+    <details class="filters-section" id="mail-settings" style="display: none;">
+      <summary style="cursor: pointer; font-weight: 600;">✉️ Courriels du support</summary>
+      <div class="filters-row" style="margin-top: 0.75rem; align-items: flex-end;">
+        <div class="filter-group">
+          <label for="mail-enabled" style="display: flex; gap: 0.5rem; align-items: center;"><input type="checkbox" id="mail-enabled"> Envoyer des courriels</label>
+        </div>
+        <div class="filter-group">
+          <label for="mail-admin">Administrateur qui reçoit les nouvelles demandes</label>
+          <select id="mail-admin" class="form-select"><option value="">— Personne (seul le créateur est averti) —</option></select>
+        </div>
+        <div class="filter-group filter-actions">
+          <button class="btn btn-primary btn-sm" id="mail-save-btn" type="button">Enregistrer</button>
+        </div>
+      </div>
+      <p style="font-size: 0.8125rem; color: var(--theme-text-secondary); margin: 0.5rem 0 0;">Nouvelle demande : l'administrateur choisi et le créateur. En cours / Résolu : le créateur. Nouveau commentaire : l'autre partie. Archivé : aucun courriel.</p>
+    </details>
+
     <!-- Filters Section -->
     <div class="filters-section">
       <div class="filters-row">
@@ -294,6 +312,7 @@
   <script src="../js/core/ui.js"></script>
   <script src="../js/core/firebase-loader.js"></script>
   <script src="../js/core/auth.js"></script>
+  <script src="../js/services/support-mail.js"></script>
   <script>
     // Data (currentUser and currentUserData are already defined in auth.js)
     let allRequests = [];
@@ -353,7 +372,40 @@
       if (isAdmin) {
         document.getElementById('filter-user-group').style.display = 'block';
         loadUsersForFilter();
+        if (currentUserData.role === 'system_admin') {
+          document.getElementById('mail-settings').style.display = 'block';
+          document.getElementById('mail-save-btn').addEventListener('click', saveMailSettings);
+        }
       }
+    }
+
+    // E-mail settings (see js/services/support-mail.js): the switch and the admin who receives the new requests
+    async function loadMailSettings() {
+      const s = await SupportMail.readSettings(db);
+      document.getElementById('mail-enabled').checked = s.enabled;
+      const select = document.getElementById('mail-admin');
+      select.value = s.adminUid;
+      if (select.value !== s.adminUid) select.value = '';   // an account that is no longer an active admin
+    }
+
+    async function saveMailSettings() {
+      try {
+        await SupportMail.saveSettings(db, firebase, {
+          enabled: document.getElementById('mail-enabled').checked,
+          adminUid: document.getElementById('mail-admin').value
+        }, { uid: currentUser.uid, name: currentUserData.name || currentUser.email });
+        showSuccess('Réglages des courriels enregistrés');
+      } catch (e) {
+        console.error('Error saving e-mail settings:', e);
+        showError('Erreur lors de l\'enregistrement des réglages');
+      }
+    }
+
+    function notifyContext(request, extra) {
+      return Object.assign({
+        request, actor: { uid: currentUser.uid, name: currentUserData.name || currentUser.email },
+        url: new URL('support.html', location.href).href
+      }, extra || {});
     }
 
     async function loadUsersForFilter() {
@@ -366,7 +418,13 @@
           option.value = doc.id;
           option.textContent = data.name || data.email;
           select.appendChild(option);
+          if (data.role === 'admin' || data.role === 'system_admin') {
+            const adminOption = option.cloneNode(true);
+            adminOption.textContent = (data.name || data.email) + (data.email && data.name ? ` (${data.email})` : '');
+            document.getElementById('mail-admin').appendChild(adminOption);
+          }
         });
+        if (currentUserData.role === 'system_admin') await loadMailSettings();
       } catch (e) {
         console.error('Error loading users:', e);
       }
@@ -502,8 +560,8 @@
 
         const docRef = await db.collection('requests').add(requestData);
 
-        // Prepare notification for system admins (Cloud Function will process this)
-        await createNotification(docRef.id, requestData);
+        // E-mails (chosen admin + the creator), if the admin switched them on in the settings
+        await SupportMail.notify(db, firebase, 'created', notifyContext(Object.assign({ id: docRef.id }, requestData)));
 
         closeNewRequestModal();
         showSuccess('Demande créée avec succès');
@@ -520,42 +578,6 @@
       } finally {
         submitBtn.disabled = false;
         submitBtn.textContent = 'Soumettre';
-      }
-    }
-
-    async function createNotification(requestId, requestData) {
-      try {
-        // Get system admins
-        const adminsSnap = await db.collection('inspectors')
-          .where('role', '==', 'system_admin')
-          .where('status', '==', 'active')
-          .get();
-
-        if (adminsSnap.empty) return;
-
-        const recipients = [];
-        adminsSnap.forEach(doc => {
-          const data = doc.data();
-          if (data.email) recipients.push(data.email);
-        });
-
-        if (recipients.length > 0) {
-          await db.collection('notifications').add({
-            type: 'new_request',
-            requestId,
-            requestTitle: requestData.title,
-            requestType: requestData.type,
-            requestPriority: requestData.priority,
-            requestDescription: requestData.description.substring(0, 200),
-            createdByName: requestData.createdByName,
-            recipients,
-            createdAt: firebase.firestore.FieldValue.serverTimestamp(),
-            processed: false
-          });
-        }
-      } catch (e) {
-        console.error('Error creating notification:', e);
-        // Don't throw - notification failure shouldn't block request creation
       }
     }
 
@@ -644,7 +666,12 @@
       }
 
       try {
+        const before = allRequests.find(r => r.id === currentRequestId);
+        const previousStatus = before ? before.status : null;
         await db.collection('requests').doc(currentRequestId).update(updates);
+        if (before && updates.status && updates.status !== previousStatus) {
+          await SupportMail.notify(db, firebase, 'status', notifyContext(before, { status: updates.status }));   // En cours / Résolu: the creator
+        }
         
         // Update local data
         const request = allRequests.find(r => r.id === currentRequestId);
@@ -746,6 +773,7 @@
         const request = allRequests.find(r => r.id === currentRequestId);
         if (request) {
           request.commentCount = (request.commentCount || 0) + 1;
+          await SupportMail.notify(db, firebase, 'comment', notifyContext(request, { text }));   // the other party
         }
 
         textarea.value = '';

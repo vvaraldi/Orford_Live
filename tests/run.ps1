@@ -45,6 +45,7 @@ $tests = @(
   @{ name = 'smoke-index';              type = 'page'; page = 'index.html';                          spec = 'smoke.html';       queries = @('?page=index&net=ski', '?page=index&net=both', '?page=index&net=ski&meteo=0') }
   @{ name = 'smoke-meteo';              type = 'page'; page = 'pages\meteo-report.html';             spec = 'smoke.html';       queries = @('?page=meteo-report&net=ski', '?page=meteo-report&net=bike') }
   @{ name = 'meteo-report';             type = 'page'; page = 'pages\meteo-report.html';             spec = 'meteo-report.html'; queries = @('?page=meteo-report&net=ski', '?page=meteo-report&net=ski&as=system', '?page=meteo-report&net=ski&as=inspector') }
+  @{ name = 'support-mail';             type = 'page'; page = 'pages\support.html';                  spec = 'support-mail.html'; queries = @('?page=support&net=ski&as=system') }
   @{ name = 'smoke-support';            type = 'page'; page = 'pages\support.html';                  spec = 'smoke.html';       queries = @('?page=support&net=bike') }
   @{ name = 'smoke-user-profile';       type = 'page'; page = 'pages\user-profile.html';              spec = 'smoke.html';       queries = @('?page=profile&net=ski') }
   @{ name = 'smoke-user-management';    type = 'page'; page = 'pages\user-management.html';           spec = 'smoke.html';       queries = @('?page=user-management&net=ski&as=system', '?page=user-management&net=both&as=admin', '?page=user-management&net=both&as=admin&choice=bike') }

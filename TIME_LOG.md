@@ -31,13 +31,15 @@ positions, editing README.md, testing as a real user, etc.).
 | 2026-10-09 (small items) | 2026-10-09 23:15 → 23:33 (~18m, one block, plus a ~20 min wait for the test suite; the block is ~9m / ~18m in all, of which about 40 % - the Météo export and the quick delete - is logged in `TIME_LOG_METEO.md`; this row is the rest) | ~5m | ~11m |
 | 2026-10-09 (small items, end) | 2026-10-09 23:33 → 23:57 (the admin can swap permanent / temporary in the report detail; ~3m of a block shared with Météo step 7) | ~3m | ~5m |
 | 2026-10-10 (end of the Météo work) | 2026-10-09 23:57 → 2026-10-10 00:16 (the Signalisations dashboard now shows permanent + temporary by default; the final time-log rows; ~2m of a ~4m block shared with the Météo items in TIME_LOG_METEO.md; a ~16 min gap before it is not counted) | ~2m | ~2m |
+| 2026-10-10 (shared date and time field) | 2026-10-10 21:23 → 21:44 (the shared "Date et heure" field in the Infractions, Signalisations, Inspections (trail and shelter) and Météo forms, with its two-field fallback, 28 + 5 x 14 tests, a full test run of ~10 min, and the answer about e-mails from Support; the hours before it are not counted) | ~13m | ~22m |
+| 2026-10-10 (Support e-mails, portal) | 2026-10-10 21:44 → 21:56 (the Support e-mails: a service that queues the e-mails for the Firebase extension, the settings card, the rules of the mail collection, 34 tests and the setup guide SUPPORT_EMAIL_SETUP.md; and the portal's line "Sélectionnez une application" removed) | ~6m | ~13m |
 
 **Manual addition (not from chat timestamps):** +2h00m - customer/team meetings, morning of 2026-09-28 (before the day's chat activity started; per the Method note above, offline time isn't normally included, but you asked for this one to be logged).
 
-**Running total (active chat time + the meeting addition, all estimates so far): ~18h12m - 24h24m**
+**Running total (active chat time + the meeting addition, all estimates so far): ~18h31m - 24h59m**
 (The Météo app started on 2026-10-09 is logged on its own in `TIME_LOG_METEO.md` and is not in this total.)
 
-**Note:** the 2026-10-10 (end of the Météo work) row is computed up to 00:16, when this estimate was made; the
+**Note:** the 2026-10-10 (Support e-mails, portal) row is computed up to 21:56, when this estimate was made; the
 session may have continued after that, and any further time will need a new row. 2026-09-23 (the
 Firebase backup/export session, ~5 min of chat) was missing from earlier estimates and is now
 included. Nothing was logged in the transcript on 2026-09-24 to 2026-09-27, 2026-09-30 or 2026-10-01.

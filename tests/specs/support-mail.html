@@ -1,0 +1,129 @@
+<pre id="out" style="position:fixed;left:0;bottom:0;background:#fff;color:#000;font-size:11px;z-index:99999;max-height:35vh;overflow:auto">running...</pre>
+<script>
+// The e-mails of the Support app: who is written to for a new request / a status change / a comment, the settings
+// (switch + the admin who receives the new requests), that a failing e-mail never blocks the work, and the rules of
+// the "mail" collection. The mock holds: u1 Test (system admin, the signed-in user), u2 Luc (inspector), u3 Ann (admin),
+// u4 Bob (no e-mail address).
+(async () => {
+  const out = []; const J = JSON.stringify;
+  const ok = (n, c, x) => out.push((c ? 'PASS ' : 'FAIL ') + n + (c ? '' : ' :: ' + J(x)));
+  const wait = ms => new Promise(r => setTimeout(r, ms));
+  const $ = id => document.getElementById(id);
+  await wait(1000);
+  ok('no script errors on load', window.__errs.length === 0, window.__errs);
+
+  window.__data.inspectors = [
+    { id: 'u1', name: 'Test', role: 'system_admin', status: 'active', email: 't@x.ca' },
+    { id: 'u2', name: 'Luc', role: 'inspector', status: 'active', email: 'luc@x.ca' },
+    { id: 'u3', name: 'Ann', role: 'admin', status: 'active', email: 'ann@x.ca' },
+    { id: 'u4', name: 'Bob', role: 'inspector', status: 'active', email: '' }
+  ];
+  const mails = () => window.__writes.filter(w => w[0] === 'mail' && w[2] === 'add').map(w => w[3]);
+  const reset = () => { window.__writes.length = 0; };
+  const R = (id, by, status) => ({ id, title: 'Le bouton ne répond pas', type: 'bug', priority: 'high', description: 'Quand je clique rien ne se passe.', status: status || 'new', createdBy: by, createdByName: { u1: 'Test', u2: 'Luc', u3: 'Ann', u4: 'Bob' }[by], createdAt: { toDate: () => new Date() }, commentCount: 0 });
+  const ON = { enabled: true, adminUid: 'u3' };
+  const setSettings = s => { window.__data.support_settings = s ? [{ id: 'config', ...s }] : []; };
+
+  // ---- the plan (pure) ----
+  const P = SupportMail.plan;
+  const kinds = l => l.map(o => o.uid + ':' + o.kind).join(',');
+  ok('new request: the chosen admin and the creator, one e-mail each', kinds(P('created', { request: R('a', 'u2'), actor: { uid: 'u2', name: 'Luc' } }, ON)) === 'u3:created_admin,u2:created_creator', P('created', { request: R('a', 'u2'), actor: { uid: 'u2' } }, ON));
+  ok('new request, nobody chosen: only the creator', kinds(P('created', { request: R('a', 'u2'), actor: { uid: 'u2' } }, { enabled: true, adminUid: '' })) === 'u2:created_creator', null);
+  ok('new request by the chosen admin themselves: one e-mail, not two', kinds(P('created', { request: R('a', 'u3'), actor: { uid: 'u3' } }, ON)) === 'u3:created_admin', kinds(P('created', { request: R('a', 'u3'), actor: { uid: 'u3' } }, ON)));
+  ok('En cours / Résolu: the creator', kinds(P('status', { request: R('a', 'u2'), actor: { uid: 'u1' }, status: 'in_progress' }, ON)) === 'u2:status' && kinds(P('status', { request: R('a', 'u2'), actor: { uid: 'u1' }, status: 'resolved' }, ON)) === 'u2:status', null);
+  ok('Archivé and Nouveau: no e-mail', P('status', { request: R('a', 'u2'), actor: { uid: 'u1' }, status: 'archived' }, ON).length === 0 && P('status', { request: R('a', 'u2'), actor: { uid: 'u1' }, status: 'new' }, ON).length === 0, null);
+  ok('status changed by the creator themselves: nothing to tell them', P('status', { request: R('a', 'u1'), actor: { uid: 'u1' }, status: 'resolved' }, ON).length === 0, null);
+  ok('comment by the creator: the chosen admin (and nobody if that is the creator)', kinds(P('comment', { request: R('a', 'u2'), actor: { uid: 'u2', name: 'Luc' }, text: 'Merci' }, ON)) === 'u3:comment' && P('comment', { request: R('a', 'u3'), actor: { uid: 'u3' }, text: 'x' }, ON).length === 0 && P('comment', { request: R('a', 'u2'), actor: { uid: 'u2' }, text: 'x' }, { enabled: true, adminUid: '' }).length === 0, null);
+  ok('comment by anyone else: the creator', kinds(P('comment', { request: R('a', 'u2'), actor: { uid: 'u1', name: 'Test' }, text: 'Voici' }, ON)) === 'u2:comment', null);
+  const created = P('created', { request: R('a', 'u2'), actor: { uid: 'u2' }, url: 'https://x/support.html' }, ON);
+  ok('texts are French, name the request, the person and the type / priority, and end with the link', /^\[Support\] Nouvelle demande : Le bouton ne répond pas$/.test(created[0].subject) && /Luc a créé une nouvelle demande/.test(created[0].text) && /Type : Bug/.test(created[0].text) && /Priorité : Haute/.test(created[0].text) && /Ouvrir la demande : https:\/\/x\/support\.html$/.test(created[0].text) && /bien été reçue/.test(created[1].subject), created);
+  const long = P('comment', { request: R('a', 'u2'), actor: { uid: 'u1', name: 'Test' }, text: 'x'.repeat(5000) }, ON)[0];
+  const longTitle = P('created', { request: Object.assign(R('a', 'u2'), { title: 'T'.repeat(500), description: 'd'.repeat(5000) }), actor: { uid: 'u2' } }, ON)[0];
+  ok('long texts are cut (the rules allow 200 / 3000 characters)', long.text.length < 1100 && longTitle.subject.length <= 180 && longTitle.text.length <= 2800, [long.text.length, longTitle.subject.length, longTitle.text.length]);
+
+  // ---- the settings card ----
+  ok('system admin: the e-mail settings are shown', $('mail-settings').style.display === 'block', $('mail-settings').style.display);
+  $('mail-admin').length = 1; await loadUsersForFilter();
+  const adminOptions = [...$('mail-admin').options].map(o => o.value);
+  ok('the admin to choose from: active admins and system admins only (not inspectors)', J(adminOptions) === J(['', 'u1', 'u3']), adminOptions);
+  ok('nothing saved yet: the switch is off', $('mail-enabled').checked === false && (await SupportMail.readSettings(db)).enabled === false, null);
+  $('mail-enabled').checked = true; $('mail-admin').value = 'u3'; reset();
+  $('mail-save-btn').click(); await wait(300);
+  const saved = window.__writes.filter(w => w[0] === 'support_settings' && w[2] === 'set');
+  ok('saving writes support_settings/config with the switch and the admin', saved.length === 1 && saved[0][1] === 'config' && saved[0][3].enabled === true && saved[0][3].adminUid === 'u3' && saved[0][3].updatedBy === 'u1', saved);
+
+  // ---- the page, switched OFF: nothing is queued ----
+  setSettings({ enabled: false, adminUid: 'u3' });
+  allRequests = []; reset();
+  openNewRequestModal();
+  $('request-title').value = 'Un bug'; $('request-type').value = 'bug'; $('request-priority').value = 'high'; $('request-description').value = 'Description';
+  await submitNewRequest(); await wait(300);
+  ok('switch off: the request is created, no e-mail queued', window.__writes.some(w => w[0] === 'requests' && w[2] === 'add') && mails().length === 0, mails());
+
+  // ---- the page, switched ON ----
+  setSettings(ON); reset();
+  openNewRequestModal();
+  $('request-title').value = 'Un autre bug'; $('request-type').value = 'bug'; $('request-priority').value = 'medium'; $('request-description').value = 'Description détaillée';
+  await submitNewRequest(); await wait(300);
+  let m = mails();
+  ok('new request: two e-mails queued, to the chosen admin and to the creator (here the same system admin as the actor: still told)', m.length === 2 && J(m.map(x => x.to)) === J([['ann@x.ca'], ['t@x.ca']]) && J(m.map(x => x.kind)) === J(['created_admin', 'created_creator']), m);
+  ok('each queued document has exactly the fields the rules allow, a server time, the actor, the request', m.every(x => J(Object.keys(x).sort()) === J(['createdAt', 'createdBy', 'kind', 'message', 'requestId', 'to']) && J(Object.keys(x.message).sort()) === J(['subject', 'text']) && x.createdAt === 'TS' && x.createdBy === 'u1' && x.requestId === 'new'), m);
+
+  // a request of Luc's, in the list
+  allRequests = [R('RQ1', 'u2'), R('RQ4', 'u4'), R('RQ3', 'u3')];
+  const setStatus = async (id, status, priority) => { reset(); await openDetailModal(id); $('admin-status').value = status; if (priority) $('admin-priority').value = priority; await saveAdminChanges(); await wait(200); };
+  await setStatus('RQ1', 'in_progress');
+  m = mails();
+  ok('status "En cours": the creator is told', m.length === 1 && J(m[0].to) === J(['luc@x.ca']) && m[0].kind === 'status' && /est en cours/.test(m[0].message.subject), m);
+  await setStatus('RQ1', 'in_progress', 'low');
+  ok('same status again (only the priority changed): no e-mail', mails().length === 0, mails());
+  await setStatus('RQ1', 'resolved');
+  m = mails();
+  ok('status "Résolu": the creator is told', m.length === 1 && /est résolue/.test(m[0].message.subject), m);
+  await setStatus('RQ1', 'archived');
+  ok('status "Archivé": no e-mail', mails().length === 0, mails());
+  await setStatus('RQ1', 'new');
+  ok('back to "Nouveau": no e-mail', mails().length === 0, mails());
+  await setStatus('RQ4', 'resolved');
+  ok('a creator without an e-mail address: skipped quietly, the change is still saved', mails().length === 0 && window.__writes.some(w => w[0] === 'requests' && w[1] === 'RQ4' && w[3].status === 'resolved'), window.__writes);
+
+  // ---- comments ----
+  const comment = async (id, text) => { reset(); await openDetailModal(id); $('new-comment').value = text; await submitComment(); await wait(200); };
+  await comment('RQ1', 'On regarde ça demain');
+  m = mails();
+  ok('comment by an admin: the creator is told, with the text', m.length === 1 && J(m[0].to) === J(['luc@x.ca']) && /Nouveau commentaire sur votre demande/.test(m[0].message.subject) && /On regarde ça demain/.test(m[0].message.text) && window.__writes.some(w => w[0] === 'requests/RQ1/comments' && w[2] === 'add'), window.__writes);
+  const keepUser = [currentUser, currentUserData];
+  currentUser = { uid: 'u2', email: 'luc@x.ca' }; currentUserData = Object.assign({}, currentUserData, { name: 'Luc', role: 'inspector' });
+  await comment('RQ1', 'Merci, ça marche');
+  m = mails();
+  ok('comment by the creator: the chosen admin is told (not the creator)', m.length === 1 && J(m[0].to) === J(['ann@x.ca']) && /Nouveau commentaire de Luc/.test(m[0].message.subject), m);
+  currentUser = keepUser[0]; currentUserData = keepUser[1];
+
+  // ---- a failing e-mail never blocks the work ----
+  const realCollection = db.collection;
+  db.collection = name => name === 'mail' ? { add: async () => { throw new Error('permission-denied'); } } : realCollection(name);
+  reset(); window.__errs.length = 0;
+  await openDetailModal('RQ1'); $('new-comment').value = 'Encore'; await submitComment(); await wait(200);
+  await setStatus('RQ1', 'resolved');
+  ok('the e-mail is refused (rules not published, no connection): comments and status changes still go through, no crash', window.__writes.some(w => w[0] === 'requests' && w[1] === 'RQ1' && w[3].status === 'resolved') && window.__errs.length === 0, [window.__writes, window.__errs]);
+  db.collection = realCollection;
+  setSettings(null);
+  ok('no settings document at all = switched off', (await SupportMail.readSettings(db)).enabled === false, null);
+  reset();
+  const res = await SupportMail.notify(db, firebase, 'created', { request: R('z', 'u2'), actor: { uid: 'u2' } });
+  ok('... and notify() then queues nothing', res.sent === 0 && mails().length === 0, res);
+
+  // ---- the rules of "mail" ----
+  const rules = await (await fetch('/assets/Rules for Firebase.txt')).text();
+  const i = rules.indexOf('match /mail/'), block = rules.slice(i, rules.indexOf('match /support_settings/', i));
+  const fn = rules.slice(rules.indexOf('function mailRecipientOk'), i);
+  ok('rules: a signed-in user may only CREATE a mail; nobody reads, changes or deletes one', /allow create: if request\.auth != null/.test(block) && /allow read, update, delete: if false/.test(block), block);
+  ok('rules: the fixed field list, one recipient, plain text of bounded size, the real author, the server time', /hasOnly\(\['to', 'message', 'requestId', 'kind', 'createdBy', 'createdAt'\]\)/.test(block) && /to\.size\(\) == 1/.test(block) && /message\.keys\(\)\.hasOnly\(\['subject', 'text'\]\)/.test(block) && /subject\.size\(\) <= 200/.test(block) && /text\.size\(\) <= 3000/.test(block) && /createdBy == request\.auth\.uid/.test(block) && /createdAt == request\.time/.test(block), block);
+  ok('rules: the recipient must be the e-mail of the request\'s creator or of the chosen admin (looked up in the accounts, not typed by the client)', /mailRecipientOk\(request\.resource\.data\.requestId, request\.resource\.data\.to\[0\]\)/.test(block) && /requests\/\$\(requestId\)\)\.data\.createdBy/.test(fn) && /support_settings\/config\)\.data\.adminUid/.test(fn) && /\.data\.email/.test(fn) && fn.split('||').length === 2, fn);
+  const s = rules.slice(rules.indexOf('match /support_settings/'), rules.indexOf('match /support_settings/') + 200);
+  ok('rules: the settings are read by signed-in users, written by the system admin only', /allow read: if request\.auth != null/.test(s) && /allow write: if isSystemAdmin\(\)/.test(s), s);
+  ok('rules: the old "notifications" placeholder (nothing ever processed it) is gone, and the page no longer writes it', !/match \/notifications\//.test(rules) && !/collection\('notifications'\)/.test(await (await fetch('/pages/support.html')).text()), null);
+
+  document.getElementById('out').textContent = out.join('\n');
+})().catch(e => { document.getElementById('out').textContent = 'HARNESS ERROR ' + e.stack; });
+</script>

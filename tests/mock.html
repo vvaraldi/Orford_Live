@@ -99,7 +99,8 @@
           update: async d => { window.__writes.push([name, id, 'update', d]); const row = (window.__data[name] || []).find(r => r.id === id); if (row) Object.assign(row, d); },
           set: async d => { window.__writes.push([name, id, 'set', d]); },
           delete: async () => { window.__writes.push([name, id, 'delete']); window.__data[name] = (window.__data[name] || []).filter(r => r.id !== id); },
-          get: async () => { const row = (window.__data[name] || []).find(r => r.id === id); return { exists: !!row, id, data: () => { if (!row) return {}; const { id: _i, ...r } = row; return r; } }; }
+          get: async () => { const row = (window.__data[name] || []).find(r => r.id === id); return { exists: !!row, id, data: () => { if (!row) return {}; const { id: _i, ...r } = row; return r; } }; },
+          collection: sub => query(name + '/' + id + '/' + sub)   // a sub-collection (e.g. the comments of a request)
         };
       },
       add: async d => { window.__writes.push([name, null, 'add', d]); return { id: 'new' }; }
@@ -126,7 +127,7 @@
     put: async () => ({}), getDownloadURL: async () => 'https://firebasestorage.googleapis.com/v0/b/test.appspot.com/o/' + encodeURIComponent(path) + '?alt=media&token=mock'
   });
   window.storage = { ref: storageRef, refFromURL: () => ({ delete: async () => {} }) };
-  window.firebase = { auth: () => ({ currentUser: { uid: 'u1', email: 't@x' } }), storage: () => window.storage, firestore: { FieldValue: { serverTimestamp: () => 'TS', delete: () => 'DEL' }, Timestamp: { fromDate: d => d } } };
+  window.firebase = { auth: () => ({ currentUser: { uid: 'u1', email: 't@x' } }), storage: () => window.storage, firestore: { FieldValue: { serverTimestamp: () => 'TS', delete: () => 'DEL', increment: n => ({ increment: n }) }, Timestamp: { fromDate: d => d } } };
   var currentUser = { uid: 'u1', email: 't@x' };
   var currentUserData = {
     uid: 'u1', name: 'Test', role: Q.get('as') === 'system' ? 'system_admin' : (Q.get('as') === 'inspector' ? 'inspector' : 'admin'),

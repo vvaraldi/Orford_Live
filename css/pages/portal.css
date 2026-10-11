@@ -13,12 +13,7 @@
   font-size: var(--text-3xl);
   font-weight: var(--font-bold);
   color: var(--theme-text);
-  margin-bottom: var(--space-2);
-}
-
-.welcome-subtitle {
-  font-size: var(--text-lg);
-  color: var(--theme-text-light);
+  margin-bottom: 0;
 }
 
 .welcome-user {
@@ -212,10 +207,6 @@
   
   .welcome-title {
     font-size: var(--text-xl);
-  }
-  
-  .welcome-subtitle {
-    font-size: var(--text-sm);
   }
   
   .app-grid {
