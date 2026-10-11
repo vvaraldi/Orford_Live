@@ -87,18 +87,6 @@
     <!-- Filters: apply to both the map and the table below -->
     <section class="content-section" style="margin-bottom:1rem;">
       <div style="display:flex; gap:1rem; flex-wrap:wrap; align-items:flex-end;">
-        <div class="form-group" style="margin-bottom:0; min-width:180px;">
-          <label class="form-label" for="filter-sector">Secteur</label>
-          <select class="form-select" id="filter-sector">
-            <option value="">Tous les secteurs</option>
-          </select>
-        </div>
-        <div class="form-group" style="margin-bottom:0; min-width:180px;">
-          <label class="form-label" for="filter-trail">Piste / Sentier</label>
-          <select class="form-select" id="filter-trail">
-            <option value="">Toutes les pistes</option>
-          </select>
-        </div>
         <!-- Both (default), permanent only or temporary only ("due à une condition temporaire") -->
         <div class="form-group" style="margin-bottom:0; min-width:180px;">
           <label class="form-label" for="filter-duration">Durée</label>
@@ -152,10 +140,7 @@
       <div class="section-card">
         <div class="section-card__header">
           <h2 class="section-card__title">📋 Rapports actifs</h2>
-          <span style="display:flex; align-items:center; gap:0.75rem; flex-wrap:wrap;">
-            <span id="reports-count" style="font-size:0.875rem;color:var(--theme-text-secondary);">0 rapport(s)</span>
-            <button type="button" class="btn btn-secondary btn-sm" id="print-sheet-btn" title="Ouvre une fiche à imprimer avec les filtres choisis, dans un nouvel onglet">🖨️ Fiche à imprimer</button>
-          </span>
+          <span id="reports-count" style="font-size:0.875rem;color:var(--theme-text-secondary);">0 rapport(s)</span>
         </div>
         <div class="section-card__body" style="padding:0;">
           <div class="table-responsive">
@@ -232,17 +217,13 @@
     let currentReportId = null;
     let sectors = []; // this activity's sectors, with their trails (SectorService.load)
     let allTrails = []; // every trail record (even hidden): tells which view (Montée / Descente) a report belongs to
-    // Filters: options are built from what's actually in reportsData, so a choice always
-    // narrows to something non-empty. Apply to both the map markers and the table.
-    let filterSector = '';
-    let filterTrail = '';
+    // Filters (Durée and Période): apply to both the map markers and the table.
     let filterDuration = 'both';   // 'both' (default), 'permanent' or 'temporary'
     let periodFilter = null;       // the Période controls (js/core/period-filter.js)
 
     // If the sectors cannot be loaded the page still shows the name stored on each report
     const sectorNameOf = r => SectorService.nameOf(sectors, r.sector, r.sectorDisplayName);
     // A trail identifies a report by id when it has one, else by name (old reports)
-    const reportTrailKey = r => r.trailId || ('name:' + (r.trail || ''));
 
     // Which map a record's photos should default to: its own trail's kind, else its sector's kind
     // when every trail of that sector shares one (e.g. a sector used only for backcountry/
@@ -267,41 +248,7 @@
     function visibleReports() {
       const period = periodFilter ? periodFilter.state() : { value: 'all' };
       let list = reportsData.filter(matchesDuration).filter(r => PeriodFilter.matches(PeriodFilter.lastChange(r), period));
-      if (filterSector) list = list.filter(r => r.sector === filterSector);
-      if (filterTrail) list = list.filter(r => reportTrailKey(r) === filterTrail);
       return list;
-    }
-
-    // Rebuilds the two filter dropdowns from what's actually in reportsData, keeping the
-    // current selection when it is still an option (otherwise resetting to "all").
-    function updateFilterOptions() {
-      const sectorIds = new Set();
-      reportsData.forEach(r => { if (r.sector) sectorIds.add(r.sector); });
-
-      const sectorSelect = document.getElementById('filter-sector');
-      const sectorOptions = Array.from(sectorIds, id => ({ id, name: SectorService.nameOf(sectors, id, id) }))
-        .sort((a, b) => a.name.localeCompare(b.name, 'fr'));
-      sectorSelect.replaceChildren(new Option('Tous les secteurs', ''), ...sectorOptions.map(s => new Option(s.name, s.id)));
-      sectorSelect.value = sectorOptions.some(s => s.id === filterSector) ? filterSector : '';
-      filterSector = sectorSelect.value;
-
-      updateTrailFilterOptions();
-    }
-
-    // The trail dropdown narrows to filterSector's trails when one is chosen.
-    function updateTrailFilterOptions() {
-      const trailSelect = document.getElementById('filter-trail');
-      const trails = new Map(); // reportTrailKey -> name
-      reportsData.forEach(r => {
-        if (filterSector && r.sector !== filterSector) return;
-        const key = reportTrailKey(r);
-        if (!trails.has(key)) trails.set(key, r.trail || key);
-      });
-      const trailOptions = Array.from(trails, ([id, name]) => ({ id, name }))
-        .sort((a, b) => a.name.localeCompare(b.name, 'fr'));
-      trailSelect.replaceChildren(new Option('Toutes les pistes', ''), ...trailOptions.map(t => new Option(t.name, t.id)));
-      trailSelect.value = trailOptions.some(t => t.id === filterTrail) ? filterTrail : '';
-      filterTrail = trailSelect.value;
     }
 
     // Montée / Descente (header switch, like Inspections): the dashboard shows the reports of the view
@@ -344,17 +291,6 @@
           buildMapSwitch();
           MapService.showImage(document.getElementById('map-image'), resumeMap);
 
-          document.getElementById('filter-sector').addEventListener('change', (e) => {
-            filterSector = e.target.value;
-            updateTrailFilterOptions(); // the trail list narrows to this sector's trails
-            renderMapMarkers();
-            renderReportsTable();
-          });
-          document.getElementById('filter-trail').addEventListener('change', (e) => {
-            filterTrail = e.target.value;
-            renderMapMarkers();
-            renderReportsTable();
-          });
           document.getElementById('filter-duration').addEventListener('change', (e) => {
             filterDuration = e.target.value;
             renderMapMarkers();
@@ -366,66 +302,30 @@
             seasonOption: document.getElementById('season-option'),
             onChange: () => { renderMapMarkers(); renderReportsTable(); }
           });
-          document.getElementById('print-sheet-btn').addEventListener('click', openPrintSheet);
 
           loadReports();
         }
       });
     }
 
-    // The one-page sheet (signalisation-print.html) opens in a new tab with the filters chosen here
-    function printSheetUrl() {
-      const params = new URLSearchParams();
-      if (filterSector) params.set('sector', filterSector);
-      if (filterTrail) params.set('trail', filterTrail);
-      params.set('duration', filterDuration);
-      PeriodFilter.toParams(periodFilter ? periodFilter.state() : { value: 'all' }, params);
-      return new URL('signalisation-print.html', location.href).href + '?' + params.toString();
-    }
-    function openPrintSheet() { window.open(printSheetUrl(), '_blank'); }
-
     async function loadReports() {
       try {
-        // Load only active reports (not resolved, not archived)
-        const snap = await db.collection('signalisations')
-          .where('resolved', '==', false)
-          .where('archived', '==', false)
-          .orderBy('createdAt', 'desc')
-          .get();
-        
+        // Active reports = not archived (read in date order, the archived ones left out here: no index needed)
+        const snap = await db.collection('signalisations').orderBy('createdAt', 'desc').get();
         reportsData = [];
         snap.forEach(doc => {
           const data = { id: doc.id, ...doc.data() };
-          if (Network.matches(data)) reportsData.push(data); // this activity's reports only
+          if (data.archived !== true && Network.matches(data)) reportsData.push(data); // this activity's reports only
         });
         reportsData = inView(reportsData);
 
-        updateFilterOptions();
         renderMapMarkers();
         renderReportsTable();
       } catch (e) {
         console.error('Error loading reports:', e);
-        // Fallback: try without compound query (might need index)
-        try {
-          const snap = await db.collection('signalisations').orderBy('createdAt', 'desc').get();
-          reportsData = [];
-          snap.forEach(doc => {
-            const data = doc.data();
-            if (data.resolved !== true && data.archived !== true && Network.matches(data)) {
-              reportsData.push({ id: doc.id, ...data });
-            }
-          });
-          reportsData = inView(reportsData);
-          updateFilterOptions();
-          renderMapMarkers();
-          renderReportsTable();
-        } catch (e2) {
-          console.error('Error loading reports (fallback):', e2);
-          document.getElementById('reports-tbody').innerHTML = '<tr class="empty-row"><td colspan="5" style="color:#ef4444;">Erreur de chargement</td></tr>';
-        }
+        document.getElementById('reports-tbody').innerHTML = '<tr class="empty-row"><td colspan="5" style="color:#ef4444;">Erreur de chargement</td></tr>';
       }
     }
-
     // One button per map of the activity (only when there are several)
     function buildMapSwitch() {
       const all = viewMaps();

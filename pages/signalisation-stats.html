@@ -40,7 +40,6 @@
     // (Montée / Descente, like the rest of the app). The numbers below are only a description; the page
     // itself (tabs, season, charts, clean-up) is data-admin.js.
     const STATUS_LABELS = { 'ouverte': 'Ouverte', 'attention-requise': 'Attention requise', 'fermee': 'Fermée' };
-    const DAY_MS = 24 * 60 * 60 * 1000;
     let sectors = [], allTrails = [];
 
     const stamp = date => firebase.firestore.Timestamp.fromDate(date);
@@ -50,7 +49,6 @@
       recs.forEach(r => { const key = keyOf(r); if (key) counts.set(key, (counts.get(key) || 0) + 1); });
       return [...counts];
     };
-    const isResolved = r => r.resolved === true;
     const percent = (n, total) => (total ? `${Math.round(n / total * 100)}% des signalisations` : '-');
 
     onFirebaseReady(() => DataAdmin.init({
@@ -65,7 +63,7 @@
         const snap = await db.collection('signalisations').where('createdAt', '>=', stamp(start)).where('createdAt', '<=', stamp(end)).get();
         const mine = snap.docs.filter(doc => Network.matches(doc.data())).map(doc => {
           const d = doc.data();
-          const created = toDate(d.createdAt), resolvedAt = toDate(d.resolvedAt);
+          const created = toDate(d.createdAt);
           return {
             id: doc.id, ...d,
             date: created,
@@ -74,8 +72,7 @@
             photoCount: PhotoService.photosFrom(d).length,
             statusLabel: STATUS_LABELS[d.status] || 'Sans statut',
             trailLabel: d.trail || 'Sans piste précisée',
-            sectorLabel: SectorService.nameOf(sectors, d.sector, d.sectorDisplayName),
-            resolutionDays: d.resolved === true && created && resolvedAt ? (resolvedAt - created) / DAY_MS : null
+            sectorLabel: SectorService.nameOf(sectors, d.sector, d.sectorDisplayName)
           };
         });
         return SectorService.inKinds(sectors, allTrails, mine, TrailService.viewKinds()); // the view shown (Montée / Descente)
@@ -83,11 +80,9 @@
 
       cards: [
         { label: 'Total signalisations', value: r => r.length, sub: () => 'Saison affichée', highlight: true },
-        { label: 'Actives (non résolues)', value: r => r.filter(i => !isResolved(i) && !i.archived).length, sub: r => percent(r.filter(i => !isResolved(i) && !i.archived).length, r.length) },
-        { label: 'Résolues', value: r => r.filter(isResolved).length, sub: r => percent(r.filter(isResolved).length, r.length) },
+        { label: 'Actives (non archivées)', value: r => r.filter(i => !i.archived).length, sub: r => percent(r.filter(i => !i.archived).length, r.length) },
         { label: 'Statut « Fermée »', value: r => r.filter(i => i.status === 'fermee').length },
         { label: 'Statut « Attention requise »', value: r => r.filter(i => i.status === 'attention-requise').length },
-        { label: 'Délai moyen de résolution', value: r => { const d = r.map(i => i.resolutionDays).filter(x => x !== null); return d.length ? `${(d.reduce((a, b) => a + b, 0) / d.length).toFixed(1)} j` : '-'; }, sub: r => `${r.filter(i => i.resolutionDays !== null).length} signalisation(s) résolue(s) avec date` },
         { label: 'Photos téléversées', value: r => r.reduce((n, i) => n + i.photoCount, 0) },
         { label: 'Inspecteurs actifs', value: r => new Set(r.map(i => i.inspectorKey)).size }
       ],
@@ -102,14 +97,14 @@
       rankings: [
         {
           title: '🏆 Classement des inspecteurs (par nombre de signalisations)',
-          columns: ['Inspecteur', 'Signalisations', 'Photos', 'Résolues'],
+          columns: ['Inspecteur', 'Signalisations', 'Photos'],
           rows: recs => {
             const stats = {};
             recs.forEach(i => {
-              const s = stats[i.inspectorKey] || (stats[i.inspectorKey] = { name: i.inspector, n: 0, photos: 0, done: 0 });
-              s.n++; s.photos += i.photoCount; if (isResolved(i)) s.done++;
+              const s = stats[i.inspectorKey] || (stats[i.inspectorKey] = { name: i.inspector, n: 0, photos: 0 });
+              s.n++; s.photos += i.photoCount;
             });
-            return Object.values(stats).sort((a, b) => b.n - a.n).map(s => [s.name, s.n, s.photos, s.done]);
+            return Object.values(stats).sort((a, b) => b.n - a.n).map(s => [s.name, s.n, s.photos]);
           }
         }
       ],
@@ -117,9 +112,9 @@
       management: {
         async overview() {
           const snap = await db.collection('signalisations').get();
-          let photos = 0, resolved = 0;
-          snap.forEach(doc => { photos += PhotoService.photosFrom(doc.data()).length; if (doc.data().resolved === true) resolved++; });
-          return [{ label: 'Signalisations', value: snap.size }, { label: 'Résolues', value: resolved }, { label: 'Photos', value: photos }];
+          let photos = 0;
+          snap.forEach(doc => { photos += PhotoService.photosFrom(doc.data()).length; });
+          return [{ label: 'Signalisations', value: snap.size }, { label: 'Photos', value: photos }];
         },
         deleteOld: {
           noun: 'les signalisations',

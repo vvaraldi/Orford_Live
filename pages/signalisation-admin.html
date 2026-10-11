@@ -28,7 +28,6 @@
     .badge--open { background: #d1fae5; color: #065f46; }
     .badge--warning { background: #fef3c7; color: #92400e; }
     .badge--closed { background: #fee2e2; color: #991b1b; }
-    .badge--resolved { background: #dbeafe; color: #1e40af; }
     .badge--archived { background: #e5e7eb; color: #374151; }
     .status-badges { display: flex; gap: 0.25rem; flex-wrap: wrap; }
     
@@ -92,6 +91,14 @@
             </select>
           </div>
           <div class="form-group">
+            <label class="form-label" for="filter-duration">Durée</label>
+            <select class="form-select" id="filter-duration" title="Une signalisation temporaire est due à une condition temporaire">
+              <option value="both" selected>Permanentes et temporaires</option>
+              <option value="permanent">Permanentes</option>
+              <option value="temporary">Temporaires</option>
+            </select>
+          </div>
+          <div class="form-group">
             <label class="form-label" for="date-filter">Période</label>
             <select class="form-select" id="date-filter" title="Selon la dernière modification du rapport">
               <option value="all" selected>Toutes les saisons</option>
@@ -114,10 +121,7 @@
               <option value="sector">Secteur</option>
             </select>
           </div>
-          <div class="form-check">
-            <input type="checkbox" class="form-check-input" id="show-resolved">
-            <label class="form-check-label" for="show-resolved">Résolus</label>
-          </div>
+
           <div class="form-check">
             <input type="checkbox" class="form-check-input" id="show-archived">
             <label class="form-check-label" for="show-archived">Archivés</label>
@@ -125,6 +129,7 @@
         </div>
         <div class="filters-actions">
           <button class="btn btn-secondary btn-sm" id="refresh-btn">🔄 Actualiser</button>
+          <button class="btn btn-secondary btn-sm" id="print-sheet-btn" title="Fiche d'une page des signalisations actives, avec le secteur, la piste, la durée et la période choisis, dans un nouvel onglet">🖨️ Fiche à imprimer</button>
         </div>
       </div>
     </div>
@@ -168,7 +173,6 @@
       <div class="detail-modal__body" id="modal-body"></div>
       <div class="detail-modal__footer">
         <div class="modal-checkboxes">
-          <label><input type="checkbox" id="modal-resolved"> Résolu</label>
           <label><input type="checkbox" id="modal-archived"> Archivé</label>
         </div>
         <div class="detail-modal__actions">
@@ -210,12 +214,12 @@
 
     let reportsData = [];
     let currentReportId = null;
-    let showResolved = false;
     let showArchived = false;
     let filterSector = '';
     let filterTrail = '';
     let sortBy = 'date';
     let periodFilter = null;   // the Période controls (js/core/period-filter.js)
+    let filterDuration = 'both';   // 'both' (default), 'permanent' or 'temporary'
     let sectors = []; // this activity's sectors, with their trails (SectorService.load)
     let allTrails = []; // every trail record (even hidden): tells which view (Montée / Descente) a report belongs to
     let filtersVisible = true;
@@ -300,15 +304,16 @@
       });
       document.getElementById('filter-trail').addEventListener('change', (e) => { filterTrail = e.target.value; renderReports(); });
       document.getElementById('sort-by').addEventListener('change', (e) => { sortBy = e.target.value; renderReports(); });
+      document.getElementById('filter-duration').addEventListener('change', (e) => { filterDuration = e.target.value; renderReports(); });
       periodFilter = PeriodFilter.attach({
         select: document.getElementById('date-filter'), custom: document.getElementById('custom-date-range'),
         start: document.getElementById('start-date'), end: document.getElementById('end-date'),
         seasonOption: document.getElementById('season-option'),
         onChange: renderReports
       });
-      document.getElementById('show-resolved').addEventListener('change', (e) => { showResolved = e.target.checked; loadReports(); });
       document.getElementById('show-archived').addEventListener('change', (e) => { showArchived = e.target.checked; loadReports(); });
       document.getElementById('refresh-btn').addEventListener('click', loadReports);
+      document.getElementById('print-sheet-btn').addEventListener('click', openPrintSheet);
       document.getElementById('toggle-filters').addEventListener('click', toggleFilters);
     }
 
@@ -320,7 +325,6 @@
         snap.forEach(doc => {
           const data = { id: doc.id, ...doc.data() };
           if (!Network.matches(data)) return; // this activity's reports only
-          if (!showResolved && data.resolved === true) return;
           if (!showArchived && data.archived === true) return;
           reportsData.push(data);
         });
@@ -335,6 +339,17 @@
       }
     }
 
+    // The one-page sheet of the ACTIVE signs (signalisation-print.html), in a new tab, with the sector, trail and period chosen here
+    function printSheetUrl() {
+      const params = new URLSearchParams();
+      if (filterSector) params.set('sector', filterSector);
+      if (filterTrail) params.set('trail', filterTrail);
+      params.set('duration', filterDuration);
+      PeriodFilter.toParams(periodFilter ? periodFilter.state() : { value: 'all' }, params);
+      return new URL('signalisation-print.html', location.href).href + '?' + params.toString();
+    }
+    function openPrintSheet() { window.open(printSheetUrl(), '_blank'); }
+
     function renderReports() {
       const tbody = document.getElementById('reports-tbody');
       
@@ -342,6 +357,8 @@
       // Compare by current sector id so a record with an older id (alias) still matches
       if (filterSector) filtered = filtered.filter(r => SectorService.find(sectors, r.sector)?.id === filterSector);
       if (filterTrail) filtered = filtered.filter(r => reportTrailKey(r) === filterTrail);
+      // Durée: a report without the field is permanent (all reports made before the choice existed)
+      if (filterDuration !== 'both') filtered = filtered.filter(r => (filterDuration === 'temporary') === (r.duration === 'temporary'));
       // Période: judged on the last change of the report (js/core/period-filter.js)
       const period = periodFilter ? periodFilter.state() : { value: 'all' };
       filtered = filtered.filter(r => PeriodFilter.matches(PeriodFilter.lastChange(r), period));
@@ -369,7 +386,6 @@
         }
         
         let etatBadges = [];
-        if (r.resolved) etatBadges.push('<span class="badge badge--resolved">Résolu</span>');
         if (r.archived) etatBadges.push('<span class="badge badge--archived">Archivé</span>');
         const etatHtml = etatBadges.length ? `<div class="status-badges">${etatBadges.join('')}</div>` : '<span style="color:var(--theme-text-secondary);">Actif</span>';
         const photoCount = PhotoService.photosFrom(r).length;
@@ -459,7 +475,6 @@
       WeatherContext.attach(document.getElementById('modal-body'), date);   // the weather nearest in time to the report (if the admin switch is on)
       document.getElementById('admin-duration').value = r.duration === 'temporary' ? 'temporary' : 'permanent';   // an admin can swap permanent / temporary
       fillLocationEditor(r);
-      document.getElementById('modal-resolved').checked = r.resolved || false;
       document.getElementById('modal-archived').checked = r.archived || false;
       
       document.getElementById('detail-modal').classList.add('show');
@@ -519,7 +534,6 @@
       if (!currentReportId) return;
       
       const adminComments = document.getElementById('admin-comments').value.trim();
-      const resolved = document.getElementById('modal-resolved').checked;
       const archived = document.getElementById('modal-archived').checked;
       const report = reportsData.find(rep => rep.id === currentReportId);
       const location = report ? locationChanges(report) : null;
@@ -531,14 +545,12 @@
       try {
         const updateData = {
           adminComments: adminComments || null,
-          resolved: resolved,
           archived: archived,
           duration: document.getElementById('admin-duration').value === 'temporary' ? 'temporary' : 'permanent',
           adminModifiedAt: firebase.firestore.FieldValue.serverTimestamp()
         };
         
         if (location) Object.assign(updateData, location); // never "network": the activity cannot change
-        if (resolved) updateData.resolvedAt = firebase.firestore.FieldValue.serverTimestamp();
         if (archived) updateData.archivedAt = firebase.firestore.FieldValue.serverTimestamp();
         
         await db.collection('signalisations').doc(currentReportId).update(updateData);

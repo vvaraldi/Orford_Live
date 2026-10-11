@@ -76,6 +76,15 @@ const APP_CONFIG = {
     api: 'https://api.weather.gc.ca/collections/swob-realtime/items',
     maxAgeHours: 3,                 // an observation older than this (before the chosen time) is not offered
     defaultLocation: 'mountain',
+    // The choices of the fields typed by hand (the customer's sheet): id -> words shown. The id is what is
+    // stored, so a word can be changed here without touching the readings already saved; do not change an id
+    // that is already used. The order here is the order of the drop-down.
+    lists: {
+      windForce:  { nul: 'Nul', faible: 'Faible', moyen: 'Moyen', fort: 'Fort', 'tres-fort': 'Très fort' },
+      snowType:   { 'poudreuse-legere': 'Poudreuse légère', 'poudreuse-lourde': 'Poudreuse lourde', granulaire: 'Granulaire', mouillee: 'Neige mouillée', croutee: 'Croûtée', glacee: 'Glacée', printaniere: 'Printanière' },
+      snowBase:   { solide: 'Solide', variable: 'Variable', mou: 'Mou', glace: 'Glacé', mince: 'Mince' },
+      snowCover:  { excellente: 'Excellente', bonne: 'Bonne', 'endroits-a-decouvert': 'Endroits à découvert', insuffisante: 'Insuffisante' }
+    },
     locations: {
       mountain: {
         id: 'mountain', name: 'Mont Orford',

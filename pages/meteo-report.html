@@ -414,8 +414,8 @@
         const mark = k => v[k] ? `<span class="wx-src" title="${v[k].source === 'manual' ? 'Valeur saisie' : 'Environnement Canada'}">${v[k].source === 'manual' ? '✎' : '🌐'}</span>` : '';
         const show = k => v[k] ? escapeHtml(display(k, v[k].value)) + mark(k) : '';
         const temp = v.tempC ? show('tempC') + (v.feelsLikeC && v.feelsLikeC.value !== v.tempC.value ? ` (ressenti ${show('feelsLikeC')})` : '') : '';
-        const wind = v.windKmh ? show('windKmh') + (v.windDir ? ' ' + escapeHtml(WS.compass(v.windDir.value)) : '') + (v.gustKmh ? `, rafales ${show('gustKmh')}` : '') : '';
-        const snow = cellText([v.newSnowCm ? 'frais ' + show('newSnowCm') : '', v.snowDepthCm ? 'base ' + show('snowDepthCm') : '']);
+        const wind = (v.windForce && !v.windKmh) ? show('windForce') : v.windKmh ? (v.windForce ? show('windForce') + ', ' : '') + show('windKmh') + (v.windDir ? ' ' + escapeHtml(WS.compass(v.windDir.value)) : '') + (v.gustKmh ? `, rafales ${show('gustKmh')}` : '') : '';
+        const snow = cellText([v.newSnowCm ? 'frais ' + show('newSnowCm') : '', v.snowType ? show('snowType') : '', v.snowDepthCm ? 'base ' + show('snowDepthCm') : '', v.snowBase ? 'fond ' + show('snowBase') : '', v.snowCover ? 'couv. ' + show('snowCover') : '']);
         const sky = cellText([v.cloudCover ? show('cloudCover') : '', v.sky ? show('sky') : '']);
         const comment = r.comment ? `<div class="wx-comment" title="${escapeHtml(r.comment)}">${escapeHtml(r.comment)}</div>` : '—';
         return `<tr data-id="${r.id}">

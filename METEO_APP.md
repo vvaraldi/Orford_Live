@@ -163,3 +163,6 @@ Public JSON, no key, readable from a page (cross-site calls allowed):
   as a shell with its access check and navigation (nav set `meteo`); rules for `weather_records`,
   `weather_public/latest` and `weather_settings` (to republish). The "Gestion" and "Admin" navigation entries
   come with their pages (step 4), so no dead entry is shown meanwhile.
+
+### 2026-10-10 - the customer's own sheet (Force des vents, Conditions de neige, Fond, Couverture)
+Four fields typed by hand only (Environment Canada gives none of them) were added to what exists, in the customer's priority order: temperature, felt, **wind force**, wind, gusts, direction, new snow, **snow conditions**, snow depth (cm, kept), **fond**, **couverture**, rain, clouds, conditions, humidity, pressure, visibility. Their choices are in config.js (APP_CONFIG.weather.lists: the id is stored, the words can be changed); they go to the public page and the other website as words. The Firestore rules (weather_public measures) had to be republished.

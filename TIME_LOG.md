@@ -36,13 +36,15 @@ positions, editing README.md, testing as a real user, etc.).
 | 2026-10-10 (Support list and settings) | 2026-10-10 21:56 → 22:08 (the setup guide corrected for the region, the answer about the chosen admin, archived requests hidden by default with a checkbox, the e-mail settings moved to the bottom of the Support page, 10 x 3 tests) | ~12m | ~12m |
 | 2026-10-10 (Cloud Function for the e-mails) | 2026-10-10 22:08 → 22:23 (the Firebase extension is being shut down, so the Support e-mails are sent by our own Cloud Function: the sending logic, its deployment files, 30 tests, the cost check and the rewritten setup guide) | ~11m | ~16m |
 | 2026-10-10 (Signalisations period and sheet) | 2026-10-10 22:23 → 22:42 (the Période filter on the dashboard and on Gestion, the "Fiche à imprimer" button and the one-page sheet in a new tab, my questions and your answers, 3 new test files and the checks on screen) | ~14m | ~19m |
+| 2026-10-10 (Signalisations sheet, second round) | 2026-10-10 22:42 → 23:03 (the sheet page without the portal header and menus, photos three times bigger, a wider comment column, the print button also on Gestion, tests and a check on screen; the Météo part of this block is in TIME_LOG_METEO.md) | ~7m | ~9m |
+| 2026-10-10 (Signalisations: dashboard, Gestion, no more "Résolu") | 2026-10-10 23:03 → 23:25 (the dashboard keeps only Durée and Période and loses the print button, Gestion gets the Durée filter and the only print button, the "Résolu" option removed from the report form, Gestion, the dashboard, the sheet and the statistics, tests updated) | ~17m | ~22m |
 
 **Manual addition (not from chat timestamps):** +2h00m - customer/team meetings, morning of 2026-09-28 (before the day's chat activity started; per the Method note above, offline time isn't normally included, but you asked for this one to be logged).
 
-**Running total (active chat time + the meeting addition, all estimates so far): ~19h08m - 25h46m**
+**Running total (active chat time + the meeting addition, all estimates so far): ~19h32m - 26h17m**
 (The Météo app started on 2026-10-09 is logged on its own in `TIME_LOG_METEO.md` and is not in this total.)
 
-**Note:** the 2026-10-10 (Signalisations period and sheet) row is computed up to 22:42, when this estimate was made; the
+**Note:** the 2026-10-10 (Signalisations: dashboard, Gestion, no more "Résolu") row is computed up to 23:25, when this estimate was made; the
 session may have continued after that, and any further time will need a new row. 2026-09-23 (the
 Firebase backup/export session, ~5 min of chat) was missing from earlier estimates and is now
 included. Nothing was logged in the transcript on 2026-09-24 to 2026-09-27, 2026-09-30 or 2026-10-01.

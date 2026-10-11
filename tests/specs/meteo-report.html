@@ -21,7 +21,12 @@
   ok('navigation: an Admin entry for the Météo Admin page, shown to admins and system admins, hidden to other users', !!adminLink && /meteo-stats\.html$/.test(adminLink.getAttribute('href')) && (getComputedStyle(adminLink).display !== 'none') === (AS !== 'inspector'), [adminLink && adminLink.getAttribute('href'), adminLink && getComputedStyle(adminLink).display]);
 
   // ---- the form on opening ----
-  ok('13 measures, each with its label and unit, a web cell and a typed input', document.querySelectorAll('.wx-row').length === 13 && /Neige fraîche \(24 h\)\s*\(cm\)/.test(text('fields-grid')) && /Température ressentie/.test(text('fields-grid')) && /Rafales/.test(text('fields-grid')), text('fields-grid').slice(0, 200));
+  ok('17 measures, each with its label and unit, a web cell and a typed input', document.querySelectorAll('.wx-row').length === 17 && /Neige fraîche \(24 h\)\s*\(cm\)/.test(text('fields-grid')) && /Température ressentie/.test(text('fields-grid')) && /Rafales/.test(text('fields-grid')), text('fields-grid').slice(0, 200));
+  const labelsOrder = [...document.querySelectorAll('.wx-row .wx-label')].map(l => l.firstChild.textContent.trim());
+  ok('the order of the form is the customer\'s priority: temperature, felt, wind force, wind, gusts, direction, new snow, snow conditions, base (cm), fond, couverture, rain, clouds, conditions, humidity, pressure, visibility', J(labelsOrder) === J(['Température', 'Température ressentie', 'Force du vent', 'Vent', 'Rafales', 'Direction du vent', 'Neige fraîche (24 h)', 'Conditions de neige', 'Neige au sol (base)', 'Fond', 'Couverture', 'Pluie (24 h)', 'Nuages', 'Conditions', 'Humidité', 'Pression', 'Visibilité']), labelsOrder);
+  const optionTexts = id => [...$(id).options].map(o => o.textContent);
+  ok('the typed-only lists (customer\'s sheet): force du vent, conditions de neige, fond, couverture - each with a blank option, the words of config.js', J(optionTexts('in-windForce')) === J(['—', 'Nul', 'Faible', 'Moyen', 'Fort', 'Très fort']) && optionTexts('in-snowType')[1] === 'Poudreuse légère' && optionTexts('in-snowBase').includes('Variable') && optionTexts('in-snowCover').includes('Endroits à découvert') && optionTexts('in-snowCover').includes('Bonne'), [optionTexts('in-windForce'), optionTexts('in-snowType')]);
+  ok('their web cell is blank for good: Environment Canada gives none of these four', ['windForce', 'snowType', 'snowBase', 'snowCover'].every(k => $('web-' + k).textContent === '—'), null);
   ok('choices: clouds (clear / partly / overcast) and conditions (sun / snow / rain / fog), each with a blank option', $('in-cloudCover').options.length === 4 && $('in-sky').options.length === 5 && $('in-cloudCover').value === '' && $('in-sky').value === '', null);
   ok('typed values start BLANK, the web cells show "—", the comment is empty', WeatherService.KEYS.every(k => $('in-' + k).value === '') && WeatherService.KEYS.every(k => $('web-' + k).textContent === '—') && $('comment').value === '', null);
   const at0 = new Date($('recorded-at').value);
@@ -119,6 +124,22 @@
   type('tempC', '3'); submit(); await wait(500);
   ok('public copy not updatable: the reading is saved all the same, and the toast says the public page was not updated', writes().filter(w => w[2] === 'add').length === addsBefore + 1 && /Relevé enregistré, mais la page publique n'a pas pu être mise à jour/.test(toast()), [toast(), writes().filter(w => w[2] === 'add').length, addsBefore]);
   window.db.collection = realCollection;
+
+  // ---- the four typed-only lists are saved, published as words, and shown in the day's list ----
+  setAt('2026-01-15T16:00'); window.fetch = async () => ({ ok: true, json: async () => ({ features: [] }) });
+  type('tempC', '-4'); type('windForce', 'fort'); type('snowType', 'poudreuse-legere'); type('snowBase', 'variable'); type('snowCover', 'endroits-a-decouvert');
+  const addsNow = writes().filter(w => w[2] === 'add').length;
+  submit(); await wait(500);
+  const addedLists = writes().filter(w => w[2] === 'add').slice(addsNow);
+  ok('the four listed values are saved as their ids, next to the others', addedLists.length === 1 && addedLists[0][3].manual.windForce === 'fort' && addedLists[0][3].manual.snowType === 'poudreuse-legere' && addedLists[0][3].manual.snowBase === 'variable' && addedLists[0][3].manual.snowCover === 'endroits-a-decouvert' && addedLists[0][3].manual.tempC === -4, addedLists);
+  // (the mock does not keep what is written: the saved reading is added to its data to see it as the page would)
+  const W3 = Object.assign({ id: 'W3' }, addedLists[0][3]); window.__data.weather_records.push(W3);
+  const pubDoc = WeatherService.publicDocument(W3, window.firebase);
+  ok('its public document carries them as WORDS (the other website has no copy of the lists)', pubDoc.measures.windForce === 'Fort' && pubDoc.measures.snowType === 'Poudreuse légère' && pubDoc.measures.snowBase === 'Variable' && pubDoc.measures.snowCover === 'Endroits à découvert' && pubDoc.measures.tempC === -4, pubDoc.measures);
+  setListDay('2026-01-15'); await wait(300);
+  const listed = rowsText().find(r => /^16 h 00/.test(r)) || '';
+  ok('the day\'s list shows them: force of the wind, the snow words, fond and couverture', /Fort✎/.test(listed) && /Poudreuse légère✎/.test(listed) && /fond Variable✎/.test(listed) && /couv\. Endroits à découvert✎/.test(listed), listed);
+  window.__data.weather_records = window.__data.weather_records.filter(r => r.id !== 'W3');  window.__writes.length = 0;
 
   // ---- deleting a reading: system admin only, after a confirmation ----
   if (SYS) {

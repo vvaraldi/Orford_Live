@@ -39,7 +39,7 @@
     const c = cards();
     // Montée (default) shows the uphill view: only the old report whose trail is unknown (SIG1); Descente adds SIG2 (2 photos)
     ok(bike ? 'bike: 1 signalisation' : (downhill ? 'Descente: 2 signalisations (the unknown-trail one shows in both views), 2 photos' : 'Montée: 1 signalisation (the downhill one is in the other view)'), bike ? c['Total signalisations'] === '1' : (downhill ? c['Total signalisations'] === '2' && c['Photos téléversées'] === '2' : c['Total signalisations'] === '1' && c['Photos téléversées'] === '0'), c);
-    ok('active / resolved / status cards', bike || (c['Actives (non résolues)'] === c['Total signalisations'] && c['Résolues'] === '0' && c['Statut « Fermée »'] === (downhill ? '1' : '0') && c['Délai moyen de résolution'] === '-'), c);
+    ok('active (not archived) / status cards; no "résolue" card and no resolution delay any more', bike || (c['Actives (non archivées)'] === c['Total signalisations'] && c['Statut « Fermée »'] === (downhill ? '1' : '0') && !('Résolues' in c) && !('Délai moyen de résolution' in c) && !('Actives (non résolues)' in c)), c);
     ok('status chart uses the statuses\' names', chartLabels('status').every(l => ['Ouverte', 'Attention requise', 'Fermée', 'Sans statut'].includes(l)) && chartLabels('status').length >= 1, chartLabels('status'));
     ok('inspectors ranking: one row, with the count of signalisations', rankRows(0).length === 1 && rankRows(0)[0][0] === 'Test', rankRows(0));
   }

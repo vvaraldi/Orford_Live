@@ -21,22 +21,28 @@ const WeatherService = (() => {
   // ---- The fields (units: °C, km/h, mm, cm, %, kPa, km) ----
   const CLOUD_COVER = { clear: 'Dégagé', partly: 'Partiellement nuageux', overcast: 'Couvert' };
   const SKY = { sun: 'Soleil', snow: 'Neige', rain: 'Pluie', fog: 'Brouillard' };
+  const LISTS = (APP_CONFIG.weather && APP_CONFIG.weather.lists) || {};   // the typed-only choices (config.js)
+  // In the order of the form (the customer's priority). windForce, snowType, snowBase and snowCover exist only typed
+  // by hand: Environment Canada does not give them.
   const FIELDS = [
     { key: 'tempC', label: 'Température', unit: '°C', type: 'number', min: -60, max: 50, step: 0.1 },
     { key: 'feelsLikeC', label: 'Température ressentie', unit: '°C', type: 'number', min: -90, max: 60, step: 1 },
+    { key: 'windForce', label: 'Force du vent', type: 'choice', choices: LISTS.windForce || {}, listed: true },
     { key: 'windKmh', label: 'Vent', unit: 'km/h', type: 'number', min: 0, max: 300, step: 1 },
-    { key: 'windDir', label: 'Direction du vent', unit: '°', type: 'number', min: 0, max: 360, step: 1 },
     { key: 'gustKmh', label: 'Rafales', unit: 'km/h', type: 'number', min: 0, max: 300, step: 1 },
-    { key: 'rainMm', label: 'Pluie (24 h)', unit: 'mm', type: 'number', min: 0, max: 500, step: 0.1 },
+    { key: 'windDir', label: 'Direction du vent', unit: '°', type: 'number', min: 0, max: 360, step: 1 },
     { key: 'newSnowCm', label: 'Neige fraîche (24 h)', unit: 'cm', type: 'number', min: 0, max: 300, step: 1 },
+    { key: 'snowType', label: 'Conditions de neige', type: 'choice', choices: LISTS.snowType || {}, listed: true },
     { key: 'snowDepthCm', label: 'Neige au sol (base)', unit: 'cm', type: 'number', min: 0, max: 1000, step: 1 },
+    { key: 'snowBase', label: 'Fond', type: 'choice', choices: LISTS.snowBase || {}, listed: true },
+    { key: 'snowCover', label: 'Couverture', type: 'choice', choices: LISTS.snowCover || {}, listed: true },
+    { key: 'rainMm', label: 'Pluie (24 h)', unit: 'mm', type: 'number', min: 0, max: 500, step: 0.1 },
     { key: 'cloudCover', label: 'Nuages', type: 'choice', choices: CLOUD_COVER },
     { key: 'sky', label: 'Conditions', type: 'choice', choices: SKY },
-    { key: 'visibilityKm', label: 'Visibilité', unit: 'km', type: 'number', min: 0, max: 100, step: 0.1 },
     { key: 'humidityPct', label: 'Humidité', unit: '%', type: 'number', min: 0, max: 100, step: 1 },
-    { key: 'pressureKpa', label: 'Pression', unit: 'kPa', type: 'number', min: 80, max: 110, step: 0.1 }
-  ];
-  const KEYS = FIELDS.map(f => f.key);
+    { key: 'pressureKpa', label: 'Pression', unit: 'kPa', type: 'number', min: 80, max: 110, step: 0.1 },
+    { key: 'visibilityKm', label: 'Visibilité', unit: 'km', type: 'number', min: 0, max: 100, step: 0.1 }
+  ];  const KEYS = FIELDS.map(f => f.key);
   const fieldOf = key => FIELDS.find(f => f.key === key);
 
   const config = () => APP_CONFIG.weather;
@@ -366,7 +372,8 @@ const WeatherService = (() => {
     const stations = new Set();
     const loc = location(record.locationId);
     keys.forEach(k => {
-      measures[k] = eff[k].value;
+      // the words of a typed-only list go out as words (the other website has no copy of the lists); the rest as stored
+      measures[k] = fieldOf(k).listed ? (fieldOf(k).choices[eff[k].value] || String(eff[k].value)) : eff[k].value;
       if (eff[k].source !== 'manual') {
         webFields.push(k);
         const st = loc.stations.find(s => s.id === eff[k].source);

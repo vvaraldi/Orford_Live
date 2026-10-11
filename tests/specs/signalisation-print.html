@@ -15,9 +15,9 @@
   const photoA = { url: 'a1.jpg', filename: 'a1.jpg', coordinates: { latitude: 45.31, longitude: -72.23 }, timestamp: null };
   const photoB = { url: 'a2.jpg', filename: 'a2.jpg', coordinates: null, timestamp: null };
   reports = [
-    { id: 'A', network: 'ski', sector: 'mont-orford', sectorDisplayName: 'Mont-Orford', trail: 'Adams', trailId: 'trail_2', comments: 'Poteau à remplacer', status: 'ouverte', resolved: false, archived: false, inspectorName: 'Zed Inspecteur', createdAt: at(100), modifiedAt: at(2), photos: [photoA, photoB] },
-    { id: 'B', network: 'ski', sector: 'mont-orford', sectorDisplayName: 'Mont-Orford', trail: 'Maxi', trailId: 'run_2', comments: '', status: 'fermee', resolved: false, archived: false, inspectorName: 'Zed Inspecteur', duration: 'temporary', createdAt: at(10), photos: [] },
-    { id: 'C', network: 'ski', sector: 'giroux-nord', sectorDisplayName: 'Mont Giroux Nord', trail: 'Magog', comments: 'Filet <b>abîmé</b>', status: 'ouverte', resolved: false, archived: false, inspectorName: 'Autre Nom', createdAt: at(40), modifiedAt: at(1), photos: [{ url: 'c1.jpg', filename: 'c1.jpg', coordinates: null, timestamp: null }] }
+    { id: 'A', network: 'ski', sector: 'mont-orford', sectorDisplayName: 'Mont-Orford', trail: 'Adams', trailId: 'trail_2', comments: 'Poteau à remplacer', status: 'ouverte', archived: false, inspectorName: 'Zed Inspecteur', createdAt: at(100), modifiedAt: at(2), photos: [photoA, photoB] },
+    { id: 'B', network: 'ski', sector: 'mont-orford', sectorDisplayName: 'Mont-Orford', trail: 'Maxi', trailId: 'run_2', comments: '', status: 'fermee', archived: false, inspectorName: 'Zed Inspecteur', duration: 'temporary', createdAt: at(10), photos: [] },
+    { id: 'C', network: 'ski', sector: 'giroux-nord', sectorDisplayName: 'Mont Giroux Nord', trail: 'Magog', comments: 'Filet <b>abîmé</b>', status: 'ouverte', archived: false, inspectorName: 'Autre Nom', createdAt: at(40), modifiedAt: at(1), photos: [{ url: 'c1.jpg', filename: 'c1.jpg', coordinates: null, timestamp: null }] }
   ];
   render();
   const ids = () => [...document.querySelectorAll('#sheet-list .sign')].map(s => s.dataset.id).join('');
@@ -57,16 +57,20 @@
     ok('state: temporary or permanent (a sign without the field is permanent)', /Permanente/.test(row('A').querySelector('.badge').textContent) && /Temporaire/.test(row('B').querySelector('.badge').textContent) && /Permanente/.test(row('C').querySelector('.badge').textContent), null);
     ok('trail name and comment (escaped, never markup)', row('A').textContent.includes('Adams') && row('A').textContent.includes('Poteau à remplacer') && row('C').textContent.includes('Filet <b>abîmé</b>') && !row('C').querySelector('.sign__comment b'), row('C').innerHTML);
     const thumbs = row('A').querySelectorAll('.sign__thumb');
-    ok('small photos, each one opening full size in a new tab', thumbs.length === 2 && /window\.open\(this\.src, '_blank'\)/.test(thumbs[0].getAttribute('onclick')) && getComputedStyle(thumbs[0]).width === '76px', [thumbs.length, getComputedStyle(thumbs[0]).width]);
+    ok('photos three times bigger (228 px, one under the other), each one opening full size in a new tab', thumbs.length === 2 && /window\.open\(this\.src, '_blank'\)/.test(thumbs[0].getAttribute('onclick')) && getComputedStyle(thumbs[0]).width === '228px' && getComputedStyle(thumbs[0]).height === '228px', [thumbs.length, getComputedStyle(thumbs[0]).width]);
     const links = row('A').querySelector('.sign__photo').querySelector('.photo-location');
     ok('a photo with a position has its map links (📍 Carte and Google Maps)', !!links && /📍 Carte/.test(links.textContent) && !!links.querySelector('a[href^="https://www.google.com/maps?q=45.31,-72.23"]'), links && links.innerHTML);
     ok('a photo without a position has no map link (only the edit link for who may edit)', !/Carte/.test(row('C').textContent) && !/Carte/.test(row('A').querySelectorAll('.sign__photo')[1].textContent), null);
     ok('a sign without photo says so', /Aucune photo/.test(row('B').textContent), null);
-    ok('the ✏️ / links are hidden on paper, the buttons and menus too', /@media print[\s\S]*\.sign \.photo-location \{ display: none; \}/.test(document.querySelector('style').textContent) && /\.no-print/.test(document.querySelector('style').textContent) && $('print-btn').closest('.no-print') !== null, null);
+    ok('on paper: the map links and ✏️ are hidden, the photos stay big (192 px)', /@media print[\s\S]*\.sign \.photo-location \{ display: none; \}/.test(document.querySelector('style').textContent) && /\.no-print/.test(document.querySelector('style').textContent) && /\.sign__thumb \{ width: 192px; height: 192px/.test(document.querySelector('style').textContent), null);
     ok('a sign is never cut across two pages', /break-inside: avoid/.test(document.querySelector('style').textContent), null);
     const printed = []; window.print = () => printed.push(1); $('print-btn').click();
     ok('the Imprimer button prints the sheet', printed.length === 1, printed);
-    ok('the photo-location links and sector are not in a nav or modal of their own: the sheet is one article', document.querySelectorAll('article.sheet').length === 1, null);
+    ok('the page holds only the sheet: no portal header, no menu, no footer, no toolbar, no link out of the sheet', document.querySelectorAll('article.sheet').length === 1 && !document.querySelector('header.header, nav, footer, .mobile-nav, .skip-link, .sheet-tools') && !document.querySelector('a[href*="index.html"], a[href*="pages/"]'), document.body.children.length);
+    ok('a plain white page (the portal\'s background pattern is off)', getComputedStyle(document.body).backgroundColor === 'rgb(255, 255, 255)' && getComputedStyle(document.body, '::before').display === 'none', getComputedStyle(document.body, '::before').display);
+    const sheetCols = getComputedStyle(row('A')).gridTemplateColumns.split(' ').map(parseFloat);
+    ok('the comment column gets the width: photos 236 px, then the wide column, then the state column', sheetCols.length === 3 && Math.round(sheetCols[0]) === 236 && sheetCols[1] > sheetCols[2] * 2 && sheetCols[1] >= 200, sheetCols);
+    ok('the only control is a small round Imprimer button, never printed', !!$('print-btn') && $('print-btn').classList.contains('no-print') && getComputedStyle($('print-btn')).position === 'fixed', null);
   }
 
   document.getElementById('out').textContent = out.join('\n');

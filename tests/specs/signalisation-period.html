@@ -1,7 +1,8 @@
 <pre id="out" style="position:fixed;left:0;bottom:0;background:#fff;color:#000;font-size:11px;z-index:99999;max-height:35vh;overflow:auto">running...</pre>
 <script>
-// The Période filter on the Signalisations dashboard and on its Gestion page (judged on the last change of a report),
-// and the dashboard's "Fiche à imprimer" button.
+// The Durée and Période filters of the Signalisations dashboard (which has only those two, no print button) and of its
+// Gestion page (which also has the sector and trail filters and the "Fiche à imprimer" button). Judged on the last
+// change of a report.
 (async () => {
   const out = []; const J = JSON.stringify;
   const ok = (n, c, x) => out.push((c ? 'PASS ' : 'FAIL ') + n + (c ? '' : ' :: ' + J(x)));
@@ -12,20 +13,22 @@
   ok('no script errors on load', window.__errs.length === 0, window.__errs);
 
   const DAYMS = 86400000, at = d => ({ toDate: () => new Date(Date.now() - d * DAYMS) });
-  const rec = (id, sector, trail, created, modified, extra) => Object.assign({ id, network: 'ski', sector, sectorDisplayName: sector, trail, trailId: trail === 'Adams' ? 'trail_2' : undefined, status: 'ouverte', resolved: false, archived: false, inspectorName: 'X', photos: [], createdAt: at(created), modifiedAt: modified == null ? undefined : at(modified) }, extra || {});
+  const rec = (id, sector, trail, created, modified, extra) => Object.assign({ id, network: 'ski', sector, sectorDisplayName: sector, trail, trailId: trail === 'Adams' ? 'trail_2' : undefined, status: 'ouverte', archived: false, inspectorName: 'X', photos: [], createdAt: at(created), modifiedAt: modified == null ? undefined : at(modified) }, extra || {});
   const data = [rec('A', 'mont-orford', 'Adams', 100, 2), rec('B', 'mont-orford', 'Maxi', 10, null), rec('C', 'giroux-nord', 'Magog', 40, 1), rec('D', 'mont-orford', 'Old', 400, null)];
   const isResume = PAGE === 'signalisation-resume';
-  if (isResume) { reportsData = data.slice(); updateFilterOptions(); renderReportsTable(); } else { reportsData = data.slice(); updateTrailFilterOptions(); renderReports(); }
+  reportsData = data.slice();
+  if (isResume) renderReportsTable(); else { updateTrailFilterOptions(); renderReports(); }
   const rows = () => [...document.querySelectorAll('#reports-tbody tr[data-id]')].map(r => r.dataset.id).sort().join('');
   const choose = (v, a, b) => { const s = $('date-filter'); s.value = v; if (a !== undefined) $('start-date').value = a; if (b !== undefined) $('end-date').value = b; s.dispatchEvent(new Event('change')); };
+  const dur = v => { $('filter-duration').value = v; $('filter-duration').dispatchEvent(new Event('change')); };
   const ymd = d => { const x = new Date(Date.now() - d * DAYMS); return `${x.getFullYear()}-${String(x.getMonth() + 1).padStart(2, '0')}-${String(x.getDate()).padStart(2, '0')}`; };
 
+  // ---- Période (both pages) ----
   const sel = $('date-filter');
   ok('a "Période" selector with the same six choices as Inspections', J([...sel.options].map(o => o.value)) === J(['all', 'season', 'today', 'week', 'month', 'custom']) && /Toutes les saisons/.test(sel.options[0].textContent) && /Dates personnalisées/.test(sel.options[5].textContent), [...sel.options].map(o => o.value));
   ok('it opens on "Toutes les saisons": every report is listed', sel.value === 'all' && rows() === 'ABCD', [sel.value, rows()]);
   ok('the season choice shows the season\'s dates', /\d{4}/.test($('season-option').textContent) && $('season-option').textContent !== 'Saison en cours', $('season-option').textContent);
   ok('the date boxes appear only for "Dates personnalisées"', getComputedStyle($('custom-date-range')).display === 'none', null);
-
   choose('week');
   ok('7 derniers jours: judged on the LAST CHANGE (A changed 2 days ago and C yesterday, though made long ago; B was made 10 days ago)', rows() === 'AC', rows());
   choose('month');
@@ -43,30 +46,40 @@
   choose('all', '', '');
   ok('back to all: everything again, date boxes hidden', rows() === 'ABCD' && getComputedStyle($('custom-date-range')).display === 'none', rows());
 
-  // it combines with the sector filter
-  $('filter-sector').value = 'mont-orford'; $('filter-sector').dispatchEvent(new Event('change'));
-  choose('month');
-  ok('combined with the sector filter: only that sector\'s reports of the period', rows() === 'AB', rows());
-  $('filter-sector').value = ''; $('filter-sector').dispatchEvent(new Event('change'));
+  // ---- Durée (both pages) ----
+  ok('Durée: "Permanentes et temporaires" by default, then Permanentes, Temporaires', J([...$('filter-duration').options].map(o => o.value)) === J(['both', 'permanent', 'temporary']) && $('filter-duration').value === 'both', null);
+  reportsData[1].duration = 'temporary';
+  renderIt();
+  function renderIt() { if (isResume) renderReportsTable(); else renderReports(); }
+  dur('temporary');
+  ok('Durée "Temporaires": only the temporary report', rows() === 'B', rows());
+  dur('permanent');
+  ok('Durée "Permanentes": the others (a report without the field is permanent)', rows() === 'ACD', rows());
+  dur('temporary'); choose('week');
+  ok('Durée and Période combine: temporary AND changed in the last 7 days = none', rows() === '', rows());
+  dur('permanent');
+  ok('... permanent AND changed in the last 7 days = A and C', rows() === 'AC', rows());
+  dur('both'); choose('all', '', ''); delete reportsData[1].duration; renderIt();
+  ok('back to the defaults: every report again', rows() === 'ABCD', rows());
 
   if (isResume) {
-    // the print button: opens the sheet in a new tab with the filters chosen
-    const opened = []; window.open = (url, target) => { opened.push([url, target]); return null; };
-    choose('all', '', '');
-    $('print-sheet-btn').click();
-    let u = new URL(opened[0][0]);
-    ok('"Fiche à imprimer" opens the sheet page in a NEW tab', opened.length === 1 && opened[0][1] === '_blank' && /\/signalisation-print\.html$/.test(u.pathname), opened);
-    ok('with no filter chosen: duration both and period all only', u.searchParams.get('duration') === 'both' && u.searchParams.get('period') === 'all' && !u.searchParams.has('sector') && !u.searchParams.has('trail'), u.search);
-    $('filter-sector').value = 'mont-orford'; $('filter-sector').dispatchEvent(new Event('change'));
-    $('filter-trail').value = 'trail_2'; $('filter-trail').dispatchEvent(new Event('change'));
-    $('filter-duration').value = 'temporary'; $('filter-duration').dispatchEvent(new Event('change'));
-    choose('custom', '2026-01-01', '2026-01-31');
-    $('print-sheet-btn').click();
-    u = new URL(opened[1][0]);
-    ok('the sector, trail, duration and period chosen are passed along', u.searchParams.get('sector') === 'mont-orford' && u.searchParams.get('trail') === 'trail_2' && u.searchParams.get('duration') === 'temporary' && u.searchParams.get('period') === 'custom' && u.searchParams.get('start') === '2026-01-01' && u.searchParams.get('end') === '2026-01-31', u.search);
-    ok('the button sits with the list it prints', !!$('print-sheet-btn').closest('.section-card'), null);
+    // the dashboard keeps only Durée and Période: no sector or trail filter, no print button, nothing archived
+    ok('the dashboard has ONLY the Durée and Période filters (no Secteur, no Piste), and no print button', !$('filter-sector') && !$('filter-trail') && !$('print-sheet-btn') && !!$('filter-duration') && !!$('date-filter') && !/imprimer/i.test(document.querySelector('main').textContent), null);
+    ok('nothing archived or resolved is offered on the dashboard: no such option anywhere', !/rchiv|solu/i.test(document.querySelector('section.content-section').textContent), document.querySelector('section.content-section').textContent);
   } else {
-    ok('Gestion: there is no print button (it belongs to the dashboard)', !$('print-sheet-btn'), null);
+    const opened = []; window.open = (url, target) => { opened.push([url, target]); return null; };
+    ok('Gestion: has the "Fiche à imprimer" button (the only page that has it)', !!$('print-sheet-btn') && /Fiche à imprimer/.test($('print-sheet-btn').textContent), null);
+    $('filter-sector').value = 'mont-orford'; $('filter-sector').dispatchEvent(new Event('change'));
+    choose('month');
+    ok('combined with the sector filter: only that sector\'s reports of the period', rows() === 'AB', rows());
+    reportsData[1].duration = 'temporary'; dur('temporary'); choose('week');
+    $('print-sheet-btn').click();
+    const u = new URL(opened[0][0]);
+    ok('the button opens the sheet in a NEW tab with the sector, the duration and the period chosen', opened[0][1] === '_blank' && /\/signalisation-print\.html$/.test(u.pathname) && u.searchParams.get('sector') === 'mont-orford' && u.searchParams.get('duration') === 'temporary' && u.searchParams.get('period') === 'week', opened);
+    dur('both'); delete reportsData[1].duration;
+    $('print-sheet-btn').click();
+    ok('with the default Durée the sheet is asked for both', new URL(opened[1][0]).searchParams.get('duration') === 'both', opened[1]);
+    ok('Gestion has no \"Résolus\" box or option any more, and keeps \"Archivés\" (to manage and restore)', !$('show-resolved') && !!$('show-archived') && !/Résolu/.test(document.querySelector('main').textContent), null);
   }
   document.getElementById('out').textContent = out.join('\n');
 })().catch(e => { document.getElementById('out').textContent = 'HARNESS ERROR ' + e.stack; });

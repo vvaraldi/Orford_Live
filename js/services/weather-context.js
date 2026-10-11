@@ -89,7 +89,7 @@ const WeatherContext = (() => {
 
   // ---- drawing it ----
 
-  const SHORT = { windKmh: 'Vent', gustKmh: 'Rafales', rainMm: 'Pluie 24 h', newSnowCm: 'Neige fraîche 24 h', snowDepthCm: 'Neige au sol', cloudCover: 'Nuages', sky: 'Conditions', visibilityKm: 'Visibilité', humidityPct: 'Humidité', pressureKpa: 'Pression' };
+  const SHORT = { windForce: 'Force du vent', snowType: 'Conditions de neige', snowBase: 'Fond', snowCover: 'Couverture', windKmh: 'Vent', gustKmh: 'Rafales', rainMm: 'Pluie 24 h', newSnowCm: 'Neige fraîche 24 h', snowDepthCm: 'Neige au sol', cloudCover: 'Nuages', sky: 'Conditions', visibilityKm: 'Visibilité', humidityPct: 'Humidité', pressureKpa: 'Pression' };
 
   /** The values of a reading as one line: typed values first-class, an airport estimate marked ≈ */
   function valuesText(record) {

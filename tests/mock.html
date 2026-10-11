@@ -70,10 +70,10 @@
           tempC: { value: -15, source: 'lac', observedAt: T(new Date(2026, 0, 15, 9, 0).getTime()), publishable: true } } } }
     ],
     signalisations: [
-      { id: 'SIG1', inspectorId: 'u1', inspectorName: 'Test', status: 'ouverte', sector: 'giroux-nord', sectorDisplayName: 'Mont Giroux Nord', trail: 'Magog', comments: 'c', resolved: false, archived: false, network: 'ski', createdAt: ago(3), photos: [] },   // old format: name only, no trail record named "Magog" any more
-      { id: 'SIG2', inspectorId: 'u1', inspectorName: 'Test', status: 'fermee', sector: 'mont-orford', sectorDisplayName: 'Mont-Orford', trail: 'Maxi', trailId: 'run_2', comments: '', resolved: false, archived: false, network: 'ski', createdAt: ago(4), coordinates: { latitude: 45.31, longitude: -72.23 },
+      { id: 'SIG1', inspectorId: 'u1', inspectorName: 'Test', status: 'ouverte', sector: 'giroux-nord', sectorDisplayName: 'Mont Giroux Nord', trail: 'Magog', comments: 'c', archived: false, network: 'ski', createdAt: ago(3), photos: [] },   // old format: name only, no trail record named "Magog" any more
+      { id: 'SIG2', inspectorId: 'u1', inspectorName: 'Test', status: 'fermee', sector: 'mont-orford', sectorDisplayName: 'Mont-Orford', trail: 'Maxi', trailId: 'run_2', comments: '', archived: false, network: 'ski', createdAt: ago(4), coordinates: { latitude: 45.31, longitude: -72.23 },
         photos: [{ url: 'photo-sig2-a.jpg', filename: 'a.jpg', coordinates: { latitude: 45.31, longitude: -72.23 }, timestamp: null }, { url: 'photo-sig2-b.jpg', filename: 'b.jpg', coordinates: null, timestamp: null }] },
-      { id: 'SIGB', inspectorId: 'u1', inspectorName: 'Test', status: 'ouverte', sector: 'sentiers-velo', sectorDisplayName: 'Sentiers vélo', trail: 'Piste verte', comments: '', resolved: false, archived: false, network: 'bike', createdAt: ago(2), photos: [] }
+      { id: 'SIGB', inspectorId: 'u1', inspectorName: 'Test', status: 'ouverte', sector: 'sentiers-velo', sectorDisplayName: 'Sentiers vélo', trail: 'Piste verte', comments: '', archived: false, network: 'bike', createdAt: ago(2), photos: [] }
     ]
   };
   const snapOf = arr => ({

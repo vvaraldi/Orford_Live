@@ -109,8 +109,12 @@ const WeatherPublic = (() => {
     } else if (has(m, 'feelsLikeC')) {
       tile('Température ressentie', `${esc(num(m.feelsLikeC))} °C`, '');
     }
-    if (has(m, 'windKmh')) {
-      tile('Vent', `${esc(num(m.windKmh))} km/h${has(m, 'windDir') ? ' ' + esc(compass(m.windDir)) : ''}`, has(m, 'gustKmh') ? `Rafales ${esc(num(m.gustKmh))} km/h` : '');
+    if (has(m, 'windKmh') || has(m, 'windForce')) {
+      // the force is typed words (Faible, Moyen, Fort...), published as words
+      const subs = [];
+      if (has(m, 'windKmh') && has(m, 'windForce')) subs.push(`Force : ${esc(m.windForce)}`);
+      if (has(m, 'gustKmh')) subs.push(`Rafales ${esc(num(m.gustKmh))} km/h`);
+      tile('Vent', has(m, 'windKmh') ? `${esc(num(m.windKmh))} km/h${has(m, 'windDir') ? ' ' + esc(compass(m.windDir)) : ''}` : esc(m.windForce), subs.join(' · '));
     }
     if (has(m, 'newSnowCm')) {
       tile('Neige fraîche (24 h)', `${esc(num(m.newSnowCm))} cm`, has(m, 'snowDepthCm') ? `Au sol : ${esc(num(m.snowDepthCm))} cm` : '');
@@ -121,6 +125,9 @@ const WeatherPublic = (() => {
     if (sky || cloud) tile('Ciel', esc(sky || cloud), sky && cloud ? esc(cloud) : '');
 
     const extras = [];
+    if (has(m, 'snowType')) extras.push(`Neige : ${esc(m.snowType)}`);
+    if (has(m, 'snowBase')) extras.push(`Fond : ${esc(m.snowBase)}`);
+    if (has(m, 'snowCover')) extras.push(`Couverture : ${esc(m.snowCover)}`);
     if (has(m, 'humidityPct')) extras.push(`Humidité ${esc(num(m.humidityPct))} %`);
     if (has(m, 'pressureKpa')) extras.push(`Pression ${esc(num(m.pressureKpa))} kPa`);
     if (has(m, 'visibilityKm')) extras.push(`Visibilité ${esc(num(m.visibilityKm))} km`);

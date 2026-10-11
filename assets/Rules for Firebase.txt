@@ -314,7 +314,7 @@ service cloud.firestore {
           request.resource.data.keys().hasOnly(['locationId', 'locationName', 'recordedAt', 'measures', 'webFields', 'attribution', 'updatedAt']) &&
           request.resource.data.keys().hasAll(['locationId', 'recordedAt', 'measures', 'updatedAt']) &&
           request.resource.data.measures is map &&
-          request.resource.data.measures.keys().hasOnly(['tempC', 'feelsLikeC', 'windKmh', 'windDir', 'gustKmh', 'rainMm', 'newSnowCm', 'snowDepthCm', 'cloudCover', 'sky', 'visibilityKm', 'humidityPct', 'pressureKpa']) &&
+          request.resource.data.measures.keys().hasOnly(['tempC', 'feelsLikeC', 'windForce', 'windKmh', 'windDir', 'gustKmh', 'rainMm', 'newSnowCm', 'snowType', 'snowDepthCm', 'snowBase', 'snowCover', 'cloudCover', 'sky', 'visibilityKm', 'humidityPct', 'pressureKpa']) &&
           request.resource.data.updatedAt == request.time;
       allow delete: if docId == 'latest' && (allowsMeteo() || isAdmin());
     }

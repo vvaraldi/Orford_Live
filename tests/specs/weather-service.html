@@ -96,6 +96,21 @@
   ok('refused: out of range, not a number, unknown choice - each named', !bad.ok && ['tempC', 'windDir', 'humidityPct', 'cloudCover', 'pressureKpa'].every(k => !!bad.errors[k]) && /entre -60 et 50/.test(bad.errors.tempC) && /un nombre/.test(bad.errors.humidityPct), bad.errors);
   ok('zero is a value (0 cm of snow is not "nothing")', WS.validateManual({ newSnowCm: 0, snowDepthCm: '0' }).values.newSnowCm === 0 && WS.validateManual({ snowDepthCm: '0' }).values.snowDepthCm === 0, null);
 
+  // ---- the lists typed by hand (the customer's sheet) ----
+  const FIELD_ORDER = WS.FIELDS.map(f => f.key);
+  ok('the fields are in the customer\'s order, the four typed-only lists in place', J(FIELD_ORDER) === J(['tempC', 'feelsLikeC', 'windForce', 'windKmh', 'gustKmh', 'windDir', 'newSnowCm', 'snowType', 'snowDepthCm', 'snowBase', 'snowCover', 'rainMm', 'cloudCover', 'sky', 'humidityPct', 'pressureKpa', 'visibilityKm']), FIELD_ORDER);
+  ok('the words come from config.js (APP_CONFIG.weather.lists), in that order', J(Object.values(WS.fieldOf('windForce').choices)) === J(['Nul', 'Faible', 'Moyen', 'Fort', 'Très fort']) && WS.fieldOf('snowType').choices['poudreuse-legere'] === 'Poudreuse légère' && WS.fieldOf('snowBase').choices.variable === 'Variable' && WS.fieldOf('snowCover').choices['endroits-a-decouvert'] === 'Endroits à découvert' && WS.fieldOf('snowCover').choices.bonne === 'Bonne', null);
+  const lists = WS.validateManual({ windForce: 'fort', snowType: 'poudreuse-legere', snowBase: 'variable', snowCover: 'bonne' });
+  ok('the four lists accept their ids', lists.ok && lists.values.windForce === 'fort' && lists.values.snowType === 'poudreuse-legere' && lists.values.snowBase === 'variable' && lists.values.snowCover === 'bonne', lists);
+  const badLists = WS.validateManual({ windForce: 'tempete', snowType: 'Poudreuse légère', snowCover: 'variable' });
+  ok('...and refuse anything else (the words instead of the id, another list\'s id): each named', !badLists.ok && !!badLists.errors.windForce && !!badLists.errors.snowType && !!badLists.errors.snowCover && /Force du vent/.test(badLists.errors.windForce), badLists.errors);
+  ok('format: the words are shown, never the id', WS.format('windForce', 'tres-fort') === 'Très fort' && WS.format('snowCover', 'endroits-a-decouvert') === 'Endroits à découvert' && WS.format('snowBase', 'solide') === 'Solide', null);
+  ok('Environment Canada never gives these four: the web mapping has none of them', ['windForce', 'snowType', 'snowBase', 'snowCover'].every(k => !(k in lac) && !(k in air)), null);
+  const typedRec = { locationId: 'mountain', recordedAt: new Date(T0), manual: { windForce: 'fort', snowType: 'poudreuse-legere', snowBase: 'variable', snowCover: 'bonne', tempC: -4 }, web: null };
+  const pubTyped = WS.publicDocument(typedRec, { firestore: { FieldValue: { serverTimestamp: () => 'TS' } } });
+  ok('public document: the four typed lists go out as WORDS (the other website has no copy of the lists)', pubTyped.measures.windForce === 'Fort' && pubTyped.measures.snowType === 'Poudreuse légère' && pubTyped.measures.snowBase === 'Variable' && pubTyped.measures.snowCover === 'Bonne' && pubTyped.measures.tempC === -4, pubTyped.measures);
+  ok('...and a list value is only a reading by itself (nothing else typed): it can be saved', WS.buildRecord({ at: new Date(T0), manual: { snowCover: 'bonne' }, web: null }, { uid: 'u', name: 'n' }, { firestore: { Timestamp: { fromDate: d => d }, FieldValue: { serverTimestamp: () => 'TS' } } }).ok, null);
+
   // ---- a record, as stored ----
   const user = { uid: 'u1', name: 'Marie' };
   const FB = { firestore: { Timestamp: { fromDate: d => ({ toDate: () => d, toMillis: () => d.getTime(), __ts: true }) }, FieldValue: { serverTimestamp: () => 'SERVER_TS' } } };
