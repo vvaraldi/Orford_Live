@@ -98,6 +98,7 @@ $tests = @(
   @{ name = 'weather-public';             type = 'unit'; spec = 'weather-public.html' }
   @{ name = 'weather-context';            type = 'unit'; spec = 'weather-context.html' }
   @{ name = 'datetime-field';             type = 'unit'; spec = 'datetime-field.html' }
+  @{ name = 'mail-function';              type = 'unit'; spec = 'mail-function.html' }
 )
 if ($Only) { $tests = $tests | Where-Object { $Only -contains $_.name } }
 

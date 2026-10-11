@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html><head><meta charset="utf-8"><title>Mail function tests</title></head>
+<body>
+<pre id="out">running...</pre>
+<script>
+// The Cloud Function that sends the Support e-mails (functions/): its logic file is run here with fake parts (no Node,
+// no SMTP), and the files that deploy it are checked for the settings that matter.
+(async () => {
+  const out = []; const J = JSON.stringify;
+  const ok = (n, c, x) => out.push((c ? 'PASS ' : 'FAIL ') + n + (c ? '' : ' :: ' + J(x)));
+  const text = async p => (await fetch(p)).text();
+
+  const src = await text('/functions/mail-sender.js');
+  const module = { exports: {} };
+  new Function('module', 'exports', src)(module, module.exports);
+  const { check, processMail } = module.exports;
+
+  const GOOD = { to: ['luc@x.ca'], message: { subject: '[Support] Votre demande est résolue : Un bug', text: 'Bonjour,\n\nVotre demande a été résolue.' }, requestId: 'r1', kind: 'status', createdBy: 'u1', createdAt: 'TS' };
+  const clone = o => JSON.parse(JSON.stringify(o));
+
+  // ---- what is accepted ----
+  const v = check(GOOD);
+  ok('a normal queued message is accepted as it is', v.ok && v.to === 'luc@x.ca' && /résolue/.test(v.subject) && /Bonjour/.test(v.text), v);
+  const bad = (name, mutate) => { const d = clone(GOOD); mutate(d); const r = check(d); ok('refused: ' + name, r.ok === false && !!r.reason, r); };
+  bad('no recipient', d => { d.to = []; });
+  bad('two recipients', d => { d.to = ['a@x.ca', 'b@x.ca']; });
+  bad('the recipient is not a list', d => { d.to = 'luc@x.ca'; });
+  bad('not an address', d => { d.to = ['luc']; });
+  bad('an address with a second one hidden in it', d => { d.to = ['luc@x.ca,evil@y.com']; });
+  bad('an address with a name and brackets', d => { d.to = ['Luc <luc@x.ca>']; });
+  bad('no message', d => { delete d.message; });
+  bad('empty subject', d => { d.message.subject = '   '; });
+  bad('a subject with a line break (header injection)', d => { d.message.subject = 'Bonjour\r\nBcc: evil@y.com'; });
+  bad('a subject over 200 characters', d => { d.message.subject = 'x'.repeat(201); });
+  bad('empty text', d => { d.message.text = ''; });
+  bad('a text over 3000 characters', d => { d.message.text = 'x'.repeat(3001); });
+  ok('refused: nothing at all', check(null).ok === false && check('x').ok === false && check(undefined).ok === false, null);
+  ok('the limits are the same as the Firestore rules (subject 200, text 3000)', module.exports.MAX_SUBJECT === 200 && module.exports.MAX_TEXT === 3000, null);
+
+  // ---- fakes ----
+  const fakes = (opts) => {
+    opts = opts || {};
+    const updates = [], sent = []; let calls = 0, claims = 0;
+    return {
+      updates, sent, get calls() { return calls; }, get claims() { return claims; },
+      deps: {
+        ref: { update: async d => { updates.push(d); } }, data: clone(GOOD), from: 'Support Mont Orford <support@x.ca>',
+        transporter: { sendMail: async mail => { calls++; if (calls <= (opts.failures || 0)) throw new Error(opts.error || 'connexion refusée'); sent.push(mail); return { messageId: '<m1@x>', accepted: [mail.to], rejected: [], response: '250 OK' }; } },
+        claim: async () => { claims++; return opts.claim !== false; },
+        now: () => 'NOW', sleep: async () => {}
+      }
+    };
+  };
+
+  // ---- sending ----
+  let f = fakes(); let r = await processMail(f.deps);
+  ok('a good message is sent once, with the sender, the recipient, the subject and the text as written', r === 'sent' && f.sent.length === 1 && f.sent[0].from === 'Support Mont Orford <support@x.ca>' && f.sent[0].to === 'luc@x.ca' && f.sent[0].subject === GOOD.message.subject && f.sent[0].text === GOOD.message.text, f.sent);
+  ok('only plain text is sent (no html)', f.sent.length === 1 && !('html' in f.sent[0]) && J(Object.keys(f.sent[0]).sort()) === J(['from', 'subject', 'text', 'to']), f.sent[0]);
+  ok('the result is written on the document: SUCCESS, attempts, the server\'s answer', f.updates.length === 1 && f.updates[0].delivery.state === 'SUCCESS' && f.updates[0].delivery.attempts === 1 && f.updates[0].delivery.messageId === '<m1@x>' && f.updates[0].delivery.response === '250 OK' && f.updates[0].delivery.error === null, f.updates);
+
+  f = fakes({ claim: false }); r = await processMail(f.deps);
+  ok('a second run for the same document (Firestore can fire twice) sends nothing and writes nothing', r === 'skipped' && f.calls === 0 && f.updates.length === 0, [r, f.calls, f.updates]);
+
+  f = fakes({ failures: 1 }); r = await processMail(f.deps);
+  ok('one failed attempt: tried again, then sent (attempts: 2)', r === 'sent' && f.calls === 2 && f.updates[0].delivery.state === 'SUCCESS' && f.updates[0].delivery.attempts === 2, [r, f.calls, f.updates]);
+
+  f = fakes({ failures: 5, error: 'Invalid login: 535 Authentication failed' }); r = await processMail(f.deps);
+  ok('every attempt fails: ERROR with the reason, written once, and nothing thrown', r === 'error' && f.calls === 2 && f.updates.length === 1 && f.updates[0].delivery.state === 'ERROR' && /535 Authentication failed/.test(f.updates[0].delivery.error), [r, f.updates]);
+
+  f = fakes({ failures: 5, error: 'x'.repeat(2000) }); await processMail(f.deps);
+  ok('a very long error message is cut', f.updates[0].delivery.error.length <= 500, f.updates[0].delivery.error.length);
+
+  f = fakes(); f.deps.data = Object.assign(clone(GOOD), { to: ['a@x.ca', 'b@x.ca'] }); r = await processMail(f.deps);
+  ok('an invalid document is never sent, never claimed: ERROR "Refusé" written on it', r === 'invalid' && f.calls === 0 && f.claims === 0 && f.updates[0].delivery.state === 'ERROR' && /^Refusé/.test(f.updates[0].delivery.error), [r, f.updates]);
+
+  // ---- the files that deploy it ----
+  const index = await text('/functions/index.js'), pkg = JSON.parse(await text('/functions/package.json'));
+  const fb = JSON.parse(await text('/firebase.json')), rc = JSON.parse(await text('/.firebaserc'));
+  ok('the function listens to new documents of "mail" only, in Firestore\'s region, without endless retries', /onDocumentCreated\(/.test(index) && /document: 'mail\/\{mailId\}'/.test(index) && /region: 'us-east1'/.test(index) && /retry: false/.test(index), null);
+  ok('the SMTP password is a secret (never in a file), the sender is a setting, cost is bounded (max instances)', /defineSecret\('SMTP_URI'\)/.test(index) && /secrets: \[SMTP_URI\]/.test(index) && /defineString\('MAIL_FROM'\)/.test(index) && /maxInstances: \d/.test(index) && !/smtps?:\/\/[^'"\s]*:[^'"\s]*@/.test(index.replace(/\/\*[\s\S]*?\*\/|\/\/.*$/gm, '')), null);
+  ok('it flags the document before sending (so a double trigger sends once)', /runTransaction/.test(index) && /state: 'PROCESSING'/.test(index) && /claim/.test(index), null);
+  ok('package: Node 22, the three libraries, the logic file is the same one the tests run', pkg.engines.node === '22' && !!pkg.dependencies['firebase-admin'] && !!pkg.dependencies['firebase-functions'] && !!pkg.dependencies['nodemailer'] && /require\('\.\/mail-sender'\)/.test(index), pkg);
+  ok('firebase.json deploys the "functions" folder; .firebaserc points at this project', fb.functions[0].source === 'functions' && rc.projects.default === 'trail-inspection', [fb, rc]);
+  const env = await text('/functions/.env.example'), ign = await text('/functions/.gitignore');
+  ok('the real .env and node_modules are never committed; the example holds no password', /\.env/.test(ign) && /node_modules/.test(ign) && /MAIL_FROM=/.test(env) && !/PASSWORD|smtps?:\/\//i.test(env.replace(/^#.*$/gm, '')), env);
+  const keys = Object.keys(GOOD).sort();
+  const page = await text('/js/services/support-mail.js');
+  ok('the page queues exactly what the function expects: to (one address), message.subject / text, plain text', /to: \[to\]/.test(page) && /message: \{ subject: item\.subject, text: item\.text \}/.test(page) && J(keys) === J(['createdAt', 'createdBy', 'kind', 'message', 'requestId', 'to']), null);
+
+  document.getElementById('out').textContent = out.join('\n');
+})().catch(e => { document.getElementById('out').textContent = 'HARNESS ERROR ' + e.stack; });
+</script>
+</body></html>
