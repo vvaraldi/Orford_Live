@@ -99,15 +99,9 @@
           </div>
 
           <!-- Date / Heure -->
-          <div class="form-row">
-            <div class="form-group">
-              <label class="form-label" for="offence-date">Date <span class="form-required">*</span></label>
-              <input type="date" class="form-input" id="offence-date" required>
-            </div>
-            <div class="form-group">
-              <label class="form-label" for="offence-time">Heure <span class="form-required">*</span></label>
-              <input type="time" class="form-input" id="offence-time" required>
-            </div>
+          <div class="form-group">
+            <label class="form-label" for="offence-at">Date et heure <span class="form-required">*</span></label>
+            <input type="datetime-local" class="form-input" id="offence-at" required>
           </div>
 
           <!-- Contrevenant -->
@@ -206,6 +200,7 @@
 
   <!-- Scripts -->
   <script src="../js/core/utils.js"></script>
+  <script src="../js/core/datetime-field.js"></script>
   <script src="../js/core/theme.js"></script>
   <script src="../js/core/ui.js"></script>
   <script src="../js/core/firebase-loader.js"></script>
@@ -236,7 +231,7 @@
 
     // Elements
     let reportSelector, duplicateContainer, duplicateBtn;
-    let patrolName, offenceDate, offenceTime, offenderName, faultSelect;
+    let patrolName, offenceAt, offenderName, faultSelect;
     let sectorSelect, trailSelect, offPiste, practiceSelect, comments;
     let photoUploadArea, photoPreviewContainer;
     let scanQrBtn, stopQrBtn, qrScannerContainer, qrPreview, qrDataDisplay, qrImagePreview, removeQrBtn;
@@ -272,8 +267,7 @@
       duplicateBtn = document.getElementById('duplicate-btn');
       
       patrolName = document.getElementById('patrol-name');
-      offenceDate = document.getElementById('offence-date');
-      offenceTime = document.getElementById('offence-time');
+      offenceAt = DateTimeField.init(document.getElementById('offence-at'));
       offenderName = document.getElementById('offender-name');
       faultSelect = document.getElementById('fault-select');
       sectorSelect = document.getElementById('sector-select');
@@ -329,10 +323,7 @@
     function setDefaultValues() {
       patrolName.value = currentUserData.name || currentUser.email;
       
-      // Use local timezone (getLocalDateTime from utils.js)
-      const { date, time } = getLocalDateTime();
-      offenceDate.value = date;
-      offenceTime.value = time;
+      DateTimeField.set(offenceAt, new Date());   // local time, to the minute
     }
 
     // Fault types and practices offered for the current activity
@@ -409,12 +400,7 @@
       
       // Populate form with local timezone
       if (infraction.offenceTimestamp?.toDate) {
-        const d = infraction.offenceTimestamp.toDate();
-        const year = d.getFullYear();
-        const month = (d.getMonth() + 1).toString().padStart(2, '0');
-        const day = d.getDate().toString().padStart(2, '0');
-        offenceDate.value = `${year}-${month}-${day}`;
-        offenceTime.value = d.toTimeString().slice(0, 5);
+        DateTimeField.set(offenceAt, infraction.offenceTimestamp.toDate());
       }
       
       offenderName.value = infraction.offenderName || '';
@@ -576,16 +562,10 @@
       const errors = [];
       clearValidation();
       
-      if (!offenceDate.value) {
+      if (!DateTimeField.read(offenceAt)) {
         isValid = false;
-        errors.push('La date est requise');
-        offenceDate.classList.add('is-invalid');
-      }
-      
-      if (!offenceTime.value) {
-        isValid = false;
-        errors.push('L\'heure est requise');
-        offenceTime.classList.add('is-invalid');
+        errors.push('La date et l\'heure sont requises');
+        offenceAt.classList.add('is-invalid');
       }
       
       const hasName = offenderName.value.trim() !== '';
@@ -617,7 +597,7 @@
     }
 
     function clearValidation() {
-      [offenceDate, offenceTime, offenderName, faultSelect, sectorSelect, scanQrBtn].forEach(el => {
+      [offenceAt, offenderName, faultSelect, sectorSelect, scanQrBtn].forEach(el => {
         el.classList.remove('is-invalid');
       });
     }
@@ -648,10 +628,7 @@
           uploadedQrUrl = await uploadQrImage();
         }
         
-        // Create timestamp from date + time
-        const [year, month, day] = offenceDate.value.split('-');
-        const [hours, minutes] = offenceTime.value.split(':');
-        const offenceTimestamp = new Date(year, month - 1, day, hours, minutes);
+        const offenceTimestamp = DateTimeField.read(offenceAt);
         
         const chosenTrail = SectorService.readTrail(trailSelect); // { id, name }: id is null for a name-only (old) report
         const infractionData = {
@@ -718,9 +695,7 @@
           uploadedQrUrl = await uploadQrImage();
         }
         
-        const [year, month, day] = offenceDate.value.split('-');
-        const [hours, minutes] = offenceTime.value.split(':');
-        const offenceTimestamp = new Date(year, month - 1, day, hours, minutes);
+        const offenceTimestamp = DateTimeField.read(offenceAt);
         
         const chosenTrail = SectorService.readTrail(trailSelect); // { id, name }
         const updateData = {

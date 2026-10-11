@@ -77,8 +77,7 @@
           <div class="form-grid">
             <div class="form-group"><label class="form-label form-label-required" for="shelter-select">Abri</label><select class="form-select" id="shelter-select" required><option value="">Sélectionner un abri</option></select></div>
             <div class="form-group"><label class="form-label" for="inspector-name">Inspecteur</label><input type="text" class="form-input" id="inspector-name" readonly><input type="hidden" id="inspector-id"></div>
-            <div class="form-group"><label class="form-label form-label-required" for="inspection-date">Date d'inspection</label><input type="date" class="form-input" id="inspection-date" required></div>
-            <div class="form-group"><label class="form-label form-label-required" for="inspection-time">Heure d'inspection</label><input type="time" class="form-input" id="inspection-time" required></div>
+            <div class="form-group"><label class="form-label form-label-required" for="inspection-at">Date et heure d'inspection</label><input type="datetime-local" class="form-input" id="inspection-at" required></div>
           </div>
         </div>
       </div>
@@ -165,6 +164,7 @@
   <footer class="footer footer--simple"><div class="footer__content"><p class="footer__copyright">© 2026 Regis for Mont Orford</p></div></footer>
   <script src="https://cdn.jsdelivr.net/npm/exif-js@2.3.0/exif.min.js"></script>
   <script src="../js/core/utils.js"></script>
+  <script src="../js/core/datetime-field.js"></script>
   <script src="../js/core/theme.js"></script>
   <script src="../js/core/ui.js"></script>
   <script src="../js/core/firebase-loader.js"></script>
@@ -180,8 +180,7 @@
     const shelterSelect = document.getElementById('shelter-select');
     const inspectorName = document.getElementById('inspector-name');
     const inspectorId = document.getElementById('inspector-id');
-    const inspectionDate = document.getElementById('inspection-date');
-    const inspectionTime = document.getElementById('inspection-time');
+    const inspectionAt = document.getElementById('inspection-at');
     const cleanlinessDetails = document.getElementById('cleanliness-details');
     const accessibilityDetails = document.getElementById('accessibility-details');
     const photoUpload = document.getElementById('photo-upload');
@@ -234,9 +233,8 @@
     }
 
     function setCurrentDateTime() {
-      const now = new Date();
-      inspectionDate.value = `${now.getFullYear()}-${(now.getMonth()+1).toString().padStart(2,'0')}-${now.getDate().toString().padStart(2,'0')}`;
-      inspectionTime.value = now.toTimeString().substring(0, 5);
+      DateTimeField.init(inspectionAt);          // (does nothing more once done)
+      DateTimeField.set(inspectionAt, new Date());   // local time, to the minute
     }
 
     function bindEvents() {
@@ -305,6 +303,7 @@
       hideMessages();
       
       // Validation
+      if (!DateTimeField.read(inspectionAt)) { showError('Veuillez entrer la date et l\'heure de l\'inspection'); return; }
       if (!shelterSelect.value) { showError('Veuillez sélectionner un abri'); return; }
       if (!form.querySelector('input[name="condition"]:checked')) { showError('Veuillez sélectionner l\'état général'); return; }
       if (!form.querySelector('input[name="cleanliness"]:checked')) { showError('Veuillez sélectionner la propreté'); return; }
@@ -318,7 +317,7 @@
         if (otherIssues.value.trim()) issues.push(otherIssues.value.trim());
         
         // Build form data
-        const dateTime = new Date(`${inspectionDate.value}T${inspectionTime.value}`);
+        const dateTime = DateTimeField.read(inspectionAt);
         const formData = {
           network: Network.current(),
           shelter_id: shelterSelect.value,

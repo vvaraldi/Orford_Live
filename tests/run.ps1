@@ -77,6 +77,11 @@ $tests = @(
   @{ name = 'wx-reports-inspection';    type = 'page'; page = 'pages\inspection-history.html';      spec = 'weather-in-reports.html'; queries = @('?page=inspection-history&net=ski') }
   @{ name = 'wx-reports-infraction';    type = 'page'; page = 'pages\infraction-admin.html';         spec = 'weather-in-reports.html'; queries = @('?page=infraction-admin&net=ski') }
   @{ name = 'wx-reports-signalisation'; type = 'page'; page = 'pages\signalisation-admin.html';      spec = 'weather-in-reports.html'; queries = @('?page=signalisation-admin&net=ski') }
+  @{ name = 'dtf-infraction';           type = 'page'; page = 'pages\infraction-report.html';          spec = 'datetime-in-forms.html'; queries = @('?page=infraction-report&net=ski') }
+  @{ name = 'dtf-signalisation';        type = 'page'; page = 'pages\signalisation-report.html';       spec = 'datetime-in-forms.html'; queries = @('?page=signalisation-report&net=ski') }
+  @{ name = 'dtf-inspection-trail';     type = 'page'; page = 'pages\inspection-trail-report.html';    spec = 'datetime-in-forms.html'; queries = @('?page=inspection-trail-report&net=ski') }
+  @{ name = 'dtf-inspection-shelter';   type = 'page'; page = 'pages\inspection-shelter-report.html';  spec = 'datetime-in-forms.html'; queries = @('?page=inspection-shelter-report&net=ski') }
+  @{ name = 'dtf-meteo';                type = 'page'; page = 'pages\meteo-report.html';               spec = 'datetime-in-forms.html'; queries = @('?page=meteo-report&net=ski') }
   @{ name = 'wx-reports-maintenance';   type = 'page'; page = 'pages\maintenance-admin.html';        spec = 'weather-in-reports.html'; queries = @('?page=maintenance-admin&net=bike') }
   @{ name = 'wx-reports-dashboard-insp'; type = 'page'; page = 'pages\inspection-dashboard.html';   spec = 'weather-in-reports.html'; queries = @('?page=inspection-dashboard&net=ski') }
   @{ name = 'wx-reports-dashboard-sig';  type = 'page'; page = 'pages\signalisation-resume.html';     spec = 'weather-in-reports.html'; queries = @('?page=signalisation-resume&net=ski') }
@@ -90,6 +95,7 @@ $tests = @(
   @{ name = 'weather-service';            type = 'unit'; spec = 'weather-service.html' }
   @{ name = 'weather-public';             type = 'unit'; spec = 'weather-public.html' }
   @{ name = 'weather-context';            type = 'unit'; spec = 'weather-context.html' }
+  @{ name = 'datetime-field';             type = 'unit'; spec = 'datetime-field.html' }
 )
 if ($Only) { $tests = $tests | Where-Object { $Only -contains $_.name } }
 

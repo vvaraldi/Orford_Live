@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html><head><meta charset="utf-8"><title>DateTimeField tests</title></head>
+<body>
+<pre id="out">running...</pre>
+<form id="f"><label for="at">Date et heure</label><input type="datetime-local" class="form-input" id="at" required><button id="go">ok</button></form>
+<form id="g"><label for="at2">Autre</label><input type="datetime-local" class="form-input" id="at2"></form>
+<script src="/js/core/datetime-field.js"></script>
+<script>
+// The shared "date and time" field of the report forms: the text format, the real browser field, and the two-field
+// version used where the browser has no datetime-local (forced here, since the test browser has it).
+(async () => {
+  const out = []; const J = JSON.stringify;
+  const ok = (n, c, x) => out.push((c ? 'PASS ' : 'FAIL ') + n + (c ? '' : ' :: ' + J(x)));
+  const D = DateTimeField;
+  const wait = ms => new Promise(r => setTimeout(r, ms));
+
+  // ---- the text format ----
+  ok('format: local time to the minute, padded', D.format(new Date(2026, 0, 5, 7, 4, 59)) === '2026-01-05T07:04' && D.format(new Date(2026, 11, 31, 23, 59)) === '2026-12-31T23:59', D.format(new Date(2026, 0, 5, 7, 4)));
+  ok('format: not a date = empty text', D.format(new Date(NaN)) === '' && D.format(null) === '' && D.format('x') === '', null);
+  const p = D.parse('2026-01-15T12:30');
+  ok('parse: the same text back to the same local moment', p instanceof Date && p.getFullYear() === 2026 && p.getMonth() === 0 && p.getDate() === 15 && p.getHours() === 12 && p.getMinutes() === 30, p);
+  ok('parse: seconds and a space instead of T are accepted', D.parse('2026-01-15T12:30:45').getMinutes() === 30 && D.parse('2026-01-15 12:30').getHours() === 12, null);
+  ok('parse: empty, partial or nonsense = null; a day that does not exist (31 April, 25 h) = null', [null, undefined, '', '2026-01-15', 'T12:30', 'abc', '2026-04-31T10:00', '2026-01-15T25:00', '2026-13-01T10:00'].every(v => D.parse(v) === null), null);
+  const rt = new Date(2026, 6, 4, 0, 5);
+  ok('format then parse: unchanged (midnight hour, summer)', D.parse(D.format(rt)).getTime() === rt.getTime(), null);
+
+  // ---- a browser WITH the field: nothing is touched ----
+  const real = document.getElementById('at2');
+  ok('detection: this browser has a real datetime-local field', D.supported() === true, D.supported());
+  D.init(real);
+  ok('real field: left exactly as it is (same element, no second field, still a datetime-local)', real.type === 'datetime-local' && !document.querySelector('#g .dtf-pair') && real.style.display === '', real.type);
+  D.set(real, new Date(2026, 1, 3, 9, 8));
+  ok('real field: set / read work through the browser', real.value === '2026-02-03T09:08' && D.read(real).getHours() === 9, real.value);
+  real.value = '';
+  ok('real field: empty reads as null', D.read(real) === null, null);
+
+  // ---- the two-field version ----
+  const input = document.getElementById('at');
+  let changes = 0; input.addEventListener('change', () => changes++);
+  D.init(input, { force: true });
+  const date = document.getElementById('at-date'), time = document.getElementById('at-time');
+  ok('pair: a date field and a time field appear in place of the original, which is hidden and no longer "required"', !!date && !!time && date.type === 'date' && time.type === 'time' && input.style.display === 'none' && input.required === false && input.type === 'text' && date.required && time.required, null);
+  ok('pair: the label now points to the date field; the two fields have names for screen readers', document.querySelector('label[for="at-date"]') !== null && date.getAttribute('aria-label') === 'Date' && time.getAttribute('aria-label') === 'Heure', null);
+  ok('pair: starts empty, reads as null', input.value === '' && D.read(input) === null, input.value);
+
+  D.set(input, new Date(2026, 0, 15, 12, 30));
+  ok('pair: the page sets the value -> both visible fields follow', date.value === '2026-01-15' && time.value === '12:30' && input.value === '2026-01-15T12:30', [date.value, time.value, input.value]);
+  ok('pair: read gives the right moment', D.read(input).getTime() === new Date(2026, 0, 15, 12, 30).getTime(), null);
+
+  changes = 0;
+  date.value = '2026-02-20'; date.dispatchEvent(new Event('change', { bubbles: true }));
+  ok('pair: the person changes the date -> the value and a "change" event follow', input.value === '2026-02-20T12:30' && changes === 1, [input.value, changes]);
+  time.value = '07:05'; time.dispatchEvent(new Event('input', { bubbles: true }));
+  ok('pair: the person changes the time -> the value follows', input.value === '2026-02-20T07:05', input.value);
+  ok('pair: the visible fields are not rewritten while typing', date.value === '2026-02-20' && time.value === '07:05', [date.value, time.value]);
+  changes = 0;
+  time.value = ''; time.dispatchEvent(new Event('change', { bubbles: true }));
+  ok('pair: a missing time = no value at all (never half a date)', input.value === '' && D.read(input) === null && changes === 1, [input.value, changes]);
+  time.dispatchEvent(new Event('change', { bubbles: true }));
+  ok('pair: nothing changed = no extra event', changes === 1, changes);
+
+  input.value = '';
+  ok('pair: the page clears it -> both visible fields are cleared', date.value === '' && time.value === '', [date.value, time.value]);
+
+  // ---- states set by the page on the original ----
+  input.classList.add('is-invalid'); await wait(20);
+  ok('pair: "is-invalid" on the original shows on both visible fields, and goes away with it', date.classList.contains('is-invalid') && time.classList.contains('is-invalid'), null);
+  input.classList.remove('is-invalid'); await wait(20);
+  ok('pair: ... removed again', !date.classList.contains('is-invalid') && !time.classList.contains('is-invalid'), null);
+  input.disabled = true; await wait(20);
+  ok('pair: disabled on the original disables both', date.disabled && time.disabled, null);
+  input.disabled = false; await wait(20);
+  ok('pair: ... and enabled again', !date.disabled && !time.disabled, null);
+
+  // ---- the form still submits (a hidden "required" field would block it with an error nobody can see) ----
+  D.set(input, new Date(2026, 5, 1, 8, 0));
+  ok('pair: the form is valid with a value, and not valid when empty (the visible fields say so)', document.getElementById('f').checkValidity() === true && (input.value = '', document.getElementById('f').checkValidity() === false), null);
+
+  // ---- an unusual start: already filled before init, and a second init ----
+  const g = document.getElementById('g'); const late = document.createElement('input');
+  late.type = 'datetime-local'; late.id = 'late'; late.value = '2026-03-04T05:06'; g.appendChild(late);
+  D.init(late, { force: true });
+  ok('pair: an input that already had a value starts with it', document.getElementById('late-date').value === '2026-03-04' && document.getElementById('late-time').value === '05:06', null);
+  D.init(late, { force: true }); D.init(input, { force: true });
+  ok('pair: calling init twice does not build a second pair', document.querySelectorAll('#late-date').length === 1 && document.querySelectorAll('#at-date').length === 1, null);
+
+  document.getElementById('out').textContent = out.join('\n');
+})().catch(e => { document.getElementById('out').textContent = 'HARNESS ERROR ' + e.stack; });
+</script>
+</body></html>

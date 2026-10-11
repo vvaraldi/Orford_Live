@@ -32,8 +32,15 @@
     .is-invalid { border-color: var(--color-danger) !important; box-shadow: 0 0 0 2px rgba(220, 38, 38, 0.2) !important; }
     .wx-errors { color: var(--color-danger); font-size: 0.875rem; margin: 0.5rem 0; }
     .wx-errors:empty { display: none; }
+    /* Wide screens: the measures sit two by two (7 lines instead of 13), each side with its own header */
+    .wx-heads { display: block; }
+    .wx-head--second { display: none; }
+    @media (min-width: 1100px) {
+      .wx-heads, #fields-grid { display: grid; grid-template-columns: 1fr 1fr; column-gap: 2.5rem; }
+      .wx-head--second { display: grid; }
+    }
     @media (max-width: 640px) {
-      .wx-head { display: none; }
+      .wx-heads { display: none; }
       .wx-row { grid-template-columns: 1fr 1fr; }
       .wx-label { grid-column: 1 / -1; }
     }
@@ -85,7 +92,7 @@
           </div>
           <ul class="wx-web-notes" id="web-notes" hidden></ul>
 
-          <div class="wx-head" aria-hidden="true"><div>Mesure</div><div>Environnement Canada</div><div>Votre valeur</div></div>
+          <div class="wx-heads" aria-hidden="true"><div class="wx-head"><div>Mesure</div><div>Environnement Canada</div><div>Votre valeur</div></div><div class="wx-head wx-head--second"><div>Mesure</div><div>Environnement Canada</div><div>Votre valeur</div></div></div>
           <div id="fields-grid"></div>
 
           <div class="form-group" style="margin-top: 1rem;">
@@ -134,6 +141,7 @@
 
   <!-- Scripts -->
   <script src="../js/core/utils.js"></script>
+  <script src="../js/core/datetime-field.js"></script>
   <script src="../js/core/theme.js"></script>
   <script src="../js/core/ui.js"></script>
   <script src="../js/core/firebase-loader.js"></script>
@@ -231,7 +239,7 @@
       ul.hidden = lines.length === 0;
     }
 
-    function readAt() { return new Date(el('recorded-at').value); }
+    function readAt() { return DateTimeField.read(el('recorded-at')) || new Date(NaN); }
 
     async function loadWeb() {
       const at = readAt();
@@ -451,6 +459,7 @@
     function initMeteoReport() {
       applySeasonIcon();
       buildFields();
+      DateTimeField.init(el('recorded-at'));   // the two-field version only where the browser has no date-and-time field
       el('weather-form').addEventListener('submit', saveReading);
       el('fetch-web-btn').addEventListener('click', loadWeb);
       el('reset-btn').addEventListener('click', resetForm);

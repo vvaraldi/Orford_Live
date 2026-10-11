@@ -79,15 +79,9 @@
           </div>
 
           <!-- Date / Heure -->
-          <div class="form-row">
-            <div class="form-group">
-              <label class="form-label" for="report-date">Date <span class="form-required">*</span></label>
-              <input type="date" class="form-input" id="report-date" required>
-            </div>
-            <div class="form-group">
-              <label class="form-label" for="report-time">Heure <span class="form-required">*</span></label>
-              <input type="time" class="form-input" id="report-time" required>
-            </div>
+          <div class="form-group">
+            <label class="form-label" for="report-at">Date et heure <span class="form-required">*</span></label>
+            <input type="datetime-local" class="form-input" id="report-at" required>
           </div>
 
           <!-- Statut -->
@@ -162,6 +156,7 @@
 
   <!-- Scripts -->
   <script src="../js/core/utils.js"></script>
+  <script src="../js/core/datetime-field.js"></script>
   <script src="../js/core/theme.js"></script>
   <script src="../js/core/ui.js"></script>
   <script src="../js/core/firebase-loader.js"></script>
@@ -192,7 +187,7 @@
     let photoPicker = null;
 
     // Elements
-    let reportSelector, inspectorNameInput, reportDate, reportTime;
+    let reportSelector, inspectorNameInput, reportAt;
     let statusSelect, photoUploadArea, photoPreviewContainer;
     let sectorSelect, trailSelect, commentsInput;
     let saveBtn, modifyBtn, resetBtn;
@@ -228,8 +223,7 @@
     function bindElements() {
       reportSelector = document.getElementById('report-selector');
       inspectorNameInput = document.getElementById('inspector-name');
-      reportDate = document.getElementById('report-date');
-      reportTime = document.getElementById('report-time');
+      reportAt = DateTimeField.init(document.getElementById('report-at'));
       statusSelect = document.getElementById('status-select');
       photoUploadArea = document.getElementById('photo-upload');
       photoPreviewContainer = document.getElementById('photo-preview-container');
@@ -261,10 +255,7 @@
 
     function setDefaultValues() {
       inspectorNameInput.value = currentUserData.name || currentUser.email;
-      // Use local timezone (getLocalDateTime from utils.js)
-      const { date, time } = getLocalDateTime();
-      reportDate.value = date;
-      reportTime.value = time;
+      DateTimeField.set(reportAt, new Date());   // local time, to the minute
     }
 
     async function loadSectors() {
@@ -341,12 +332,7 @@
       
       // Populate form with local timezone
       if (report.createdAt?.toDate) {
-        const d = report.createdAt.toDate();
-        const year = d.getFullYear();
-        const month = (d.getMonth() + 1).toString().padStart(2, '0');
-        const day = d.getDate().toString().padStart(2, '0');
-        reportDate.value = `${year}-${month}-${day}`;
-        reportTime.value = d.toTimeString().slice(0, 5);
+        DateTimeField.set(reportAt, report.createdAt.toDate());
       }
       
       statusSelect.value = report.status || '';
@@ -418,8 +404,7 @@
       let isValid = true;
       clearValidation();
       
-      if (!reportDate.value) { reportDate.classList.add('is-invalid'); isValid = false; }
-      if (!reportTime.value) { reportTime.classList.add('is-invalid'); isValid = false; }
+      if (!DateTimeField.read(reportAt)) { reportAt.classList.add('is-invalid'); isValid = false; }
       
       const hasStatus = statusSelect.value !== '';
       const hasPhotos = photoPicker.hasPhotos();
@@ -437,7 +422,7 @@
     }
 
     function clearValidation() {
-      [reportDate, reportTime, statusSelect, photoUploadArea, sectorSelect, trailSelect].forEach(el => {
+      [reportAt, statusSelect, photoUploadArea, sectorSelect, trailSelect].forEach(el => {
         if (el) el.classList.remove('is-invalid');
       });
     }

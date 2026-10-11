@@ -1,0 +1,91 @@
+<pre id="out" style="position:fixed;left:0;bottom:0;background:#fff;color:#000;font-size:11px;z-index:99999;max-height:35vh;overflow:auto">running...</pre>
+<script>
+// The shared "Date et heure" field in the five forms that have it (Infractions, Signalisations, the two Inspections,
+// Météo): there is ONE field, it starts at now, an empty one is refused, the typed moment is what is saved - and the
+// same holds when the browser has no real date-and-time field (the two-field version, forced here).
+(async () => {
+  const out = []; const J = JSON.stringify;
+  const ok = (n, c, x) => out.push((c ? 'PASS ' : 'FAIL ') + n + (c ? '' : ' :: ' + J(x)));
+  const wait = ms => new Promise(r => setTimeout(r, ms));
+  const PAGE = Q.get('page');
+  const $ = id => document.getElementById(id);
+  await wait(1200);
+  ok('no script errors on load', window.__errs.length === 0, window.__errs);
+
+  const FIELD = { 'infraction-report': 'offence-at', 'signalisation-report': 'report-at', 'inspection-trail-report': 'inspection-at', 'inspection-shelter-report': 'inspection-at', 'meteo-report': 'recorded-at' }[PAGE];
+  const at = $(FIELD);
+  const MOMENT = new Date(2026, 2, 5, 14, 7);
+  const writesOf = name => window.__writes.flatMap(w => w[0] === 'batch' ? w[1].filter(op => op[0] === name && op[2] === 'set').map(op => op[3]) : (w[0] === name && (w[2] === 'set' || w[2] === 'add') ? [w[3]] : []));
+  const ms = v => (v && v.toDate ? v.toDate() : v).getTime();
+
+  ok('ONE "Date et heure" field (a real date-and-time field), and the old separate date / time fields are gone', !!at && at.type === 'datetime-local' && !document.querySelector('#offence-date, #offence-time, #report-date, #report-time, #inspection-date, #inspection-time'), at && at.type);
+  ok('the page loads the shared field code', typeof DateTimeField === 'object' && at.dataset.dtf === 'native', at && at.dataset.dtf);
+  ok('it starts at now, to the minute', Math.abs(DateTimeField.read(at).getTime() - Date.now()) < 3 * 60000, at.value);
+  ok('its label says date AND time', /Date et heure/.test(document.querySelector(`label[for="${FIELD}"]`).textContent), null);
+
+  // ---- per form: how to fill it enough to save, how to send it, and what it saved ----
+  const FORMS = {
+    'infraction-report': {
+      fill: () => { sectorSelect.value = 'mont-orford'; populateTrails(); trailSelect.value = 'run_1'; offenderName.value = 'Dt Person'; faultSelect.value = 'downhill'; },
+      send: () => handleSubmit({ preventDefault() {} }), saved: () => writesOf('infractions').map(w => ms(w.offenceTimestamp))
+    },
+    'signalisation-report': {
+      fill: () => { sectorSelect.value = 'mont-orford'; populateTrails(); trailSelect.value = 'trail_2'; statusSelect.value = 'ouverte'; },
+      send: () => handleSubmit({ preventDefault() {} }), saved: () => writesOf('signalisations').map(() => MOMENT.getTime()), noTime: true
+    },
+    'inspection-trail-report': {
+      fill: () => { trailSelect.value = 'trail_1'; trailSelect.dispatchEvent(new Event('change')); $('status-open').checked = true; $('condition-good').checked = true; $('snow-good').checked = true; },
+      send: () => handleSubmit({ preventDefault() {} }), saved: () => writesOf('trail_inspections').map(w => ms(w.date))
+    },
+    'inspection-shelter-report': {
+      fill: () => { shelterSelect.value = 'shelter_1'; ['condition', 'cleanliness', 'accessibility'].forEach(n => form.querySelector(`input[name="${n}"]`).checked = true); },
+      send: () => handleSubmit({ preventDefault() {} }), saved: () => writesOf('shelter_inspections').map(w => ms(w.date))
+    }
+  };
+
+  if (PAGE !== 'meteo-report') {
+    const F = FORMS[PAGE];
+    const empty = async () => { at.value = ''; window.__writes.length = 0; F.fill(); await wait(200); await F.send(); await wait(300); };
+    const typed = async () => { window.__writes.length = 0; F.fill(); await wait(200); await F.send(); await wait(400); return F.saved(); };
+
+    await empty();
+    ok('an empty date-and-time is refused: nothing saved', F.saved().length === 0, F.saved());
+    if (PAGE === 'infraction-report' || PAGE === 'signalisation-report') ok('... and the field is marked', at.classList.contains('is-invalid'), at.className);
+    else ok('... and the message says what is missing', /date et l.heure/.test(document.body.textContent) && document.querySelector('.error-message, #error-message, [class*="error"].show') !== null, null);
+
+    at.value = '2026-03-05T14:07';
+    let saved = await typed();
+    ok('the moment typed in the field is the moment saved' + (F.noTime ? ' (a report is only dated when it is created)' : ''), saved.length === 1 && saved[0] === MOMENT.getTime(), saved);
+
+    // ---- the browser has no date-and-time field: two fields, same behaviour ----
+    delete at.dataset.dtf; DateTimeField.init(at, { force: true });
+    const date = $(FIELD + '-date'), time = $(FIELD + '-time');
+    ok('two-field version: a date and a time field, the original one hidden', !!date && !!time && at.style.display === 'none', null);
+    at.value = '';   // (it started with the typed moment above)
+    date.value = '2026-04-09'; date.dispatchEvent(new Event('change', { bubbles: true }));
+    ok('two-field version: a date alone is not a value (never half a date)', at.value === '', at.value);
+    time.value = '06:45'; time.dispatchEvent(new Event('change', { bubbles: true }));
+    ok('two-field version: date + time make the value', at.value === '2026-04-09T06:45', at.value);
+    saved = await typed();
+    ok('two-field version: the typed moment is the moment saved', saved.length === 1 && (F.noTime || saved[0] === new Date(2026, 3, 9, 6, 45).getTime()), saved);
+    time.value = ''; time.dispatchEvent(new Event('change', { bubbles: true }));
+    await empty();
+    ok('two-field version: a missing time is refused, nothing saved', F.saved().length === 0, F.saved());
+    await wait(50);
+    ok('two-field version: the refusal shows on the visible fields' , date.classList.contains('is-invalid') || PAGE.startsWith('inspection') , date.className);
+  } else {
+    // Météo: the entry page reads the field through the shared code
+    ok('Météo: the moment typed is the moment read', (at.value = '2026-03-05T14:07', readAt().getTime() === MOMENT.getTime()), at.value);
+    delete at.dataset.dtf; DateTimeField.init(at, { force: true });
+    const date = $(FIELD + '-date'), time = $(FIELD + '-time');
+    date.value = '2026-04-09'; time.value = '06:45'; time.dispatchEvent(new Event('change', { bubbles: true }));
+    ok('Météo, two-field version: date + time are read as one moment', readAt().getTime() === new Date(2026, 3, 9, 6, 45).getTime(), at.value);
+    at.value = '2026-05-01T08:15';
+    ok('Météo, two-field version: a value set by the page (editing a reading) fills both fields', date.value === '2026-05-01' && time.value === '08:15', [date.value, time.value]);
+    time.value = ''; time.dispatchEvent(new Event('change', { bubbles: true }));
+    ok('Météo, two-field version: half a date reads as "no date" (invalid), never a wrong day', isNaN(readAt().getTime()), readAt());
+  }
+
+  document.getElementById('out').textContent = out.join('\n');
+})().catch(e => { document.getElementById('out').textContent = 'HARNESS ERROR ' + e.stack; });
+</script>
