@@ -92,6 +92,22 @@
             </select>
           </div>
           <div class="form-group">
+            <label class="form-label" for="date-filter">Période</label>
+            <select class="form-select" id="date-filter" title="Selon la dernière modification du rapport">
+              <option value="all" selected>Toutes les saisons</option>
+              <option value="season" id="season-option">Saison en cours</option><!-- label filled with the dates -->
+              <option value="today">Aujourd'hui</option>
+              <option value="week">7 derniers jours</option>
+              <option value="month">30 derniers jours</option>
+              <option value="custom">Dates personnalisées</option>
+            </select>
+            <div id="custom-date-range" style="display:none; gap:0.5rem; align-items:center; margin-top:0.5rem;">
+              <input type="date" class="form-input" id="start-date" aria-label="Du">
+              <span>à</span>
+              <input type="date" class="form-input" id="end-date" aria-label="Au">
+            </div>
+          </div>
+          <div class="form-group">
             <label class="form-label" for="sort-by">Trier par</label>
             <select class="form-select" id="sort-by">
               <option value="date">Date</option>
@@ -166,6 +182,7 @@
   <footer class="footer footer--simple"><div class="footer__content"><p class="footer__copyright">© 2026 Regis for Mont Orford</p></div></footer>
 
   <script src="../js/core/utils.js"></script>
+  <script src="../js/core/period-filter.js"></script>
   <script src="../js/core/theme.js"></script>
   <script src="../js/core/ui.js"></script>
   <script src="../js/core/firebase-loader.js"></script>
@@ -198,6 +215,7 @@
     let filterSector = '';
     let filterTrail = '';
     let sortBy = 'date';
+    let periodFilter = null;   // the Période controls (js/core/period-filter.js)
     let sectors = []; // this activity's sectors, with their trails (SectorService.load)
     let allTrails = []; // every trail record (even hidden): tells which view (Montée / Descente) a report belongs to
     let filtersVisible = true;
@@ -282,6 +300,12 @@
       });
       document.getElementById('filter-trail').addEventListener('change', (e) => { filterTrail = e.target.value; renderReports(); });
       document.getElementById('sort-by').addEventListener('change', (e) => { sortBy = e.target.value; renderReports(); });
+      periodFilter = PeriodFilter.attach({
+        select: document.getElementById('date-filter'), custom: document.getElementById('custom-date-range'),
+        start: document.getElementById('start-date'), end: document.getElementById('end-date'),
+        seasonOption: document.getElementById('season-option'),
+        onChange: renderReports
+      });
       document.getElementById('show-resolved').addEventListener('change', (e) => { showResolved = e.target.checked; loadReports(); });
       document.getElementById('show-archived').addEventListener('change', (e) => { showArchived = e.target.checked; loadReports(); });
       document.getElementById('refresh-btn').addEventListener('click', loadReports);
@@ -318,6 +342,9 @@
       // Compare by current sector id so a record with an older id (alias) still matches
       if (filterSector) filtered = filtered.filter(r => SectorService.find(sectors, r.sector)?.id === filterSector);
       if (filterTrail) filtered = filtered.filter(r => reportTrailKey(r) === filterTrail);
+      // Période: judged on the last change of the report (js/core/period-filter.js)
+      const period = periodFilter ? periodFilter.state() : { value: 'all' };
+      filtered = filtered.filter(r => PeriodFilter.matches(PeriodFilter.lastChange(r), period));
 
       if (sortBy === 'date') {
         filtered.sort((a, b) => (b.createdAt?.toDate?.() || 0) - (a.createdAt?.toDate?.() || 0));

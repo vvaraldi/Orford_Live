@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html><head><meta charset="utf-8"><title>PeriodFilter tests</title></head>
+<body>
+<pre id="out">running...</pre>
+<script>
+// A stand-in for the part of Network the filter uses (the season of the activity), then the real PeriodFilter file.
+const Network = { seasonStart: () => new Date(2025, 10, 15), seasonRange: () => ({}), seasonLabel: () => 'Saison 2025-2026 (depuis le 15 nov.)' };
+</script>
+<script src="/js/core/period-filter.js"></script>
+<script>
+// The Période choice of the Signalisations pages: the six options, which dates each keeps, the words for a printed
+// sheet, the address parameters and the wiring of a page's controls.
+(async () => {
+  const out = []; const J = JSON.stringify;
+  const ok = (n, c, x) => out.push((c ? 'PASS ' : 'FAIL ') + n + (c ? '' : ' :: ' + J(x)));
+  const P = PeriodFilter;
+  const NOW = new Date(2026, 0, 15, 14, 30);
+  const m = (date, value, extra) => P.matches(date, Object.assign({ value }, extra || {}), NOW);
+  const d = (y, mo, da, h) => new Date(y, mo - 1, da, h || 12, 0);
+
+  ok('the six choices, in the same words as Inspections > Gestion', J(P.VALUES) === J(['all', 'season', 'today', 'week', 'month', 'custom']) && P.LABELS.all === 'Toutes les saisons' && P.LABELS.season === 'Saison en cours' && P.LABELS.today === "Aujourd'hui" && P.LABELS.week === '7 derniers jours' && P.LABELS.month === '30 derniers jours' && P.LABELS.custom === 'Dates personnalisées', P.LABELS);
+  ok('all: every date, and a report without a date', m(d(2019, 1, 1), 'all') && P.matches(null, { value: 'all' }, NOW), null);
+  ok('no date: kept by "all" only', !m(null, 'week') && !m(null, 'season') && !m(new Date(NaN), 'today'), null);
+  ok('today: the same calendar day, any hour', m(d(2026, 1, 15, 0), 'today') && m(d(2026, 1, 15, 23), 'today') && !m(d(2026, 1, 14, 23), 'today') && !m(d(2026, 1, 16, 1), 'today'), null);
+  ok('week: the last 7 days', m(d(2026, 1, 9, 15), 'week') && !m(d(2026, 1, 8, 12), 'week') && m(NOW, 'week'), null);
+  ok('month: back to the same day last month', m(d(2025, 12, 16), 'month') && !m(d(2025, 12, 14), 'month'), null);
+  ok('season: from the season start of the activity', m(d(2025, 11, 15, 8), 'season') && m(d(2026, 1, 1), 'season') && !m(d(2025, 11, 14, 23), 'season'), null);
+  ok('custom: both days included, inclusive of the whole last day', m(d(2026, 1, 10, 0), 'custom', { start: '2026-01-10', end: '2026-01-12' }) && m(d(2026, 1, 12, 23), 'custom', { start: '2026-01-10', end: '2026-01-12' }) && !m(d(2026, 1, 13, 0), 'custom', { start: '2026-01-10', end: '2026-01-12' }) && !m(d(2026, 1, 9, 23), 'custom', { start: '2026-01-10', end: '2026-01-12' }), null);
+  ok('custom: an open end on either side', m(d(2030, 1, 1), 'custom', { start: '2026-01-10' }) && !m(d(2026, 1, 9), 'custom', { start: '2026-01-10' }) && m(d(2019, 1, 1), 'custom', { end: '2026-01-12' }) && !m(d(2026, 1, 13), 'custom', { end: '2026-01-12' }) && m(d(2019, 1, 1), 'custom', {}), null);
+  ok('an unknown choice behaves like "all"', P.matches(d(2019, 1, 1), { value: 'nonsense' }, NOW) && P.matches(d(2019, 1, 1), null, NOW), null);
+
+  const rec = { createdAt: { toDate: () => d(2026, 1, 1) } };
+  ok('last change: the modification date when there is one, else the creation date, else none', P.lastChange(Object.assign({ modifiedAt: { toDate: () => d(2026, 1, 12) } }, rec)).getDate() === 12 && P.lastChange(rec).getDate() === 1 && P.lastChange({}) === null && P.lastChange(null) === null && P.lastChange({ createdAt: 'TS' }) === null, null);
+  ok('last change also accepts plain Dates', P.lastChange({ modifiedAt: d(2026, 1, 5) }).getDate() === 5, null);
+
+  ok('words for a printed sheet', P.label({ value: 'week' }) === '7 derniers jours' && P.label({ value: 'all' }) === 'Toutes les saisons' && P.label(null) === 'Toutes les saisons', null);
+  ok('words for custom dates: from-to, from only, to only, none', /^du .*2026.* au .*2026/.test(P.label({ value: 'custom', start: '2026-01-10', end: '2026-01-12' })) && /^depuis le /.test(P.label({ value: 'custom', start: '2026-01-10' })) && /^jusqu'au /.test(P.label({ value: 'custom', end: '2026-01-12' })) && P.label({ value: 'custom' }) === 'Dates personnalisées', P.label({ value: 'custom', start: '2026-01-10', end: '2026-01-12' }));
+
+  const q = P.toParams({ value: 'custom', start: '2026-01-10', end: '2026-01-12' }, new URLSearchParams('sector=x'));
+  ok('address parameters: written next to the others and read back', q.toString() === 'sector=x&period=custom&start=2026-01-10&end=2026-01-12' && J(P.fromParams(q)) === J({ value: 'custom', start: '2026-01-10', end: '2026-01-12' }), q.toString());
+  ok('address parameters: dates are only written for custom; a missing or wrong period reads as "all"', P.toParams({ value: 'week', start: '2026-01-10' }).toString() === 'period=week' && P.fromParams(new URLSearchParams('')).value === 'all' && P.fromParams(new URLSearchParams('period=hack')).value === 'all', null);
+
+  // ---- the controls ----
+  document.body.insertAdjacentHTML('beforeend', '<select id="s"><option value="all">a</option><option value="season" id="so">x</option><option value="custom">c</option></select><div id="c" style="display:none"><input id="a" type="date"><input id="b" type="date"></div>');
+  const el = id => document.getElementById(id);
+  let seen = 0, last = null;
+  const ctl = P.attach({ select: el('s'), custom: el('c'), start: el('a'), end: el('b'), seasonOption: el('so'), onChange: s => { seen++; last = s; } });
+  ok('the season option shows the dates of the season', el('so').textContent === 'Saison 2025-2026 (depuis le 15 nov.)', el('so').textContent);
+  ok('starts on "all" with the date boxes hidden', ctl.state().value === 'all' && el('c').style.display === 'none', ctl.state());
+  el('s').value = 'custom'; el('s').dispatchEvent(new Event('change'));
+  ok('choosing custom shows the date boxes and tells the page', el('c').style.display === 'flex' && seen === 1 && last.value === 'custom', [el('c').style.display, seen]);
+  el('a').value = '2026-01-10'; el('a').dispatchEvent(new Event('change')); el('b').value = '2026-01-12'; el('b').dispatchEvent(new Event('change'));
+  ok('typing the dates tells the page each time, with the dates', seen === 3 && last.start === '2026-01-10' && last.end === '2026-01-12', [seen, last]);
+  ctl.reset();
+  ok('reset: back to "all", no dates, boxes hidden', ctl.state().value === 'all' && ctl.state().start === '' && el('c').style.display === 'none', ctl.state());
+
+  document.getElementById('out').textContent = out.join('\n');
+})().catch(e => { document.getElementById('out').textContent = 'HARNESS ERROR ' + e.stack; });
+</script>
+</body></html>

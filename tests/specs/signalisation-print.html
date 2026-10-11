@@ -1,0 +1,74 @@
+<pre id="out" style="position:fixed;left:0;bottom:0;background:#fff;color:#000;font-size:11px;z-index:99999;max-height:35vh;overflow:auto">running...</pre>
+<script>
+// The one-page sheet of the active signs (pages/signalisation-print.html), opened from the dashboard with the filters in
+// the address. The case under test comes from &case=...; the page's own reports are replaced by three known ones.
+(async () => {
+  const out = []; const J = JSON.stringify;
+  const ok = (n, c, x) => out.push((c ? 'PASS ' : 'FAIL ') + n + (c ? '' : ' :: ' + J(x)));
+  const wait = ms => new Promise(r => setTimeout(r, ms));
+  const $ = id => document.getElementById(id);
+  const CASE = Q.get('case') || 'all';
+  await wait(1200);
+  ok('no script errors on load', window.__errs.length === 0, window.__errs);
+
+  const DAYMS = 86400000, at = days => ({ toDate: () => new Date(Date.now() - days * DAYMS) });
+  const photoA = { url: 'a1.jpg', filename: 'a1.jpg', coordinates: { latitude: 45.31, longitude: -72.23 }, timestamp: null };
+  const photoB = { url: 'a2.jpg', filename: 'a2.jpg', coordinates: null, timestamp: null };
+  reports = [
+    { id: 'A', network: 'ski', sector: 'mont-orford', sectorDisplayName: 'Mont-Orford', trail: 'Adams', trailId: 'trail_2', comments: 'Poteau à remplacer', status: 'ouverte', resolved: false, archived: false, inspectorName: 'Zed Inspecteur', createdAt: at(100), modifiedAt: at(2), photos: [photoA, photoB] },
+    { id: 'B', network: 'ski', sector: 'mont-orford', sectorDisplayName: 'Mont-Orford', trail: 'Maxi', trailId: 'run_2', comments: '', status: 'fermee', resolved: false, archived: false, inspectorName: 'Zed Inspecteur', duration: 'temporary', createdAt: at(10), photos: [] },
+    { id: 'C', network: 'ski', sector: 'giroux-nord', sectorDisplayName: 'Mont Giroux Nord', trail: 'Magog', comments: 'Filet <b>abîmé</b>', status: 'ouverte', resolved: false, archived: false, inspectorName: 'Autre Nom', createdAt: at(40), modifiedAt: at(1), photos: [{ url: 'c1.jpg', filename: 'c1.jpg', coordinates: null, timestamp: null }] }
+  ];
+  render();
+  const ids = () => [...document.querySelectorAll('#sheet-list .sign')].map(s => s.dataset.id).join('');
+  const filters = () => $('sheet-filters').textContent.replace(/\s+/g, ' ').trim();
+  const sheet = () => $('sheet').textContent.replace(/\s+/g, ' ');
+  const total = () => $('sheet-total').textContent;
+
+  // what every case shows, whatever the filters
+  ok('the top of the sheet: "Signalisations" and the logo', document.querySelector('.sheet-head h1').textContent === 'Signalisations' && /Logo_Mont-Orford/.test(decodeURIComponent($('sheet-logo').getAttribute('src') || '')), [$('sheet-logo').getAttribute('src')]);
+  ok('then the filters used: sector, trail, duration, period', /Secteur : /.test(filters()) && /Piste \/ Sentier : /.test(filters()) && /Durée : /.test(filters()) && /Période : /.test(filters()), filters());
+  ok('no weather, no names of inspectors, nothing to click on in the sheet but photos and links', !/Zed|Autre Nom|Inspecteur|Météo|°C/.test(sheet().replace(/Inspecteur\b(?! )/, '')) && !document.querySelector('.wxc, [data-inspector]') && typeof WeatherContext === 'undefined', sheet().slice(0, 300));
+
+  const EXPECT = {
+    all:      { ids: 'CAB', f: ['Secteur : Tous', 'Piste / Sentier : Toutes', 'Durée : Permanentes et temporaires', 'Période : Toutes les saisons'] },
+    sector:   { ids: 'AB', f: ['Secteur : Mont-Orford'] },
+    trail:    { ids: 'A', f: ['Piste / Sentier : Adams'] },
+    trailname:{ ids: 'C', f: ['Piste / Sentier : Magog'] },
+    temp:     { ids: 'B', f: ['Durée : Temporaires'] },
+    perm:     { ids: 'CA', f: ['Durée : Permanentes'] },
+    week:     { ids: 'CA', f: ['Période : 7 derniers jours'] },
+    today:    { ids: '', f: ["Période : Aujourd'hui"] },
+    custom:   { ids: '', f: ['Période : du '] },
+    combo:    { ids: 'A', f: ['Secteur : Mont-Orford', 'Durée : Permanentes', 'Période : 7 derniers jours'] }
+  }[CASE];
+  ok('case "' + CASE + '": the signs listed (by sector, then trail)', ids() === EXPECT.ids, [ids(), EXPECT.ids]);
+  ok('case "' + CASE + '": the filters used are written', EXPECT.f.every(t => filters().includes(t)), [filters(), EXPECT.f]);
+  const n = EXPECT.ids.length;
+  ok('case "' + CASE + '": the total', total().startsWith(n + ' signalisation(s) active(s)'), total());
+  if (n === 0) ok('nothing matches: a clear line says so', /Aucune signalisation active pour ces filtres/.test($('sheet-list').textContent), $('sheet-list').textContent);
+
+  if (CASE === 'all') {
+    const titles = [...document.querySelectorAll('.sector-title')].map(t => t.textContent);
+    ok('signs are grouped under their sector, in alphabetical order', J(titles) === J(['Mont Giroux Nord', 'Mont-Orford']) && document.querySelectorAll('.sign').length === 3, titles);
+    const row = id => document.querySelector(`.sign[data-id="${id}"]`);
+    const day = d => new Date(Date.now() - d * DAYMS).toLocaleDateString('fr-CA', { year: 'numeric', month: 'short', day: 'numeric' });
+    ok('one date per sign: the last change (day only, no hour); the creation date when never changed', row('A').querySelector('.sign__date').textContent === day(2) && row('B').querySelector('.sign__date').textContent === day(10) && row('C').querySelector('.sign__date').textContent === day(1) && !/\d ?h|:\d\d/.test(row('A').querySelector('.sign__date').textContent), [row('A').querySelector('.sign__date').textContent, day(2)]);
+    ok('state: temporary or permanent (a sign without the field is permanent)', /Permanente/.test(row('A').querySelector('.badge').textContent) && /Temporaire/.test(row('B').querySelector('.badge').textContent) && /Permanente/.test(row('C').querySelector('.badge').textContent), null);
+    ok('trail name and comment (escaped, never markup)', row('A').textContent.includes('Adams') && row('A').textContent.includes('Poteau à remplacer') && row('C').textContent.includes('Filet <b>abîmé</b>') && !row('C').querySelector('.sign__comment b'), row('C').innerHTML);
+    const thumbs = row('A').querySelectorAll('.sign__thumb');
+    ok('small photos, each one opening full size in a new tab', thumbs.length === 2 && /window\.open\(this\.src, '_blank'\)/.test(thumbs[0].getAttribute('onclick')) && getComputedStyle(thumbs[0]).width === '76px', [thumbs.length, getComputedStyle(thumbs[0]).width]);
+    const links = row('A').querySelector('.sign__photo').querySelector('.photo-location');
+    ok('a photo with a position has its map links (📍 Carte and Google Maps)', !!links && /📍 Carte/.test(links.textContent) && !!links.querySelector('a[href^="https://www.google.com/maps?q=45.31,-72.23"]'), links && links.innerHTML);
+    ok('a photo without a position has no map link (only the edit link for who may edit)', !/Carte/.test(row('C').textContent) && !/Carte/.test(row('A').querySelectorAll('.sign__photo')[1].textContent), null);
+    ok('a sign without photo says so', /Aucune photo/.test(row('B').textContent), null);
+    ok('the ✏️ / links are hidden on paper, the buttons and menus too', /@media print[\s\S]*\.sign \.photo-location \{ display: none; \}/.test(document.querySelector('style').textContent) && /\.no-print/.test(document.querySelector('style').textContent) && $('print-btn').closest('.no-print') !== null, null);
+    ok('a sign is never cut across two pages', /break-inside: avoid/.test(document.querySelector('style').textContent), null);
+    const printed = []; window.print = () => printed.push(1); $('print-btn').click();
+    ok('the Imprimer button prints the sheet', printed.length === 1, printed);
+    ok('the photo-location links and sector are not in a nav or modal of their own: the sheet is one article', document.querySelectorAll('article.sheet').length === 1, null);
+  }
+
+  document.getElementById('out').textContent = out.join('\n');
+})().catch(e => { document.getElementById('out').textContent = 'HARNESS ERROR ' + e.stack; });
+</script>

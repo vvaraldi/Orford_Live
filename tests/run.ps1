@@ -47,6 +47,9 @@ $tests = @(
   @{ name = 'meteo-report';             type = 'page'; page = 'pages\meteo-report.html';             spec = 'meteo-report.html'; queries = @('?page=meteo-report&net=ski', '?page=meteo-report&net=ski&as=system', '?page=meteo-report&net=ski&as=inspector') }
   @{ name = 'support-mail';             type = 'page'; page = 'pages\support.html';                  spec = 'support-mail.html'; queries = @('?page=support&net=ski&as=system') }
   @{ name = 'support-archived';         type = 'page'; page = 'pages\support.html';                  spec = 'support-archived.html'; queries = @('?page=support&net=ski&as=system', '?page=support&net=ski&as=admin', '?page=support&net=ski&as=inspector') }
+  @{ name = 'signalisation-print';      type = 'page'; page = 'pages\signalisation-print.html';        spec = 'signalisation-print.html'; queries = @('?page=signalisation-print&net=ski&case=all', '?page=signalisation-print&net=ski&case=sector&sector=mont-orford', '?page=signalisation-print&net=ski&case=trail&trail=trail_2', '?page=signalisation-print&net=ski&case=trailname&trail=name%3AMagog', '?page=signalisation-print&net=ski&case=temp&duration=temporary', '?page=signalisation-print&net=ski&case=perm&duration=permanent', '?page=signalisation-print&net=ski&case=week&period=week', '?page=signalisation-print&net=ski&case=today&period=today', '?page=signalisation-print&net=ski&case=custom&period=custom&start=2020-01-01&end=2020-01-02', '?page=signalisation-print&net=ski&case=combo&sector=mont-orford&duration=permanent&period=week') }
+  @{ name = 'signalisation-period-resume'; type = 'page'; page = 'pages\signalisation-resume.html'; spec = 'signalisation-period.html'; queries = @('?page=signalisation-resume&net=ski') }
+  @{ name = 'signalisation-period-admin';  type = 'page'; page = 'pages\signalisation-admin.html';  spec = 'signalisation-period.html'; queries = @('?page=signalisation-admin&net=ski') }
   @{ name = 'smoke-support';            type = 'page'; page = 'pages\support.html';                  spec = 'smoke.html';       queries = @('?page=support&net=bike') }
   @{ name = 'smoke-user-profile';       type = 'page'; page = 'pages\user-profile.html';              spec = 'smoke.html';       queries = @('?page=profile&net=ski') }
   @{ name = 'smoke-user-management';    type = 'page'; page = 'pages\user-management.html';           spec = 'smoke.html';       queries = @('?page=user-management&net=ski&as=system', '?page=user-management&net=both&as=admin', '?page=user-management&net=both&as=admin&choice=bike') }
@@ -99,6 +102,7 @@ $tests = @(
   @{ name = 'weather-context';            type = 'unit'; spec = 'weather-context.html' }
   @{ name = 'datetime-field';             type = 'unit'; spec = 'datetime-field.html' }
   @{ name = 'mail-function';              type = 'unit'; spec = 'mail-function.html' }
+  @{ name = 'period-filter';              type = 'unit'; spec = 'period-filter.html' }
 )
 if ($Only) { $tests = $tests | Where-Object { $Only -contains $_.name } }
 

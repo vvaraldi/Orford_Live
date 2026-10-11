@@ -108,6 +108,23 @@
             <option value="temporary">Temporaires</option>
           </select>
         </div>
+        <!-- Period (same choices as Inspections > Gestion), judged on the report's last change -->
+        <div class="form-group" style="margin-bottom:0; min-width:180px;">
+          <label class="form-label" for="date-filter">Période</label>
+          <select class="form-select" id="date-filter" title="Selon la dernière modification du rapport">
+            <option value="all" selected>Toutes les saisons</option>
+            <option value="season" id="season-option">Saison en cours</option><!-- label filled with the dates -->
+            <option value="today">Aujourd'hui</option>
+            <option value="week">7 derniers jours</option>
+            <option value="month">30 derniers jours</option>
+            <option value="custom">Dates personnalisées</option>
+          </select>
+          <div id="custom-date-range" style="display:none; gap:0.5rem; align-items:center; margin-top:0.5rem;">
+            <input type="date" class="form-input" id="start-date" aria-label="Du">
+            <span>à</span>
+            <input type="date" class="form-input" id="end-date" aria-label="Au">
+          </div>
+        </div>
       </div>
     </section>
 
@@ -135,7 +152,10 @@
       <div class="section-card">
         <div class="section-card__header">
           <h2 class="section-card__title">📋 Rapports actifs</h2>
-          <span id="reports-count" style="font-size:0.875rem;color:var(--theme-text-secondary);">0 rapport(s)</span>
+          <span style="display:flex; align-items:center; gap:0.75rem; flex-wrap:wrap;">
+            <span id="reports-count" style="font-size:0.875rem;color:var(--theme-text-secondary);">0 rapport(s)</span>
+            <button type="button" class="btn btn-secondary btn-sm" id="print-sheet-btn" title="Ouvre une fiche à imprimer avec les filtres choisis, dans un nouvel onglet">🖨️ Fiche à imprimer</button>
+          </span>
         </div>
         <div class="section-card__body" style="padding:0;">
           <div class="table-responsive">
@@ -176,6 +196,7 @@
   <footer class="footer footer--simple"><div class="footer__content"><p class="footer__copyright">© 2026 Regis for Mont Orford</p></div></footer>
 
   <script src="../js/core/utils.js"></script>
+  <script src="../js/core/period-filter.js"></script>
   <script src="../js/core/theme.js"></script>
   <script src="../js/core/ui.js"></script>
   <script src="../js/core/firebase-loader.js"></script>
@@ -216,6 +237,7 @@
     let filterSector = '';
     let filterTrail = '';
     let filterDuration = 'both';   // 'both' (default), 'permanent' or 'temporary'
+    let periodFilter = null;       // the Période controls (js/core/period-filter.js)
 
     // If the sectors cannot be loaded the page still shows the name stored on each report
     const sectorNameOf = r => SectorService.nameOf(sectors, r.sector, r.sectorDisplayName);
@@ -243,7 +265,8 @@
     const temporaryBadge = r => (isTemporary(r) ? ' <span class="badge badge-warning" title="Due à une condition temporaire">Temporaire</span>' : '');
 
     function visibleReports() {
-      let list = reportsData.filter(matchesDuration);
+      const period = periodFilter ? periodFilter.state() : { value: 'all' };
+      let list = reportsData.filter(matchesDuration).filter(r => PeriodFilter.matches(PeriodFilter.lastChange(r), period));
       if (filterSector) list = list.filter(r => r.sector === filterSector);
       if (filterTrail) list = list.filter(r => reportTrailKey(r) === filterTrail);
       return list;
@@ -337,11 +360,29 @@
             renderMapMarkers();
             renderReportsTable();
           });
+          periodFilter = PeriodFilter.attach({
+            select: document.getElementById('date-filter'), custom: document.getElementById('custom-date-range'),
+            start: document.getElementById('start-date'), end: document.getElementById('end-date'),
+            seasonOption: document.getElementById('season-option'),
+            onChange: () => { renderMapMarkers(); renderReportsTable(); }
+          });
+          document.getElementById('print-sheet-btn').addEventListener('click', openPrintSheet);
 
           loadReports();
         }
       });
     }
+
+    // The one-page sheet (signalisation-print.html) opens in a new tab with the filters chosen here
+    function printSheetUrl() {
+      const params = new URLSearchParams();
+      if (filterSector) params.set('sector', filterSector);
+      if (filterTrail) params.set('trail', filterTrail);
+      params.set('duration', filterDuration);
+      PeriodFilter.toParams(periodFilter ? periodFilter.state() : { value: 'all' }, params);
+      return new URL('signalisation-print.html', location.href).href + '?' + params.toString();
+    }
+    function openPrintSheet() { window.open(printSheetUrl(), '_blank'); }
 
     async function loadReports() {
       try {
