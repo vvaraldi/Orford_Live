@@ -1,0 +1,39 @@
+<pre id="out" style="position:fixed;left:0;bottom:0;background:#fff;color:#000;font-size:11px;z-index:99999;max-height:35vh;overflow:auto">running...</pre>
+<script>
+// Support list: archived requests are left out by default (a checkbox includes them), and the e-mail settings sit at the
+// bottom of the page, shown to the system admin only.
+(async () => {
+  const out = []; const J = JSON.stringify;
+  const ok = (n, c, x) => out.push((c ? 'PASS ' : 'FAIL ') + n + (c ? '' : ' :: ' + J(x)));
+  const wait = ms => new Promise(r => setTimeout(r, ms));
+  const $ = id => document.getElementById(id);
+  const AS = Q.get('as') || 'admin';
+  await wait(1000);
+  ok('no script errors on load', window.__errs.length === 0, window.__errs);
+
+  const R = (id, status) => ({ id, title: 'Demande ' + id, type: 'bug', priority: 'medium', description: 'd', status, createdBy: 'u1', createdByName: 'Test', createdAt: { toDate: () => new Date() }, commentCount: 0 });
+  allRequests = [R('A', 'new'), R('B', 'in_progress'), R('C', 'resolved'), R('D', 'archived'), R('E', 'archived')];
+  const shown = () => [...document.querySelectorAll('#requests-list .request-card')].map(c => c.dataset.id).join('');
+  const count = () => $('request-count').textContent;
+
+  applyFilters();
+  ok('"Inclure les archivées" exists and is unticked', $('filter-archived') && $('filter-archived').type === 'checkbox' && $('filter-archived').checked === false, null);
+  ok('by default the archived requests are not listed (nor counted)', shown() === 'ABC' && /^3 demande/.test(count()), [shown(), count()]);
+  $('filter-archived').checked = true; $('filter-archived').dispatchEvent(new Event('change'));
+  ok('ticked: they are listed again', shown() === 'ABCDE' && /^5 demande/.test(count()), [shown(), count()]);
+  $('filter-archived').checked = false; $('filter-archived').dispatchEvent(new Event('change'));
+  ok('unticked: hidden again', shown() === 'ABC', shown());
+  $('filter-status').value = 'archived'; $('filter-status').dispatchEvent(new Event('change'));
+  ok('choosing the status "Archivé" shows them without ticking anything', shown() === 'DE', shown());
+  $('filter-status').value = 'resolved'; $('filter-status').dispatchEvent(new Event('change'));
+  ok('another status still works as before', shown() === 'C', shown());
+  $('filter-archived').checked = true; resetFilters();
+  ok('"Réinitialiser" unticks the box and hides the archived again', $('filter-archived').checked === false && shown() === 'ABC' && $('filter-status').value === 'all', [shown(), $('filter-archived').checked]);
+
+  // the e-mail settings: bottom of the page, system admin only
+  const card = $('mail-settings'), list = $('requests-list');
+  ok('the e-mail settings are BELOW the list of requests (bottom of the page)', !!(list.compareDocumentPosition(card) & Node.DOCUMENT_POSITION_FOLLOWING) && !!($('filter-type').compareDocumentPosition(card) & Node.DOCUMENT_POSITION_FOLLOWING), null);
+  ok(AS === 'system' ? 'system admin: the settings are shown' : 'not a system admin: the settings are not shown at all', (card.style.display !== 'none') === (AS === 'system'), card.style.display);
+  document.getElementById('out').textContent = out.join('\n');
+})().catch(e => { document.getElementById('out').textContent = 'HARNESS ERROR ' + e.stack; });
+</script>

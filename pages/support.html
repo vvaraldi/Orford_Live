@@ -130,24 +130,6 @@
       </div>
     </div>
 
-    <!-- E-mail settings (system admin only): who is told of a new request, and the on / off switch -->
-    <details class="filters-section" id="mail-settings" style="display: none;">
-      <summary style="cursor: pointer; font-weight: 600;">✉️ Courriels du support</summary>
-      <div class="filters-row" style="margin-top: 0.75rem; align-items: flex-end;">
-        <div class="filter-group">
-          <label for="mail-enabled" style="display: flex; gap: 0.5rem; align-items: center;"><input type="checkbox" id="mail-enabled"> Envoyer des courriels</label>
-        </div>
-        <div class="filter-group">
-          <label for="mail-admin">Administrateur qui reçoit les nouvelles demandes</label>
-          <select id="mail-admin" class="form-select"><option value="">— Personne (seul le créateur est averti) —</option></select>
-        </div>
-        <div class="filter-group filter-actions">
-          <button class="btn btn-primary btn-sm" id="mail-save-btn" type="button">Enregistrer</button>
-        </div>
-      </div>
-      <p style="font-size: 0.8125rem; color: var(--theme-text-secondary); margin: 0.5rem 0 0;">Nouvelle demande : l'administrateur choisi et le créateur. En cours / Résolu : le créateur. Nouveau commentaire : l'autre partie. Archivé : aucun courriel.</p>
-    </details>
-
     <!-- Filters Section -->
     <div class="filters-section">
       <div class="filters-row">
@@ -185,6 +167,9 @@
             <option value="all">Tous les utilisateurs</option>
           </select>
         </div>
+        <div class="filter-group">
+          <label for="filter-archived" style="display: flex; gap: 0.5rem; align-items: center;"><input type="checkbox" id="filter-archived"> Inclure les archivées</label>
+        </div>
         <div class="filter-group filter-actions">
           <button class="btn btn-secondary btn-sm" id="reset-filters-btn">Réinitialiser</button>
         </div>
@@ -197,6 +182,24 @@
         <p>Chargement des demandes...</p>
       </div>
     </div>
+
+    <!-- E-mail settings, at the bottom of the page (system admin only, who can change them): who is told of a new request, and the on / off switch -->
+    <details class="filters-section" id="mail-settings" style="display: none; margin-top: 1.5rem;">
+      <summary style="cursor: pointer; font-weight: 600;">✉️ Courriels du support</summary>
+      <div class="filters-row" style="margin-top: 0.75rem; align-items: flex-end;">
+        <div class="filter-group">
+          <label for="mail-enabled" style="display: flex; gap: 0.5rem; align-items: center;"><input type="checkbox" id="mail-enabled"> Envoyer des courriels</label>
+        </div>
+        <div class="filter-group">
+          <label for="mail-admin">Administrateur qui reçoit les nouvelles demandes</label>
+          <select id="mail-admin" class="form-select"><option value="">— Personne (seul le créateur est averti) —</option></select>
+        </div>
+        <div class="filter-group filter-actions">
+          <button class="btn btn-primary btn-sm" id="mail-save-btn" type="button">Enregistrer</button>
+        </div>
+      </div>
+      <p style="font-size: 0.8125rem; color: var(--theme-text-secondary); margin: 0.5rem 0 0;">Nouvelle demande : l'administrateur choisi et le créateur. En cours / Résolu : le créateur. Nouveau commentaire : l'autre partie. Archivé : aucun courriel.</p>
+    </details>
   </main>
 
   <!-- New Request Modal -->
@@ -356,6 +359,7 @@
       document.getElementById('filter-status').addEventListener('change', applyFilters);
       document.getElementById('filter-priority').addEventListener('change', applyFilters);
       document.getElementById('filter-user').addEventListener('change', applyFilters);
+      document.getElementById('filter-archived').addEventListener('change', applyFilters);
       document.getElementById('reset-filters-btn').addEventListener('click', resetFilters);
 
       // Escape key
@@ -457,8 +461,10 @@
       const statusFilter = document.getElementById('filter-status').value;
       const priorityFilter = document.getElementById('filter-priority').value;
       const userFilter = document.getElementById('filter-user').value;
+      const withArchived = document.getElementById('filter-archived').checked;   // archived requests are left out unless asked for (or chosen as the status)
 
       const filtered = allRequests.filter(r => {
+        if (r.status === 'archived' && !withArchived && statusFilter !== 'archived') return false;
         if (typeFilter !== 'all' && r.type !== typeFilter) return false;
         if (statusFilter !== 'all' && r.status !== statusFilter) return false;
         if (priorityFilter !== 'all' && r.priority !== priorityFilter) return false;
@@ -474,6 +480,7 @@
       document.getElementById('filter-status').value = 'all';
       document.getElementById('filter-priority').value = 'all';
       document.getElementById('filter-user').value = 'all';
+      document.getElementById('filter-archived').checked = false;
       applyFilters();
     }
 
